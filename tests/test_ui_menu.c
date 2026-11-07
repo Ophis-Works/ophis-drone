@@ -403,11 +403,12 @@ static void test_item_value_enum_rows(void)
     CHECK(strcmp(b, "OSC 3") == 0);        /* tgt 2 -> "OSC %d" (v + 1) */
 }
 
-/* ---- P2 (PLAN_HZ_EDIT.md §1.4, R2/PR-D): the digit-box rows render
- * FIXED-WIDTH ZERO-PADDED — "00220 Hz", "20000 Hz" at the ceiling,
- * "00001 Hz" at the floor — on all three digit-box rows (OSC FREQ,
- * FILTER CUT, DELAY TONE; R1). Red until ui_draw.c's item_value formats
- * the freq rows "%05d Hz". ---- */
+/* ---- P2 (PLAN_FREQ_DECIMALS.md §1.3, R1/R5): the digit-box rows render
+ * 5 integer digits + PERIOD + 2 decimals — "00220.00 Hz", "20000.00 Hz"
+ * at the ceiling, "00000.01 Hz" at the 0.01 floor, a preset-loaded 55.5
+ * as "00055.50 Hz" — on the freq rows (OSC FREQ, FILTER CUT, DELAY
+ * TONE; R1). Red until ui_draw.c's item_value formats the freq rows
+ * "%05d.%02d Hz". ---- */
 static void test_item_value_freq_odometer(void)
 {
     ui_t u;
@@ -420,38 +421,45 @@ static void test_item_value_freq_odometer(void)
 
     u.draft.chain[0].freq_hz = 220.0f;
     item_value(&u, it, b, (int)sizeof b);
-    CHECK(strcmp(b, "00220 Hz") == 0);
+    CHECK(strcmp(b, "00220.00 Hz") == 0);
 
     u.draft.chain[0].freq_hz = 20000.0f;   /* the ceiling */
     item_value(&u, it, b, (int)sizeof b);
-    CHECK(strcmp(b, "20000 Hz") == 0);
+    CHECK(strcmp(b, "20000.00 Hz") == 0);
 
-    u.draft.chain[0].freq_hz = 1.0f;       /* the edit floor */
+    u.draft.chain[0].freq_hz = 0.01f;      /* the 0.01 Hz edit floor */
     item_value(&u, it, b, (int)sizeof b);
-    CHECK(strcmp(b, "00001 Hz") == 0);
+    CHECK(strcmp(b, "00000.01 Hz") == 0);
+
+    u.draft.chain[0].freq_hz = 55.5f;      /* fraction SHOWN, not rounded */
+    item_value(&u, it, b, (int)sizeof b);
+    CHECK(strcmp(b, "00055.50 Hz") == 0);
 
     u.sub[0] = SUB_ENVFLT;                 /* FILTER CUT: same box (R1) */
     it = content_item(&u, 5);              /* ADSR(4) + FILT_ITEMS[1] */
     CHECK(it.id == IT_FILT_CUT);
     u.draft.chain[0].fc = 1500.0f;
     item_value(&u, it, b, (int)sizeof b);
-    CHECK(strcmp(b, "01500 Hz") == 0);
+    CHECK(strcmp(b, "01500.00 Hz") == 0);
 
     u.tab = TAB_MASTER;                    /* DELAY TONE: same box (R1) */
     it = content_item(&u, 8);              /* MASTER_ITEMS[8] = TONE */
     CHECK(it.id == IT_DLY_TONE);
     u.draft.delay.tone = 8500;
     item_value(&u, it, b, (int)sizeof b);
-    CHECK(strcmp(b, "08500 Hz") == 0);
+    CHECK(strcmp(b, "08500.00 Hz") == 0);
 }
 
-/* ---- P4 (PLAN_HZ_EDIT.md §1.4, R6/PR-B): the fractional-preservation
- * rule — a preset-loaded 55.5 Hz ROUNDS in the display ("00056 Hz") but
- * item_get still returns 55.5 (the DSP keeps the fraction) until an
- * edit touches the row; the first 1s-digit step rounds then steps
- * (55.5 -> 56 -> 57). Driven through edit_item (ui_internal.h surface,
- * mirrored above); the digit cursor starts at the 1s digit on a fresh
- * ui (PR-E). Red until the R6 wiring lands. ---- */
+/* ---- P2 (PLAN_FREQ_DECIMALS.md §1.3, R5/PR-B): the fractional-
+ * preservation rule in the centi-Hz space — a preset-loaded 55.5 Hz
+ * SHOWS its fraction ("00055.50 Hz"; R5 display, no rounding — the
+ * value is exactly 5550 centi-Hz) and item_get still returns 55.5; the
+ * first 1s-digit step snaps through centi-Hz ints (55.50 -> 56.50).
+ * Driven through edit_item (ui_internal.h surface, mirrored above);
+ * the digit cursor is explicitly parked on the 1s digit (index 4 of
+ * 0..6 from the left — a memset ui leaves freq_digit 0, which is the
+ * 10000s digit in the new space). Red until the centi-Hz edit wiring
+ * lands. ---- */
 static void test_freq_fractional_rounding(void)
 {
     ui_t u;
@@ -463,13 +471,15 @@ static void test_freq_fractional_rounding(void)
     CHECK(it.id == IT_OSC_FREQ);
 
     u.draft.chain[0].freq_hz = 55.5f;
+    u.freq_digit = 4;                      /* the 1s digit (first
+                                            * non-decimal digit, R3) */
     char b[32];
     item_value(&u, it, b, (int)sizeof b);
-    CHECK(strcmp(b, "00056 Hz") == 0);     /* display ROUNDS */
+    CHECK(strcmp(b, "00055.50 Hz") == 0);  /* fraction displayed */
     CHECK(item_get(&u, it) == 55.5);       /* value keeps the fraction */
 
     edit_item(&u, it, +1);                 /* one 1s-digit step */
-    CHECK(item_get(&u, it) == 57.0);       /* round(55.5)=56, then +1 */
+    CHECK(item_get(&u, it) == 56.5);       /* 5550 +100 centi-Hz */
 }
 
 /* ---- P6 (PLAN_HZ_EDIT.md §1.4, R11): EVERY numeric edit field rolls
@@ -574,26 +584,63 @@ static void test_seq_nav_rows(void)
     item_t it;
     char b[32];
 
-    /* PITCH row renders ZERO-PADDED (R12 + the ITF_HZ box): the bound
-     * step (si = seq_sel) shows "00220 Hz" */
+    /* PITCH row renders ZERO-PADDED with decimals (R1/R5 + the ITF_HZ
+     * box): the bound step (si = seq_sel) shows "00220.00 Hz" */
     {
         ui_t u = seq_ui(5, 0, 3);
         u.draft.seq[0].steps[3].pitch_hz = 220.0f;
         it = content_item(&u, 5);
         CHECK(it.id == IT_STEP_PITCH && it.si == 3);
         item_value(&u, it, b, (int)sizeof b);
-        CHECK(strcmp(b, "00220 Hz") == 0);
+        CHECK(strcmp(b, "00220.00 Hz") == 0);
     }
 
-    /* PITCH row: NAV moves the DIGIT cursor, NEVER the rectangle */
+    /* PITCH row: ROW ENTRY resets the digit cursor to index 4 — the 1s
+     * digit, the FIRST NON-DECIMAL digit (R3; 7 digits 0..6 counted
+     * from the left, the period cell skipped). Red until the reset
+     * constant moves off 0. */
     {
-        ui_t u = seq_ui(5, 2, 3);
-        ui_handle_action(&u, ACT_NAV_LEFT);
-        CHECK(u.freq_digit == 3);      /* LEFT walks toward the 10000s */
+        ui_t u = seq_ui(5, 6, 3);
+        ui_handle_action(&u, ACT_SEL_DOWN);    /* -> VEL row (no box) */
+        ui_handle_action(&u, ACT_SEL_UP);      /* row entry: PITCH again */
+        CHECK(u.freq_digit == 4);      /* the 1s digit, index 4 of 0..6 */
+        CHECK(u.seq_sel[0] == 3);      /* the rectangle must not move */
+    }
+
+    /* PITCH row: NAV moves the DIGIT cursor, NEVER the rectangle;
+     * RIGHT walks toward the 0.01s digit (index 6) and a step there
+     * moves +0.01 Hz (R2/R3) */
+    {
+        ui_t u = seq_ui(5, 4, 3);      /* default: the 1s digit */
+        u.draft.seq[0].steps[3].pitch_hz = 220.0f;
+        ui_handle_action(&u, ACT_NAV_RIGHT);
+        CHECK(u.freq_digit == 5);      /* 4 -> 5: the 0.1s digit */
         CHECK(u.seq_sel[0] == 3);      /* the rectangle must not move */
         ui_handle_action(&u, ACT_NAV_RIGHT);
-        CHECK(u.freq_digit == 2);      /* RIGHT back toward the 1s */
-        CHECK(u.seq_sel[0] == 3);
+        CHECK(u.freq_digit == 6);      /* 5 -> 6: the 0.01s digit */
+        ui_handle_action(&u, ACT_VAL_INC);
+        CHECK(u.draft.seq[0].steps[3].pitch_hz == 220.01f);
+        CHECK(u.draft.seq[0].steps[0].pitch_hz == 0.0f);
+        CHECK(u.draft.seq[0].steps[4].pitch_hz == 0.0f);
+    }
+
+    /* PITCH row: LEFT walks toward the 10000s digit (index 0) and a
+     * step there moves +10000.00 Hz (place 10000 Hz = 1000000
+     * centi-Hz, R2 — the 7 places are 10000..0.01) */
+    {
+        ui_t u = seq_ui(5, 4, 3);
+        u.draft.seq[0].steps[3].pitch_hz = 220.0f;
+        ui_handle_action(&u, ACT_NAV_LEFT);
+        CHECK(u.freq_digit == 3);      /* 4 -> 3: the 10s digit */
+        ui_handle_action(&u, ACT_NAV_LEFT);
+        CHECK(u.freq_digit == 2);      /* 3 -> 2: the 100s digit */
+        ui_handle_action(&u, ACT_NAV_LEFT);
+        CHECK(u.freq_digit == 1);      /* 2 -> 1: the 1000s digit */
+        ui_handle_action(&u, ACT_NAV_LEFT);
+        CHECK(u.freq_digit == 0);      /* 1 -> 0: the 10000s digit */
+        CHECK(u.seq_sel[0] == 3);      /* the rectangle must not move */
+        ui_handle_action(&u, ACT_VAL_INC);
+        CHECK(u.draft.seq[0].steps[3].pitch_hz == 10220.0f);
     }
 
     /* STEP row: NAV moves the rectangle (unchanged R12 behavior), 0..7
@@ -627,10 +674,10 @@ static void test_seq_nav_rows(void)
     }
 
     /* PITCH digit edit (X/Z): ACT_VAL_INC with the cursor on the 1s
-     * digit steps the BOUND step's pitch by exactly one Hz — and only
-     * that step */
+     * digit (index 4) steps the BOUND step's pitch by exactly one Hz —
+     * and only that step */
     {
-        ui_t u = seq_ui(5, 0, 3);      /* freq_digit 0 = the 1s digit */
+        ui_t u = seq_ui(5, 4, 3);      /* freq_digit 4 = the 1s digit */
         u.draft.seq[0].steps[3].pitch_hz = 220.0f;
         ui_handle_action(&u, ACT_VAL_INC);
         CHECK(u.draft.seq[0].steps[3].pitch_hz == 221.0f);

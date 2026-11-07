@@ -17,11 +17,12 @@
  * the section tables all live in ui/seq_items.{h,c} — pure data,
  * regression-tested by tests/test_seq_items.c). The page CONTENT (item
  * ids and counts per PLAN §8.2/§8.6 amended) is documented there.
- * Ranges (PLAN §8.3 as amended by PLAN_HZ_EDIT.md):
- *  - freq rows:  integer-Hz 5-digit odometer boxes (OSC FREQ 1..20000,
- *                FILTER CUT / DELAY TONE 20..20000, R5) — X/Z step the
- *                digit cursor's place with true carry and roll-over at
- *                the range edges; the 1/12-octave ladder is gone (R9)
+ * Ranges (PLAN §8.3 as amended by PLAN_HZ_EDIT.md + PLAN_FREQ_DECIMALS.md):
+ *  - freq rows:  centi-Hz 7-digit odometer boxes (OSC FREQ / SEQ PITCH
+ *                0.01..20000, FILTER CUT / DELAY TONE 20..20000, R2/R4)
+ *                — X/Z step the digit cursor's place (10000..0.01 Hz)
+ *                with true carry and roll-over at the range edges; the
+ *                1/12-octave ladder is gone (R9)
  *  - ADSR A/D/R: pos 0 = 0 s; pos 1..50 = 0.001*60000^((pos-1)/49)
  *  - percents:   integer 0..100, 1 pp steps
  *  - BPM:        GLOBAL tempo (PLAN §6): integer 1..500, one value for
@@ -73,7 +74,8 @@ static double amt_clamp(mod_dest_t dest, double v)
                                                    shared clamp (item 3) */
 }
 
-/* --- PLAN_HZ_EDIT.md: the 5-digit odometer boxes (R1) ---------------- */
+/* --- PLAN_HZ_EDIT.md (R1), amended by PLAN_FREQ_DECIMALS.md (R2/R3):
+ * the 7-digit centi-Hz odometer boxes (10000..0.01 Hz) ----------------- */
 
 /* R12a: "digit box" is a SPEC property (nav == NAV_DIGITS), not an id
  * list — OSC FREQ / FILTER CUT / DELAY TONE / SEQ PITCH carry it in
@@ -84,16 +86,19 @@ static int is_digit_box(int id)
     return sp != NULL && sp->nav == NAV_DIGITS;
 }
 
-/* the place value of the CURRENT digit for a row: every digit box steps
- * the selected digit (10^freq_digit, 1..10000); any other Hz row would
- * step the 1s digit (there are none left — all ITF_HZ rows are boxes) */
+/* the place value of the CURRENT digit for a row, in CENTI-HZ (R2):
+ * digit 0 = 10000s place (1000000 centi-Hz) .. digit 4 = 1s (100),
+ * digit 5 = 0.1s (10), digit 6 = 0.01s (1); any other Hz row would step
+ * the 1s digit (there are none left — all ITF_HZ rows are boxes) */
 static int digit_place(const ui_t *ui, int id)
 {
+    static const int PLACES[7] = { 1000000, 100000, 10000, 1000,
+                                   100, 10, 1 };
     int place = 1;
     if (!is_digit_box(id))
         return 1;
-    for (int i = 0; i < ui->freq_digit && place < 10000; i++)
-        place *= 10;
+    if (ui->freq_digit >= 0 && ui->freq_digit <= 6)
+        place = PLACES[ui->freq_digit];
     return place;
 }
 
@@ -121,14 +126,16 @@ static int cur_cursor_idx(const ui_t *ui)
 }
 int *cur_cursor(ui_t *ui) { return &ui->cursor[cur_cursor_idx(ui)]; }
 
-/* PR-E (PLAN_HZ_EDIT.md): the digit cursor starts over on every row
- * entry — reset to the 1s digit whenever the cursor lands on a digit-box
- * row (nav == NAV_DIGITS; called after every cursor/tab change). */
+/* PR-E (PLAN_HZ_EDIT.md), R3 (PLAN_FREQ_DECIMALS.md): the digit cursor
+ * starts over on every row entry — reset to the FIRST NON-DECIMAL digit
+ * (the 1s place, index 4 of 0..6 from the left) whenever the cursor
+ * lands on a digit-box row (nav == NAV_DIGITS; called after every
+ * cursor/tab change). */
 static void freq_digit_sync(ui_t *ui)
 {
     item_t it = content_item(ui, *cur_cursor(ui));
     if (is_digit_box(it.id))
-        ui->freq_digit = 0;
+        ui->freq_digit = 4;
 }
 
 /* content item count / item for the current tab+sub-tab: the page
@@ -329,17 +336,17 @@ void edit_item(ui_t *ui, item_t it, int dir)
         return;                            /* unknown id: inert */
     double v = item_get(ui, it);
     switch (sp->fmt) {
-    case ITF_HZ:                           /* odometer box: the selected
-                                            * digit's place, roll-over at
-                                            * [min, max] (R4/R5); the
-                                            * FIRST edit rounds any
-                                            * preset fraction (R6) */
-        v = hz_digit_step((int)lround(v), digit_place(ui, it.id), dir,
-                          sp->min, sp->max);
-        break;
-    case ITF_TONE:                         /* same box, floor 20 (R5) */
-        v = hz_digit_step((int)lround(v), digit_place(ui, it.id), dir,
-                          sp->min, sp->max);
+    case ITF_HZ:                           /* centi-Hz odometer box (R2):
+                                            * snap the float param value
+                                            * through centi-Hz ints, step
+                                            * the selected digit's place,
+                                            * roll-over at [min, max]
+                                            * (R4/R5); the FIRST edit
+                                            * snaps any preset fraction
+                                            * (R5 fractional rule) */
+    case ITF_TONE:                         /* same box, floor 20.00 (R2) */
+        v = hz_digit_step((int)lround(v * 100.0), digit_place(ui, it.id),
+                          dir, sp->min, sp->max) / 100.0;
         break;
     case ITF_SEC: {                        /* ADSR ladder pos 0..max —
                                             * wraps top -> 0 (R11) */
@@ -522,10 +529,13 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
             case NAV_DIGITS:           /* digit box: move the digit
                                         * cursor — LEFT walks toward the
                                         * 10000s digit, RIGHT toward the
-                                        * 1s; dimmed rows are digit-inert
-                                        * (R10) */
+                                        * 0.01s; dimmed rows are
+                                        * digit-inert (R10) */
                 if (!item_dim(ui, it))
-                    ui->freq_digit = clampi(ui->freq_digit - dir, 0, 4);
+                    /* freq_digit counts FROM THE LEFT (0 = 10000s): RIGHT
+                     * (+1) walks toward the 0.01s digit, LEFT (-1) toward
+                     * the 10000s; clamped 0..6 (R3) */
+                    ui->freq_digit = clampi(ui->freq_digit + dir, 0, 6);
                 break;
             default:                   /* NAV_NONE: inert (as today) */
                 break;

@@ -254,24 +254,27 @@ int main(void)
     CHECK(item_spec(-1) == NULL);             /* out-of-range -> NULL */
     CHECK(item_spec(IT_COUNT) == NULL);
 
-    /* ---- P3 (PLAN_HZ_EDIT.md §1.4, R5/R9): the frequency rows are
-     * INTEGER-Hz odometer boxes now — the 1/12-octave pos ladder
-     * (0.1*2^(pos/12), pos 0..212) is DELETED, so the spec carries Hz
-     * bounds: OSC FREQ 1..20000 (edit floor 1; the 0.1 Hz schema floor
-     * stays preset-only, PR-H), FILTER CUT 20..20000. STEP PITCH shares
-     * the freq value space; with the ladder gone it carries the same
-     * integer-Hz bounds as OSC FREQ (the old pos pins died with it). ---- */
+    /* ---- P4 (PLAN_FREQ_DECIMALS.md §1.3): the frequency rows are
+     * CENTI-HZ odometer boxes — the whole spec edit space moves to
+     * centi-Hz ints (22000 = 220.00 Hz), so the bounds are expressed
+     * there: OSC FREQ floor 0.01 Hz (LFO range, R2/R4 — the fmt
+     * documents the floor; implementer's choice pinned as min <= 100
+     * centi-Hz) .. 20000.00; STEP PITCH shares the freq space and
+     * floor. FILTER CUT and DELAY TONE keep their 20.00..20000.00
+     * ranges (R4) = 2000..2000000 centi-Hz. ---- */
     CHECK(item_spec(IT_OSC_FREQ)->fmt == ITF_HZ &&
-          item_spec(IT_OSC_FREQ)->min == 1 &&
-          item_spec(IT_OSC_FREQ)->max == 20000 &&
+          item_spec(IT_OSC_FREQ)->min >= 1 &&
+          item_spec(IT_OSC_FREQ)->min <= 100 &&
+          item_spec(IT_OSC_FREQ)->max == 2000000 &&
           item_spec(IT_OSC_FREQ)->wrap == 0);
     CHECK(item_spec(IT_FILT_CUT)->fmt == ITF_HZ &&
-          item_spec(IT_FILT_CUT)->min == 20 &&
-          item_spec(IT_FILT_CUT)->max == 20000 &&
+          item_spec(IT_FILT_CUT)->min == 2000 &&
+          item_spec(IT_FILT_CUT)->max == 2000000 &&
           item_spec(IT_FILT_CUT)->wrap == 0);
     CHECK(item_spec(IT_STEP_PITCH)->fmt == ITF_HZ &&
-          item_spec(IT_STEP_PITCH)->min == 1 &&
-          item_spec(IT_STEP_PITCH)->max == 20000 &&
+          item_spec(IT_STEP_PITCH)->min >= 1 &&
+          item_spec(IT_STEP_PITCH)->min <= 100 &&
+          item_spec(IT_STEP_PITCH)->max == 2000000 &&
           item_spec(IT_STEP_PITCH)->wrap == 0);
     /* sub DIV (O2): subharmonic divider 1..16, wraps — the ratio/HZ
      * ladders are GONE from subs */
@@ -346,9 +349,12 @@ int main(void)
           item_spec(IT_DLY_TIMEL)->min == 0 &&
           item_spec(IT_DLY_TIMEL)->max == 200);
     CHECK(item_spec(IT_DLY_TONE)->fmt == ITF_TONE &&
-          item_spec(IT_DLY_TONE)->min == 20 &&
-          item_spec(IT_DLY_TONE)->max == 20000);
-    CHECK(TONE_MIN_HZ == 20);
+          item_spec(IT_DLY_TONE)->min == 2000 &&
+          item_spec(IT_DLY_TONE)->max == 2000000);
+    /* the tone floor stays single-sourced beside the table (its unit
+     * moves with the spec's centi-Hz space) */
+    CHECK(TONE_MIN_HZ == 2000 &&
+          item_spec(IT_DLY_TONE)->min == TONE_MIN_HZ);
 
     /* ---- wrap-flag selectors (labels cycle, they do not clamp);
      * IT_FILT_POLES is NOT here — 12/24 dB/oct is a direction-independent
@@ -504,36 +510,31 @@ int main(void)
         CHECK(strcmp(nb, "OSC 1 SUB 2") == 0);
     }
 
-    /* ---- P1 (PLAN_HZ_EDIT.md §1.4, PR-G): the pure odometer helpers.
-     * hz_digits — 5-digit zero-padded splitter, digits[0] = 10000s place;
-     * hz_digit_step(hz, place, dir, floor, ceil) — value ± place with
-     * TRUE odometer carry and roll-over at [floor, ceil] (R4/R5, PR-C/
-     * PR-H). Red until seq_items.c/h gains both (compile-red:
-     * undeclared). ---- */
+    /* ---- P1 (PLAN_FREQ_DECIMALS.md §1.3): the pure odometer helpers
+     * move to CENTI-HZ integers (22000 = 220.00 Hz). hz_digits splits
+     * into SEVEN digits — digits[0] = 10000s place .. digits[4] = 1s,
+     * digits[5] = 0.1s, digits[6] = 0.01s ("00055.50" for 5550);
+     * hz_digit_step(centi_hz, place_centi, dir, floor, ceil) — value ±
+     * place with TRUE odometer carry and roll-over at [floor, ceil]
+     * (R2/R4). Red until seq_items.c/h gains the 7-digit splitter
+     * (the step pins hold in both spaces — pure odometer arithmetic;
+     * the splitter is the new contract). ---- */
     {
-        int d[5];
-        hz_digits(220, d);                     /* 00220 */
-        CHECK(d[0] == 0 && d[1] == 0 && d[2] == 2 &&
-              d[3] == 2 && d[4] == 0);
-        hz_digits(20000, d);                   /* 20000: the ceiling */
-        CHECK(d[0] == 2 && d[1] == 0 && d[2] == 0 &&
-              d[3] == 0 && d[4] == 0);
-        hz_digits(1, d);                       /* 00001: the floor */
+        int d[7];
+        hz_digits(5550, d);                    /* 00055.50 (55.50 Hz) */
         CHECK(d[0] == 0 && d[1] == 0 && d[2] == 0 &&
-              d[3] == 0 && d[4] == 1);
+              d[3] == 5 && d[4] == 5 && d[5] == 5 && d[6] == 0);
 
-        CHECK(hz_digit_step(220, 10, +1, 1, 20000) == 230);
-        CHECK(hz_digit_step(90, 10, +1, 1, 20000) == 100);   /* carry 9->0 */
-        CHECK(hz_digit_step(100, 10, -1, 1, 20000) == 90);   /* borrow 0->9 */
-        CHECK(hz_digit_step(1, 1, -1, 1, 20000) == 20000);   /* FREQ floor
-                                                                roll-over */
-        CHECK(hz_digit_step(20000, 1, +1, 1, 20000) == 1);   /* ceiling ->
-                                                                FREQ floor */
-        CHECK(hz_digit_step(20000, 1, +1, 20, 20000) == 20); /* ceiling ->
-                                                                CUT/TONE
-                                                                floor */
-        CHECK(hz_digit_step(20, 1, -1, 20, 20000) == 20000); /* CUT floor
-                                                                roll-over */
+        CHECK(hz_digit_step(22000, 100, +1, 1, 2000000) == 22100);
+        /* carry through the 10s digit lands exactly on the ceiling */
+        CHECK(hz_digit_step(1999000, 1000, +1, 1, 2000000) == 2000000);
+        /* FREQ floor 0.01 Hz (1 centi-Hz): rolling below -> 20000.00 */
+        CHECK(hz_digit_step(1, 1, -1, 1, 2000000) == 2000000);
+        /* ceiling 20000.00 +0.01 -> the FREQ floor 0.01 */
+        CHECK(hz_digit_step(2000000, 1, +1, 1, 2000000) == 1);
+        /* CUT/TONE floor 20.00 Hz (2000 centi-Hz): rolling below ->
+         * 20000.00 */
+        CHECK(hz_digit_step(2000, 1, -1, 2000, 2000000) == 2000000);
     }
 
     HARNESS_REPORT();

@@ -189,25 +189,26 @@ const char *SEQONCE_NAMES[SEQONCE_COUNT] = { "LOOP", "ONCE" };
 /* ---- PLAN_HZ_EDIT.md (R4/R5/R6, PR-G): the pure odometer helpers —
  * contracts documented in seq_items.h ---- */
 
-int hz_digit_step(int hz, int place, int dir, int floor, int ceil)
+int hz_digit_step(int centi_hz, int place_centi, int dir, int floor,
+                  int ceil)
 {
-    int v = (int)lround((double)hz) + dir * place;
-    if (v < floor) return ceil;            /* roll-over at the edges (R5) */
+    int v = centi_hz + dir * place_centi;  /* already centi-Hz ints (PR-B) */
+    if (v < floor) return ceil;            /* roll-over at the edges (R2) */
     if (v > ceil)  return floor;
     return v;
 }
 
-int hz_digits(int hz, int digits[5])
+int hz_digits(int centi_hz, int digits[7])
 {
-    int v = (int)lround((double)hz);       /* display rounds (R6) */
-    if (v < 0)     v = 0;
-    if (v > 99999) v = 99999;
-    for (int i = 4; i >= 0; i--) {
+    int v = centi_hz;                      /* exact centi-Hz in (R5) */
+    if (v < 0)       v = 0;
+    if (v > 2000000) v = 2000000;          /* display ceiling 20000.00 */
+    for (int i = 6; i >= 0; i--) {         /* 7 digits: 10000s..0.01s */
         digits[i] = v % 10;
         v /= 10;
     }
-    return digits[0] * 10000 + digits[1] * 1000 + digits[2] * 100 +
-           digits[3] * 10 + digits[4];
+    return digits[0] * 1000000 + digits[1] * 100000 + digits[2] * 10000 +
+           digits[3] * 1000 + digits[4] * 100 + digits[5] * 10 + digits[6];
 }
 
 /* ---- item spec table (Phase 5 item 2): ONE entry per IT_* id, in id
@@ -218,8 +219,9 @@ int hz_digits(int hz, int digits[5])
  * enum's first member). See seq_items.h for the field semantics. ---- */
 
 const item_spec_t ITEM_SPECS[ITEM_SPECS_N] = {
-  /* OSC MAIN section */
-  [IT_OSC_FREQ]   = { IT_OSC_FREQ,   ITF_HZ,      1, 20000, 0, ITT_CHAIN , PK_CHAIN_FREQ , NAV_DIGITS },
+  /* OSC MAIN section — freq bounds in the centi-Hz edit space
+   * (PLAN_FREQ_DECIMALS.md R2/R4: 1..2000000 = 0.01..20000.00 Hz) */
+  [IT_OSC_FREQ]   = { IT_OSC_FREQ,   ITF_HZ,      1, 2000000, 0, ITT_CHAIN , PK_CHAIN_FREQ , NAV_DIGITS },
   [IT_OSC_WAVE]   = { IT_OSC_WAVE,   ITF_WAVE,    0,    5, 1, ITT_CHAIN , PK_CHAIN_WAVE },
   [IT_OSC_DUTY]   = { IT_OSC_DUTY,   ITF_DUTY,    5,   95, 0, ITT_CHAIN , PK_CHAIN_DUTY },
   [IT_LEVEL]      = { IT_LEVEL,      ITF_PCT,     0,  100, 0, ITT_CHAIN , PK_CHAIN_LEVEL },
@@ -238,7 +240,7 @@ const item_spec_t ITEM_SPECS[ITEM_SPECS_N] = {
   [IT_SUB_LEVEL]  = { IT_SUB_LEVEL,  ITF_PCT,     0,  100, 0, ITT_SUB , PK_SUB_LEVEL },
   /* FILTER section (ENV+FLT) */
   [IT_FILT_MODE]  = { IT_FILT_MODE,  ITF_FILT,    0,    3, 1, ITT_CHAIN , PK_CHAIN_FMODE },
-  [IT_FILT_CUT]   = { IT_FILT_CUT,   ITF_HZ,     20, 20000, 0, ITT_CHAIN , PK_CHAIN_FC , NAV_DIGITS },
+  [IT_FILT_CUT]   = { IT_FILT_CUT,   ITF_HZ,   2000, 2000000, 0, ITT_CHAIN , PK_CHAIN_FC , NAV_DIGITS },
   [IT_FILT_RES]   = { IT_FILT_RES,   ITF_PCT,     0,  100, 0, ITT_CHAIN , PK_CHAIN_RES },
   [IT_FILT_ENV]   = { IT_FILT_ENV,   ITF_SPCT, -100,  100, 0, ITT_CHAIN , PK_CHAIN_ENV },
   [IT_FILT_POLES] = { IT_FILT_POLES, ITF_POLES,  12,   24, 0, ITT_CHAIN , PK_CHAIN_POLES },
@@ -261,14 +263,14 @@ const item_spec_t ITEM_SPECS[ITEM_SPECS_N] = {
   [IT_SEQ_MODE]   = { IT_SEQ_MODE,   ITF_SEQMODE, 0,    4, 1, ITT_SEQ , PK_SEQ_MODE },
   [IT_SEQ_ONCE]   = { IT_SEQ_ONCE,   ITF_SEQONCE, 0,    1, 1, ITT_SEQ , PK_SEQ_ONCE },
   [IT_SEQ_STEPSEL]= { IT_SEQ_STEPSEL,ITF_STEPSEL, 0,    7, 1, ITT_UI , PK_NONE , NAV_STEPSEL },
-  [IT_STEP_PITCH] = { IT_STEP_PITCH, ITF_HZ,      1, 20000, 0, ITT_STEP , PK_STEP_PITCH , NAV_DIGITS },
+  [IT_STEP_PITCH] = { IT_STEP_PITCH, ITF_HZ,      1, 2000000, 0, ITT_STEP , PK_STEP_PITCH , NAV_DIGITS },
   [IT_STEP_VEL]   = { IT_STEP_VEL,   ITF_PCT,     0,  100, 0, ITT_STEP , PK_STEP_VEL },
   /* MASTER tab */
   [IT_MASTER]     = { IT_MASTER,     ITF_PCT,     0,  100, 0, ITT_TOP , PK_TOP_MASTER },
   [IT_SAFETY]     = { IT_SAFETY,     ITF_ONOFF,   0,    1, 1, ITT_TOP , PK_TOP_SAFETY },
   [IT_DLY_TIMEL]  = { IT_DLY_TIMEL,  ITF_CENTS,   0,  200, 0, ITT_DELAY , PK_DLY_TIMEL },
   [IT_DLY_FB]     = { IT_DLY_FB,     ITF_PCT,     0,  100, 0, ITT_DELAY , PK_DLY_FB },
-  [IT_DLY_TONE]   = { IT_DLY_TONE,   ITF_TONE,   20, 20000, 0, ITT_DELAY , PK_DLY_TONE , NAV_DIGITS },
+  [IT_DLY_TONE]   = { IT_DLY_TONE,   ITF_TONE, 2000, 2000000, 0, ITT_DELAY , PK_DLY_TONE , NAV_DIGITS },
   [IT_DLY_MIX]    = { IT_DLY_MIX,    ITF_PCT,     0,  100, 0, ITT_DELAY , PK_DLY_MIX },
   /* reverb */
   [IT_RVB_SIZE]   = { IT_RVB_SIZE,   ITF_PCT,     0,  100, 0, ITT_REVERB , PK_RVB_SIZE },

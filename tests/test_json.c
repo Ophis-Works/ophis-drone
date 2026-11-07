@@ -928,7 +928,9 @@ int main(void)
      * -1, *p untouched. Boundaries are inclusive. */
     {
         static const struct { const char *from, *to; } bad[] = {
-            { "\"freq_hz\":55.0",       "\"freq_hz\":0.05"   },
+            /* PLAN_FREQ_DECIMALS.md P3 (R4): the floor widens to
+             * 0.01 Hz — 0.05 is VALID now; 0.009 (sub-centi) rejects */
+            { "\"freq_hz\":55.0",       "\"freq_hz\":0.009"  },
             { "\"freq_hz\":55.0",       "\"freq_hz\":1e999"  },
             { "\"freq_hz\":55.0",       "\"freq_hz\":20001"  },
             /* sub freq/fmode/amount keys are GONE (O2); the amount
@@ -947,7 +949,7 @@ int main(void)
             { "\"r\":0.5",              "\"r\":-1.0"         },
             { "\"fc\":800.0",           "\"fc\":19.0"        },
             { "\"fc\":800.0",           "\"fc\":20001.0"     },
-            { "\"pitch_hz\":55.0",      "\"pitch_hz\":0.05"  },
+            { "\"pitch_hz\":55.0",      "\"pitch_hz\":0.009" },
             { "\"pitch_hz\":55.0",      "\"pitch_hz\":1e999" },
             { "\"src\":\"off\",\"dest\":\"off\",\"amount\":0.0",
               "\"src\":\"off\",\"dest\":\"pitch\",\"amount\":51.0" },
@@ -959,9 +961,10 @@ int main(void)
             CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                                       err, sizeof err) == -1);
         }
-        /* boundaries are inclusive: parse ok */
+        /* boundaries are inclusive: parse ok — freq_hz / step pitch_hz
+         * floors are 0.01 now (PLAN_FREQ_DECIMALS.md P3, R4) */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
-        CHECK(replace_once(buf, "\"freq_hz\":55.0", "\"freq_hz\":0.1") == 0);
+        CHECK(replace_once(buf, "\"freq_hz\":55.0", "\"freq_hz\":0.01") == 0);
         CHECK(replace_once(buf, "\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
               "\"amount\":0.0}",
               "\"xmod\":[{\"src\":\"off\",\"dest\":\"pitch\","
@@ -972,7 +975,7 @@ int main(void)
               "\"amount\":100.0}") == 0);
         CHECK(replace_once(buf, "\"a\":0.05", "\"a\":60.0") == 0);
         CHECK(replace_once(buf, "\"fc\":800.0", "\"fc\":20000.0") == 0);
-        CHECK(replace_once(buf, "\"pitch_hz\":55.0", "\"pitch_hz\":0.1") == 0);
+        CHECK(replace_once(buf, "\"pitch_hz\":55.0", "\"pitch_hz\":0.01") == 0);
         CHECK(replace_once(buf, "\"src\":\"off\",\"dest\":\"off\",\"amount\":0.0",
               "\"src\":\"off\",\"dest\":\"pitch\",\"amount\":50.0") == 0);
         CHECK(schema_parse_params(buf, (int)strlen(buf), &q,

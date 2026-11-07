@@ -75,10 +75,16 @@ void item_value(const ui_t *ui, item_t it, char *b, int blen)
     double v = item_get(ui, it);
     switch (sp->fmt) {
     case ITF_DIV:     snprintf(b, blen, "/%d", (int)v); break;
-    case ITF_HZ:      /* odometer boxes: fixed-width zero-padded (R2),
-                       * display rounds a preset fraction (R6) */
-                      snprintf(b, blen, "%05d Hz", (int)lround(v)); break;
-    case ITF_TONE:    snprintf(b, blen, "%05d Hz", (int)lround(v)); break;
+    case ITF_HZ:      /* centi-Hz odometer boxes (PLAN_FREQ_DECIMALS.md
+                       * R1/R5): "%05d.%02d Hz" — integer part + period +
+                       * 2 decimals; a preset fraction is SHOWN, not
+                       * rounded (R5 fractional rule) */
+    case ITF_TONE: {
+                      int centi = (int)lround(v * 100.0);
+                      int ip = centi / 100, dec = centi - ip * 100;
+                      snprintf(b, blen, "%05d.%02d Hz", ip, dec);
+                      break;
+    }
     case ITF_SEC:     fmt_sec(b, blen, v); break;
     case ITF_CENTS:   snprintf(b, blen, "%.2f s", v); break;
     case ITF_WAVE:    ui_enum_display(schema_wave_name((int)v), b, blen);
@@ -260,12 +266,17 @@ static void hint_binding(char *b1, int n1, char *b2, int n2)
              run ? run : "?", trig ? trig : "?", menu ? menu : "?");
 }
 
-/* R3/PR-D/R12a (PLAN_HZ_EDIT.md): the digit marker — one short underline
- * under the ACTIVE digit cell of the fixed-width "%05d Hz" field (value
- * text starts at x=460, one 10 px cell per digit, leftmost = 10000s;
- * freq_digit counts from the 1s digit, so the cell index from the left
- * is 4-freq_digit). Drawn only when ui_digit_marker_active() gates it
- * on (R13): cursor row + content focus + not dim + NAV_DIGITS. */
+/* R3/PR-D/R12a (PLAN_HZ_EDIT.md), amended by PLAN_FREQ_DECIMALS.md
+ * (PR-C/R1): the digit marker — one short underline under the ACTIVE
+ * digit cell of the fixed-width "%05d.%02d Hz" field (value text starts
+ * at x=460, one 10 px cell per glyph; cells from the left: 5 integer
+ * digits, then the fixed period separator, then the 2 decimal digits —
+ * 8 cells total, the period is not editable). freq_digit counts the 7
+ * editable digits 0..6 from the left, so the cell index is freq_digit
+ * for the integer digits (0..4) and freq_digit + 1 for the decimal
+ * digits (5 -> cell 6, 6 -> cell 7), skipping the period cell. Drawn
+ * only when ui_digit_marker_active() gates it on (R13): cursor row +
+ * content focus + not dim + NAV_DIGITS. */
 
 /* R13 (PLAN_HZ_EDIT.md): the marker's gate, factored out of the two
  * draw paths (draw_sections + the SEQ row loop) — the mode comes from
@@ -285,7 +296,9 @@ int ui_digit_marker_active(const ui_t *ui, item_t it)
 
 static void draw_digit_marker(ui_t *ui, SDL_Renderer *r, int y)
 {
-    int d = 4 - ui->freq_digit;
+    /* editable digit -> cell index from the left; the period cell (5)
+     * is skipped (PR-C) */
+    int d = ui->freq_digit <= 4 ? ui->freq_digit : ui->freq_digit + 1;
     SDL_Rect mk = { 460 + d * OPHIS_FONT_W,
                     y + OPHIS_FONT_H + 1, OPHIS_FONT_W, 2 };
     SDL_SetRenderDrawColor(r, THEME_ACCENT.r, THEME_ACCENT.g,

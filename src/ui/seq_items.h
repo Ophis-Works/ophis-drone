@@ -113,10 +113,12 @@ extern const char *SEQONCE_NAMES[SEQONCE_COUNT];
 /* value kind: the edit space min/max are expressed in + the display
  * format (one formatter switch on this in ui.c) */
 typedef enum {
-  ITF_HZ,        /* integer-Hz odometer box min..max (R5, PLAN_HZ_EDIT.md);
-                    display zero-padded "%05d Hz" (R2) — true value may
-                    keep a preset-loaded fraction until the first digit
-                    edit rounds it (R6) */
+  ITF_HZ,        /* centi-Hz odometer box min..max (PLAN_FREQ_DECIMALS.md
+                    R2/R4: 7 editable digits 10000..0.01 Hz, min/max in
+                    centi-Hz; OSC FREQ / SEQ PITCH floor 0.01 = 1);
+                    display zero-padded "%05d.%02d Hz" (R5) — the true
+                    value may keep a preset-loaded fraction, which the
+                    display shows exactly (R5 fractional rule) */
   ITF_WAVE,      /* wave selector, wraps; WAVE names */
   ITF_DUTY,      /* square pulse width percent (5..95); "%d %%" */
   ITF_PCT,       /* percent min..max; "%d %%" */
@@ -141,8 +143,9 @@ typedef enum {
   ITF_INT,       /* plain integer min..max; "%d" (BPM) */
   ITF_XDIV,      /* clock divider integer; "x%d" */
   ITF_CENTS,     /* delay time in centiseconds (0.01 s steps); "%.2f s" */
-  ITF_TONE       /* delay tone: integer-Hz odometer box min..max
-                    (20..20000, R5); display "%05d Hz" */
+  ITF_TONE       /* delay tone: centi-Hz odometer box min..max
+                    (2000..2000000 = 20.00..20000.00 Hz, R4 keeps the
+                    CUT/TONE 20 Hz floor); display "%05d.%02d Hz" */
 } item_fmt_t;
 
 /* si-target: which parameter slot the item's value lives in (the item's
@@ -193,9 +196,11 @@ typedef enum {
   NAV_NONE,            /* LEFT/RIGHT inert (default — every spec entry
                           without an explicit nav is this) */
   NAV_STEPSEL,         /* move the SEQ step rectangle (wrap min..max) */
-  NAV_DIGITS           /* move the digit cursor (ui_t.freq_digit,
-                          clamped, reset to the 1s digit on row entry);
-                          X/Z step the selected digit's place */
+  NAV_DIGITS           /* move the digit cursor (ui_t.freq_digit, 0..6
+                          from the left, clamped; reset to the 1s digit
+                          — index 4, the first non-decimal digit — on
+                          row entry); X/Z step the selected digit's
+                          place */
 } nav_mode_t;
 
 typedef struct {
@@ -212,35 +217,43 @@ typedef struct {
 } item_spec_t;
 
 /* ladder bounds that are properties of the ladders themselves (kept
- * beside the table so every range is single-sourced here) */
-#define TONE_MIN_HZ 20         /* delay tone floor (§8.3: 20 Hz..20 kHz;
+ * beside the table so every range is single-sourced here; the unit
+ * follows the spec's centi-Hz edit space — PLAN_FREQ_DECIMALS.md R4:
+ * 20.00 Hz = 2000) */
+#define TONE_MIN_HZ 2000       /* delay tone floor (§8.3: 20 Hz..20 kHz;
                                 * also IT_DLY_TONE's spec min below) */
 
-/* ---- PLAN_HZ_EDIT.md (R4/R5/R6, PR-G): the pure 5-digit odometer
- * helpers behind the frequency digit boxes (OSC FREQ, FILTER CUT, DELAY
- * TONE). SDL-free, unit-tested by tests/test_seq_items.c.
+/* ---- PLAN_HZ_EDIT.md (R4/R5/R6, PR-G) amended by PLAN_FREQ_DECIMALS.md
+ * (R1/R2/R4/R5): the pure odometer helpers behind the frequency digit
+ * boxes (OSC FREQ, FILTER CUT, DELAY TONE, SEQ PITCH). SDL-free,
+ * unit-tested by tests/test_seq_items.c. All values are CENTI-HZ
+ * integers (1 Hz = 100; 20000.00 Hz = 2000000 — exact up to the
+ * ceiling, PR-B).
  *
- * hz_digits splits the ROUNDED value into exactly 5 zero-padded digits,
- * digits[0] = 10000s place .. digits[4] = 1s place ("00220" for 220);
- * display-side rounding only — see the R6 rule below.
+ * hz_digits splits the value into exactly SEVEN zero-padded digits,
+ * digits[0] = 10000s place .. digits[4] = 1s place, digits[5] = 0.1s,
+ * digits[6] = 0.01s ("00055.50" for 5550 = 55.50 Hz; the period between
+ * digits[4] and digits[5] is a fixed separator, not a digit).
  *
  * hz_digit_step is one odometer step: value + dir*place (TRUE carry —
  * stepping the 10s digit over 9->0 borrows through the arithmetic), and
- * ROLL-OVER at the range edges (R5): a result below floor returns ceil,
- * above ceil returns floor (20000 +1 on the 1s digit -> the row's floor;
- * 1 -1 -> 20000). Integer steps only.
+ * ROLL-OVER at the range edges (R2): a result below floor returns ceil,
+ * above ceil returns floor (20000.00 +0.01 on the 0.01s digit -> the
+ * row's floor; OSC FREQ / SEQ PITCH floor 0.01 -> 20000.00; CUT/TONE
+ * keep their 20.00 floor, R2/R4). Integer centi-Hz steps only.
  *
- * R6 (the fractional rule): a preset-loaded fractional value (e.g. 55.5
- * Hz — the schema floor is 0.1) is DISPLAYED rounded ("00056") and KEEPS
- * its fractional part in the DSP until the user edits the row; the
- * FIRST digit edit rounds the value to the nearest integer and proceeds
- * from there (55.5 +1 on the 1s digit -> round(55.5)=56 -> 57). The
- * rounding happens at the edit site (ui.c edit_item, which owns the
- * double value); these helpers take/return ints. The OSC FREQ edit
- * floor is 1 Hz (integer box — editing cannot reach the 0.1..0.9 Hz
- * preset-only range, PR-H). ---- */
-int hz_digit_step(int hz, int place, int dir, int floor, int ceil);
-int hz_digits(int hz, int digits[5]);
+ * R5 (the fractional rule): a preset-loaded fractional value (e.g.
+ * 55.5 Hz — the schema floor is now 0.01) is DISPLAYED exactly
+ * ("00055.50") and KEEPS its fractional part in the DSP until the user
+ * edits the row; the FIRST digit edit snaps the value through centi-Hz
+ * integers and proceeds from there (55.5 +1 on the 1s digit -> 5550 +
+ * 100 = 5650 -> 56.50). The snapping happens at the edit site (ui.c
+ * edit_item, which owns the double value); these helpers take/return
+ * centi-Hz ints. The OSC FREQ / SEQ PITCH edit floor is 0.01 Hz (R2 —
+ * the LFO range). ---- */
+int hz_digit_step(int centi_hz, int place_centi, int dir, int floor,
+                  int ceil);
+int hz_digits(int centi_hz, int digits[7]);
 
 #define ITEM_SPECS_N (IT_COUNT)
 extern const item_spec_t ITEM_SPECS[ITEM_SPECS_N];

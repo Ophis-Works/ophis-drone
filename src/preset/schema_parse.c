@@ -359,7 +359,8 @@ static const key_spec_t ROOT_KEYS[] = {
 
 static const key_spec_t CHAIN_KEYS[] = {
     [CB_FREQ]  = { "freq_hz", KT_FNUM, offsetof(chain_params_t, freq_hz),
-                   0.1, 20000.0 },
+                   0.01, 20000.0 },  /* floor 0.01 Hz (PLAN_FREQ_
+                                      * DECIMALS.md R4 — the LFO range) */
     [CB_WAVE]  = { "wave",    KT_ENUM, offsetof(chain_params_t, wave),
                    6, 0, wave_tab },
     [CB_DUTY]  = { "duty",    KT_DUTY, offsetof(chain_params_t, duty) },
@@ -402,7 +403,8 @@ static const key_spec_t FILTER_KEYS[] = {
 
 static const key_spec_t STEP_KEYS[] = {
     [TB_PITCH] = { "pitch_hz", KT_FNUM, offsetof(seq_step_t, pitch_hz),
-                   0.1, 20000.0 },
+                   0.01, 20000.0 },  /* floor 0.01 Hz (PLAN_FREQ_
+                                      * DECIMALS.md R4) */
     [TB_VEL]   = { "vel",      KT_PERCENT, offsetof(seq_step_t, vel) },
 };
 
