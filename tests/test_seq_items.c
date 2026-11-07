@@ -1,0 +1,540 @@
+/* tests/test_seq_items.c — (AMENDED, owner order, PLAN.md §10/§8.2) the
+ * SEQ page item table: exactly 7 items; exact order SEQ ON · DIV · MODE ·
+ * ONCE · STEP · PITCH · VEL — NO BPM (the GLOBAL tempo lives on the
+ * MASTER tab); the MODE selector (fwd · pingpong · oddeven · random ·
+ * markov) and the ONCE selector (loop · once) are PRESENT — the demanded
+ * presence regression. ALSO asserts the tab-reorg pure model (owner
+ * order, PLAN §8.2/§8.6 amended): 5 top tabs (OSC 1|2|3, MOD, MASTER),
+ * OSC sub-tabs OSC|ENV+FLT|SEQ, every page a flat item list split into
+ * labeled sections — item tables MAIN/SUB/ADSR/FILT/MOD/MASTER plus the
+ * section tables (label + first + count) that drive rendering. SDL-free
+ * pure data: reads only src/ui/seq_items.h. TDD: extended BEFORE the
+ * implementation changes (strict TDD, watched failing first). */
+#include <string.h>
+#include "harness.h"
+#include "ui/seq_items.h"
+
+int main(void)
+{
+    /* ---- exactly 7 items (BPM moved OFF the SEQ pages, owner order) ---- */
+    CHECK(SEQ_ITEMS_N == 7);
+
+    /* ---- exact order: cursor index == item == drawn row (PLAN §8.2).
+     * si is 0 for every entry — PITCH/VEL si is bound to the selected
+     * rectangle at use time by ui.c, not by the table. ---- */
+    static const char *const NAMES[7] =
+      { "SEQ ON", "DIV", "MODE", "ONCE", "STEP", "PITCH", "VEL" };
+    static const int IDS[7] =
+      { IT_SEQ_ON, IT_SEQ_DIV, IT_SEQ_MODE, IT_SEQ_ONCE,
+        IT_SEQ_STEPSEL, IT_STEP_PITCH, IT_STEP_VEL };
+    for (int i = 0; i < SEQ_ITEMS_N; i++) {
+        CHECK(SEQ_ITEMS[i].name != NULL &&
+              strcmp(SEQ_ITEMS[i].name, NAMES[i]) == 0);
+        CHECK(SEQ_ITEMS[i].id == IDS[i]);
+        CHECK(SEQ_ITEMS[i].si == 0);
+    }
+
+    /* ---- NO BPM anywhere on the SEQ page (neither name nor id) ---- */
+    for (int i = 0; i < SEQ_ITEMS_N; i++) {
+        CHECK(SEQ_ITEMS[i].name == NULL ||
+              strcmp(SEQ_ITEMS[i].name, "BPM") != 0);
+        CHECK(SEQ_ITEMS[i].id != IT_BPM);
+    }
+
+    /* ---- MODE selector PRESENT: 5 entries, exact content in order
+     * (fwd · pingpong · oddeven · random · markov, PLAN §6/§8.3) ---- */
+    CHECK(SEQMODE_COUNT == 5);
+    static const char *const MODE_WANT[5] =
+      { "FWD", "PINGPONG", "ODDEVEN", "RANDOM", "MARKOV" };
+    for (int i = 0; i < SEQMODE_COUNT; i++)
+        CHECK(SEQMODE_NAMES[i] != NULL &&
+              strcmp(SEQMODE_NAMES[i], MODE_WANT[i]) == 0);
+
+    /* ---- ONCE selector PRESENT: loop · once (PLAN §6/§8.3) ---- */
+    CHECK(SEQONCE_COUNT == 2);
+    CHECK(SEQONCE_NAMES[0] != NULL && strcmp(SEQONCE_NAMES[0], "LOOP") == 0);
+    CHECK(SEQONCE_NAMES[1] != NULL && strcmp(SEQONCE_NAMES[1], "ONCE") == 0);
+
+    /* ==================================================================
+     * TAB REORG (owner order, PLAN §8.2/§8.6 amended): every page is a
+     * flat item list split into labeled sections; the tables below are
+     * the single source of truth for names, orders, item ids, si and
+     * the section layout. The ADSR items moved OFF the OSC page into
+     * ENV+FLT; SUB/MOD names lost their "SL1 "/"SUB1 " prefixes (the
+     * section labels carry the context); the old FX tab's delay/reverb
+     * items merged into MASTER. Same underlying params/ids — pure UI
+     * reorg, NO dsp/param/model changes.
+     * ================================================================== */
+
+    /* ---- OSC sub-tab, OSC page: MAIN (5 — CHFM REMOVED,
+     * PLAN_MOD_ROUTING.md M4) + SUB 1/SUB 2 (4+4, O2) = 13 ---- */
+    CHECK(MAIN_ITEMS_N == 5);
+    static const char *const MN5[5] =
+      { "FREQ", "WAVE", "DUTY", "LEVEL", "VEL" };
+    static const int    MI5[5] =
+      { IT_OSC_FREQ, IT_OSC_WAVE, IT_OSC_DUTY, IT_LEVEL, IT_VEL };
+    for (int i = 0; i < MAIN_ITEMS_N; i++) {
+        CHECK(MAIN_ITEMS[i].name != NULL &&
+              strcmp(MAIN_ITEMS[i].name, MN5[i]) == 0);
+        CHECK(MAIN_ITEMS[i].id == MI5[i]);
+        CHECK(MAIN_ITEMS[i].si == 0);
+    }
+    CHECK(MAIN_ITEMS[0].id == IT_OSC_FREQ);       /* demanded spot check */
+
+    /* MAIN has NO ADSR items — they live on ENV+FLT (owner order) */
+    for (int i = 0; i < MAIN_ITEMS_N; i++) {
+        CHECK(MAIN_ITEMS[i].id != IT_A && MAIN_ITEMS[i].id != IT_D &&
+              MAIN_ITEMS[i].id != IT_S && MAIN_ITEMS[i].id != IT_R);
+    }
+
+    /* subs are Spice/Subharmonicon voices (O2): DIV · WAVE · DUTY ·
+     * LEVEL — no FMODE/FREQ/DEST/AMT */
+    CHECK(SUB_ITEMS_N == 8);
+    static const char *const SN8[8] =
+      { "DIV", "WAVE", "DUTY", "LEVEL", "DIV", "WAVE", "DUTY", "LEVEL" };
+    static const int SI8[8] =
+      { IT_SUB_DIV, IT_SUB_WAVE, IT_SUB_DUTY, IT_SUB_LEVEL,
+        IT_SUB_DIV, IT_SUB_WAVE, IT_SUB_DUTY, IT_SUB_LEVEL };
+    for (int i = 0; i < SUB_ITEMS_N; i++) {
+        CHECK(SUB_ITEMS[i].name != NULL &&
+              strcmp(SUB_ITEMS[i].name, SN8[i]) == 0);
+        CHECK(SUB_ITEMS[i].id == SI8[i]);
+        CHECK(SUB_ITEMS[i].si == i / 4);          /* sub 1 (0) then sub 2 (1) */
+    }
+
+    /* ---- ENV+FLT page: ADSR (4) + FILTER (5) = 9 ---- */
+    CHECK(ADSR_ITEMS_N == 4);
+    static const char *const AN4[4] =
+      { "ATTACK", "DECAY", "SUSTAIN", "RELEASE" };
+    static const int AI4[4] = { IT_A, IT_D, IT_S, IT_R };
+    for (int i = 0; i < ADSR_ITEMS_N; i++) {
+        CHECK(ADSR_ITEMS[i].name != NULL &&
+              strcmp(ADSR_ITEMS[i].name, AN4[i]) == 0);
+        CHECK(ADSR_ITEMS[i].id == AI4[i]);        /* demanded spot checks */
+        CHECK(ADSR_ITEMS[i].si == 0);
+    }
+
+    CHECK(FILT_ITEMS_N == 5);
+    static const char *const FN5[5] =
+      { "MODE", "CUTOFF", "RES", "ENV", "POLES" };
+    static const int FI5[5] =
+      { IT_FILT_MODE, IT_FILT_CUT, IT_FILT_RES, IT_FILT_ENV, IT_FILT_POLES };
+    for (int i = 0; i < FILT_ITEMS_N; i++) {
+        CHECK(FILT_ITEMS[i].name != NULL &&
+              strcmp(FILT_ITEMS[i].name, FN5[i]) == 0);
+        CHECK(FILT_ITEMS[i].id == FI5[i]);
+        CHECK(FILT_ITEMS[i].si == 0);
+    }
+
+    /* ---- MOD tab: MOD 1..MOD 3, each SOURCE · OSC · DEST · DEPTH ·
+     * LEVEL = 15 (no "SL1 " prefixes — the section labels carry the
+     * context; OSC = the slot's routing target, PLAN_MOD_ROUTING.md M1
+     * + PLAN_OSC_NAMING.md R1; LEVEL = the slot's own ADD knob, owner
+     * order 2026-11-06) ---- */
+    CHECK(MOD_ITEMS_N == 15);
+    static const char *const XN15[15] =
+      { "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL",
+        "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL",
+        "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL" };
+    static const int XI15[15] =
+      { IT_XMOD_SRC, IT_XMOD_TGT, IT_XMOD_DEST, IT_XMOD_AMT, IT_XMOD_MIX,
+        IT_XMOD_SRC, IT_XMOD_TGT, IT_XMOD_DEST, IT_XMOD_AMT, IT_XMOD_MIX,
+        IT_XMOD_SRC, IT_XMOD_TGT, IT_XMOD_DEST, IT_XMOD_AMT, IT_XMOD_MIX };
+    for (int i = 0; i < MOD_ITEMS_N; i++) {
+        CHECK(MOD_ITEMS[i].name != NULL &&
+              strcmp(MOD_ITEMS[i].name, XN15[i]) == 0);
+        CHECK(MOD_ITEMS[i].id == XI15[i]);
+        CHECK(MOD_ITEMS[i].si == i / 5);          /* slot 0..2 */
+    }
+    CHECK(MOD_ITEMS[0].id == IT_XMOD_SRC);        /* demanded spot check */
+
+    /* ---- MASTER tab: MASTER (3) + MIX (3) + DELAY (4) + REVERB (4)
+     * = 14 (MIX A/B/C: the per-chain master send, PLAN_MOD_ROUTING.md
+     * M3 — si IS the chain index; the old FX tab's delay/reverb items
+     * live HERE now; the GLOBAL tempo BPM is visible and edited on
+     * MASTER, owner order, PLAN §8.2/§6) ---- */
+    CHECK(MASTER_ITEMS_N == 14);
+    static const char *const TN14[14] =
+      { "MASTER", "SAFETY", "BPM", "OSC A", "OSC B", "OSC C",
+        "TIME L", "FEEDBACK", "TONE", "MIX",
+        "SIZE", "DAMP", "MIX", "WIDTH" };
+    static const int TI14[14] =
+      { IT_MASTER,  IT_SAFETY,  IT_BPM,
+        IT_MIXVOL,  IT_MIXVOL,  IT_MIXVOL,
+        IT_DLY_TIMEL, IT_DLY_FB, IT_DLY_TONE, IT_DLY_MIX,
+        IT_RVB_SIZE,  IT_RVB_DAMP, IT_RVB_MIX, IT_RVB_WIDTH };
+    for (int i = 0; i < MASTER_ITEMS_N; i++) {
+        CHECK(MASTER_ITEMS[i].name != NULL &&
+              strcmp(MASTER_ITEMS[i].name, TN14[i]) == 0);
+        CHECK(MASTER_ITEMS[i].id == TI14[i]);
+        if (MASTER_ITEMS[i].id == IT_MIXVOL)
+            CHECK(MASTER_ITEMS[i].si == i - 3);   /* si IS the chain */
+        else
+            CHECK(MASTER_ITEMS[i].si == 0);
+    }
+    CHECK(MASTER_ITEMS[2].id  == IT_BPM);         /* demanded spot checks */
+    CHECK(MASTER_ITEMS[3].id  == IT_MIXVOL);
+    CHECK(MASTER_ITEMS[6].id  == IT_DLY_TIMEL);
+    CHECK(MASTER_ITEMS[10].id == IT_RVB_SIZE);
+
+    /* ---- section tables: gray label rows, items indented, ONE 16 px
+     * blank row before every next section label (owner order,
+     * PLAN §8.6 amended). first/count are flat-item indices into the
+     * page's item list; the cursor walks that flat list 0..N-1 (wrap),
+     * skipping over labels/gaps visually. ---- */
+    CHECK(OSC_SECTIONS_N == 3);
+    static const char *const OSL[3] = { "MAIN", "SUB 1", "SUB 2" };
+    /* subs are 4-item voices (O2): 0, 5, 9, counts 5/4/4 */
+    static const int OSF[3] = { 0, 5, 9 };
+    static const int OSC[3] = { 5, 4, 4 };
+    for (int s = 0; s < OSC_SECTIONS_N; s++) {
+        CHECK(OSC_SECTIONS[s].label != NULL &&
+              strcmp(OSC_SECTIONS[s].label, OSL[s]) == 0);
+        CHECK(OSC_SECTIONS[s].first == OSF[s]);
+        CHECK(OSC_SECTIONS[s].count == OSC[s]);
+    }
+    CHECK(OSC_SECTIONS[0].first + OSC_SECTIONS[0].count == OSC_SECTIONS[1].first);
+    CHECK(OSC_SECTIONS[1].first + OSC_SECTIONS[1].count == OSC_SECTIONS[2].first);
+    CHECK(OSC_SECTIONS[2].first + OSC_SECTIONS[2].count == MAIN_ITEMS_N + SUB_ITEMS_N);
+
+    CHECK(ENVFLT_SECTIONS_N == 2);
+    CHECK(ENVFLT_SECTIONS[0].label != NULL &&
+          strcmp(ENVFLT_SECTIONS[0].label, "ADSR") == 0);
+    CHECK(ENVFLT_SECTIONS[0].first == 0 && ENVFLT_SECTIONS[0].count == 4);
+    CHECK(ENVFLT_SECTIONS[1].label != NULL &&
+          strcmp(ENVFLT_SECTIONS[1].label, "FILTER") == 0);
+    CHECK(ENVFLT_SECTIONS[1].first == 4 && ENVFLT_SECTIONS[1].count == 5);
+    CHECK(ENVFLT_SECTIONS[1].first + ENVFLT_SECTIONS[1].count ==
+          ADSR_ITEMS_N + FILT_ITEMS_N);
+
+    CHECK(MOD_SECTIONS_N == 3);
+    static const char *const MSL[3] = { "MOD 1", "MOD 2", "MOD 3" };
+    for (int s = 0; s < MOD_SECTIONS_N; s++) {
+        CHECK(MOD_SECTIONS[s].label != NULL &&
+              strcmp(MOD_SECTIONS[s].label, MSL[s]) == 0);
+        CHECK(MOD_SECTIONS[s].first == s * 5);
+        CHECK(MOD_SECTIONS[s].count == 5);
+    }
+    CHECK(MOD_SECTIONS[2].first + MOD_SECTIONS[2].count == MOD_ITEMS_N);
+
+    CHECK(MASTER_SECTIONS_N == 4);
+    static const char *const TSL[4] = { "MASTER", "MIX", "DELAY", "REVERB" };
+    static const int TSF[4] = { 0, 3, 6, 10 };
+    static const int TSC[4] = { 3, 3, 4, 4 };
+    for (int s = 0; s < MASTER_SECTIONS_N; s++) {
+        CHECK(MASTER_SECTIONS[s].label != NULL &&
+              strcmp(MASTER_SECTIONS[s].label, TSL[s]) == 0);
+        CHECK(MASTER_SECTIONS[s].first == TSF[s]);
+        CHECK(MASTER_SECTIONS[s].count == TSC[s]);
+    }
+    CHECK(MASTER_SECTIONS[MASTER_SECTIONS_N - 1].first +
+          MASTER_SECTIONS[MASTER_SECTIONS_N - 1].count == MASTER_ITEMS_N);
+
+    /* ==================================================================
+     * ITEM SPEC TABLE (Phase 5 item 2, PLAN_CODE_REVIEW_FIXES.md; ranges
+     * per PLAN.md §8.3): ONE table keyed by IT_* id — {fmt, min, max,
+     * wrap-flag, si-target} — the single source of every item's edit
+     * range and value format. SDL-free pure data, like the rest of this
+     * suite. ================================================================== */
+
+    /* ---- completeness: every IT_* id has EXACTLY one entry, no
+     * extras, and the accessor agrees ---- */
+    CHECK(ITEM_SPECS_N == IT_COUNT);
+    for (int id = 0; id < IT_COUNT; id++) {
+        int n = 0;
+        for (int i = 0; i < ITEM_SPECS_N; i++)
+            if (ITEM_SPECS[i].id == id) n++;
+        CHECK(n == 1);                        /* exactly one entry per id */
+        const item_spec_t *sp = item_spec(id);
+        CHECK(sp != NULL && sp->id == id);    /* accessor returns it */
+        CHECK(sp >= ITEM_SPECS && sp < ITEM_SPECS + ITEM_SPECS_N);
+    }
+    for (int i = 0; i < ITEM_SPECS_N; i++)
+        CHECK(ITEM_SPECS[i].id >= 0 && ITEM_SPECS[i].id < IT_COUNT);
+    CHECK(item_spec(-1) == NULL);             /* out-of-range -> NULL */
+    CHECK(item_spec(IT_COUNT) == NULL);
+
+    /* ---- P3 (PLAN_HZ_EDIT.md §1.4, R5/R9): the frequency rows are
+     * INTEGER-Hz odometer boxes now — the 1/12-octave pos ladder
+     * (0.1*2^(pos/12), pos 0..212) is DELETED, so the spec carries Hz
+     * bounds: OSC FREQ 1..20000 (edit floor 1; the 0.1 Hz schema floor
+     * stays preset-only, PR-H), FILTER CUT 20..20000. STEP PITCH shares
+     * the freq value space; with the ladder gone it carries the same
+     * integer-Hz bounds as OSC FREQ (the old pos pins died with it). ---- */
+    CHECK(item_spec(IT_OSC_FREQ)->fmt == ITF_HZ &&
+          item_spec(IT_OSC_FREQ)->min == 1 &&
+          item_spec(IT_OSC_FREQ)->max == 20000 &&
+          item_spec(IT_OSC_FREQ)->wrap == 0);
+    CHECK(item_spec(IT_FILT_CUT)->fmt == ITF_HZ &&
+          item_spec(IT_FILT_CUT)->min == 20 &&
+          item_spec(IT_FILT_CUT)->max == 20000 &&
+          item_spec(IT_FILT_CUT)->wrap == 0);
+    CHECK(item_spec(IT_STEP_PITCH)->fmt == ITF_HZ &&
+          item_spec(IT_STEP_PITCH)->min == 1 &&
+          item_spec(IT_STEP_PITCH)->max == 20000 &&
+          item_spec(IT_STEP_PITCH)->wrap == 0);
+    /* sub DIV (O2): subharmonic divider 1..16, wraps — the ratio/HZ
+     * ladders are GONE from subs */
+    const item_spec_t *sp_div = item_spec(IT_SUB_DIV);
+    CHECK(sp_div->fmt == ITF_DIV && sp_div->min == 1 &&
+          sp_div->max == 16 && sp_div->wrap == 1);
+    CHECK(item_spec(IT_SUB_DIV)->tgt == ITT_SUB);
+    CHECK(item_spec(IT_SUB_LEVEL)->fmt == ITF_PCT &&
+          item_spec(IT_SUB_LEVEL)->min == 0 &&
+          item_spec(IT_SUB_LEVEL)->max == 100 &&
+          item_spec(IT_SUB_LEVEL)->wrap == 0);
+
+    /* ---- ADSR (PLAN §8.3): A/D/R pos 0..50 (0 s .. 60 s log); S is a
+     * percent 0..100 ---- */
+    static const int SEC_IDS[3] = { IT_A, IT_D, IT_R };
+    for (int i = 0; i < 3; i++) {
+        const item_spec_t *sp = item_spec(SEC_IDS[i]);
+        CHECK(sp->fmt == ITF_SEC && sp->min == 0 && sp->max == 50 &&
+              sp->wrap == 0);
+    }
+    CHECK(item_spec(IT_S)->fmt == ITF_PCT && item_spec(IT_S)->min == 0 &&
+          item_spec(IT_S)->max == 100);
+
+    /* ---- percents (PLAN §8.3): integer 0..100, 1 pp steps, clamped ---- */
+    static const int PCT_IDS[11] =
+      { IT_LEVEL, IT_VEL, IT_FILT_RES, IT_STEP_VEL, IT_MASTER,
+        IT_DLY_FB, IT_DLY_MIX, IT_RVB_SIZE, IT_RVB_DAMP, IT_RVB_MIX,
+        IT_RVB_WIDTH };
+    for (int i = 0; i < 11; i++) {
+        const item_spec_t *sp = item_spec(PCT_IDS[i]);
+        CHECK(sp->fmt == ITF_PCT && sp->min == 0 && sp->max == 100 &&
+              sp->wrap == 0);
+    }
+
+    /* ---- ENV AMT (PLAN §8.3): percent -100..+100 ---- */
+    CHECK(item_spec(IT_FILT_ENV)->fmt == ITF_SPCT &&
+          item_spec(IT_FILT_ENV)->min == -100 &&
+          item_spec(IT_FILT_ENV)->max == 100 &&
+          item_spec(IT_FILT_ENV)->wrap == 0);
+
+    /* ---- AMT (PLAN §8.3): widest table bound is ±100; the PITCH dest
+     * narrows to ±50 at edit time (dest-dependent, amt helper) ---- */
+    CHECK(item_spec(IT_XMOD_AMT)->fmt == ITF_AMT &&
+          item_spec(IT_XMOD_AMT)->min == -100 &&
+          item_spec(IT_XMOD_AMT)->max == 100);
+
+    /* ---- DUTY (approved plan change): percent 5..95 ---- */
+    CHECK(item_spec(IT_OSC_DUTY)->fmt == ITF_DUTY &&
+          item_spec(IT_OSC_DUTY)->min == 5 &&
+          item_spec(IT_OSC_DUTY)->max == 95);
+    CHECK(item_spec(IT_SUB_DUTY)->fmt == ITF_DUTY &&
+          item_spec(IT_SUB_DUTY)->min == 5 &&
+          item_spec(IT_SUB_DUTY)->max == 95);
+
+    /* ---- BPM (PLAN §6/§8.3): integer 1..500; SEQ DIV: integer 1..16 ---- */
+    /* MIX VOLUME (PLAN_MOD_ROUTING.md M3): percent 0..100 per chain */
+    CHECK(item_spec(IT_MIXVOL)->fmt == ITF_PCT &&
+          item_spec(IT_MIXVOL)->min == 0 &&
+          item_spec(IT_MIXVOL)->max == 100 &&
+          item_spec(IT_MIXVOL)->wrap == 0 &&
+          item_spec(IT_MIXVOL)->tgt == ITT_MIXVOL);
+    CHECK(item_spec(IT_BPM)->fmt == ITF_INT && item_spec(IT_BPM)->min == 1 &&
+          item_spec(IT_BPM)->max == 500 && item_spec(IT_BPM)->wrap == 0);
+    CHECK(item_spec(IT_SEQ_DIV)->fmt == ITF_XDIV &&
+          item_spec(IT_SEQ_DIV)->min == 1 && item_spec(IT_SEQ_DIV)->max == 16 &&
+          item_spec(IT_SEQ_DIV)->wrap == 0);
+
+    /* ---- delay time (owner-ordered FX): seconds 0..2 in 0.01 s steps
+     * -> cents 0..200; TONE (P3, PLAN_HZ_EDIT.md R5): integer-Hz
+     * odometer box 20..20000 — the freq ladder pos 0..212 is gone ---- */
+    CHECK(item_spec(IT_DLY_TIMEL)->fmt == ITF_CENTS &&
+          item_spec(IT_DLY_TIMEL)->min == 0 &&
+          item_spec(IT_DLY_TIMEL)->max == 200);
+    CHECK(item_spec(IT_DLY_TONE)->fmt == ITF_TONE &&
+          item_spec(IT_DLY_TONE)->min == 20 &&
+          item_spec(IT_DLY_TONE)->max == 20000);
+    CHECK(TONE_MIN_HZ == 20);
+
+    /* ---- wrap-flag selectors (labels cycle, they do not clamp);
+     * IT_FILT_POLES is NOT here — 12/24 dB/oct is a direction-independent
+     * toggle (ITF_POLES), not a wrap across min..max ---- */
+    static const int WRAP_IDS[9] =
+      { IT_OSC_WAVE, IT_SUB_WAVE, IT_FILT_MODE,
+        IT_XMOD_SRC, IT_XMOD_TGT, IT_XMOD_DEST,
+        IT_SEQ_MODE, IT_SEQ_ONCE, IT_SEQ_ON };
+    for (int i = 0; i < 9; i++)
+        CHECK(item_spec(WRAP_IDS[i])->wrap == 1);
+    /* selector counts (PLAN §8.3/§8.2/§6, amended O2): 6 waves, 4 filt,
+     * 10 xmod srcs, 7 dests, 5 modes, 2 once, 2 on; subs are voices */
+    CHECK(item_spec(IT_OSC_WAVE)->min == 0 && item_spec(IT_OSC_WAVE)->max == 5);
+    CHECK(item_spec(IT_SUB_WAVE)->min == 0 && item_spec(IT_SUB_WAVE)->max == 5);
+    CHECK(item_spec(IT_FILT_MODE)->min == 0 && item_spec(IT_FILT_MODE)->max == 3);
+    /* xmod src ladder extended (PLAN_MOD_ROUTING.md M2): 10 sources —
+     * off, B/C osc+subs (ids 1..6, unchanged), A osc+subs (7..9) */
+    CHECK(item_spec(IT_XMOD_SRC)->min == 0 && item_spec(IT_XMOD_SRC)->max == 9);
+    /* TGT (PLAN_MOD_ROUTING.md M1): chain selector 0..2, wraps; fmt is
+     * ITF_TGT since the OSC-naming milestone (PLAN_OSC_NAMING.md R2 —
+     * the value displays "OSC 1/2/3", not the raw 0/1/2) */
+    CHECK(item_spec(IT_XMOD_TGT)->fmt == ITF_TGT &&
+          item_spec(IT_XMOD_TGT)->min == 0 &&
+          item_spec(IT_XMOD_TGT)->max == 2 &&
+          item_spec(IT_XMOD_TGT)->wrap == 1 &&
+          item_spec(IT_XMOD_TGT)->tgt == ITT_XMOD);
+    /* dest ladder (PLAN_MOD_ROUTING.md M4 + PLAN_OSC_NAMING.md R0e):
+     * dest "mix" is gone, "filter" renamed "flt_cut" and "flt_res"
+     * added — off/pitch/phase/amp/flt_cut/flt_res/ring/fm = 0..7 */
+    CHECK(item_spec(IT_XMOD_DEST)->min == 0 && item_spec(IT_XMOD_DEST)->max == 7);
+    CHECK(item_spec(IT_SEQ_MODE)->min == 0 && item_spec(IT_SEQ_MODE)->max == 4);
+    CHECK(item_spec(IT_SEQ_ONCE)->min == 0 && item_spec(IT_SEQ_ONCE)->max == 1);
+    CHECK(item_spec(IT_SEQ_ON)->min == 0 && item_spec(IT_SEQ_ON)->max == 1);
+    CHECK(item_spec(IT_SAFETY)->wrap == 1 && item_spec(IT_SAFETY)->min == 0 &&
+          item_spec(IT_SAFETY)->max == 1);
+    /* poles toggle: 12 <-> 24 dB/oct */
+    CHECK(item_spec(IT_FILT_POLES)->fmt == ITF_POLES &&
+          item_spec(IT_FILT_POLES)->min == 12 &&
+          item_spec(IT_FILT_POLES)->max == 24);
+    /* STEP rectangle selection: UI state (no commit), wraps 0..7 */
+    CHECK(item_spec(IT_SEQ_STEPSEL)->fmt == ITF_STEPSEL &&
+          item_spec(IT_SEQ_STEPSEL)->tgt == ITT_UI &&
+          item_spec(IT_SEQ_STEPSEL)->min == 0 &&
+          item_spec(IT_SEQ_STEPSEL)->max == 7 &&
+          item_spec(IT_SEQ_STEPSEL)->wrap == 1);
+
+    /* ---- si-target spot checks: which slot the item's si indexes ---- */
+    CHECK(item_spec(IT_SUB_DIV)->tgt == ITT_SUB);
+    CHECK(item_spec(IT_XMOD_SRC)->tgt == ITT_XMOD);
+    CHECK(item_spec(IT_STEP_PITCH)->tgt == ITT_STEP);
+    CHECK(item_spec(IT_BPM)->tgt == ITT_TOP);
+    CHECK(item_spec(IT_MASTER)->tgt == ITT_TOP);
+    CHECK(item_spec(IT_SAFETY)->tgt == ITT_TOP);
+    CHECK(item_spec(IT_DLY_TIMEL)->tgt == ITT_DELAY);
+    CHECK(item_spec(IT_RVB_SIZE)->tgt == ITT_REVERB);
+    CHECK(item_spec(IT_SEQ_ON)->tgt == ITT_SEQ);
+    CHECK(item_spec(IT_OSC_FREQ)->tgt == ITT_CHAIN);
+    CHECK(item_spec(IT_FILT_CUT)->tgt == ITT_CHAIN);
+
+    /* ---- A1 (PLAN_OPTIMIZATION.md O4): the page model — counts and
+     * sections come from ONE place; coverage over every tab+sub ---- */
+    for (int tab = 0; tab < 3; tab++) {
+        const page_t *p0 = page_get(tab, 0);
+        const page_t *p1 = page_get(tab, 1);
+        const page_t *p2 = page_get(tab, 2);
+        CHECK(p0 && p1 && p2);
+        int n0 = 0, n1 = 0, n2 = 0;
+        for (int k = 0; k < p0->nspans; k++) n0 += p0->spans[k].n;
+        for (int k = 0; k < p1->nspans; k++) n1 += p1->spans[k].n;
+        for (int k = 0; k < p2->nspans; k++) n2 += p2->spans[k].n;
+        CHECK(n0 == MAIN_ITEMS_N + SUB_ITEMS_N);
+        CHECK(n1 == ADSR_ITEMS_N + FILT_ITEMS_N);
+        CHECK(n2 == SEQ_ITEMS_N);
+        CHECK(p0->nsections == OSC_SECTIONS_N);
+        CHECK(p1->nsections == ENVFLT_SECTIONS_N);
+    }
+    CHECK(page_get(3, 0)->spans[0].n == MOD_ITEMS_N &&
+          page_get(3, 0)->nsections == MOD_SECTIONS_N);
+    CHECK(page_get(4, 0)->spans[0].n == MASTER_ITEMS_N &&
+          page_get(4, 0)->nsections == MASTER_SECTIONS_N);
+    CHECK(page_get(5, 0) == NULL && page_get(0, 3) == NULL &&
+          page_get(-1, 0) == NULL);
+
+    /* ==================================================================
+     * PINS — PLAN_OSC_NAMING.md §1.4 (written FIRST, red before the
+     * implementation; strict TDD, watched failing first).
+     * ================================================================== */
+
+    /* ---- P1 (PLAN_OSC_NAMING.md §1.0a/R1): the MOD-page row labels
+     * are SOURCE · OSC · DEST · DEPTH · LEVEL per slot (si == i/5);
+     * the preset keys stay raw — labels are UI-only. Red until
+     * seq_items.c renames them. ---- */
+    static const char *const XNL15[15] =
+      { "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL",
+        "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL",
+        "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL" };
+    for (int i = 0; i < MOD_ITEMS_N; i++) {
+        CHECK(MOD_ITEMS[i].name != NULL &&
+              strcmp(MOD_ITEMS[i].name, XNL15[i]) == 0);
+        CHECK(MOD_ITEMS[i].si == i / 5);          /* slot 0..2 */
+    }
+
+    /* ---- P2 (PLAN_OSC_NAMING.md §1.0a/R4): the MASTER MIX rows read
+     * "OSC A" / "OSC B" / "OSC C" at si 0/1/2 (chain A/B/C); the
+     * section title "MIX" is UNCHANGED. Red until seq_items.c renames
+     * the rows. ---- */
+    CHECK(MASTER_ITEMS[3].name != NULL &&
+          strcmp(MASTER_ITEMS[3].name, "OSC A") == 0);
+    CHECK(MASTER_ITEMS[4].name != NULL &&
+          strcmp(MASTER_ITEMS[4].name, "OSC B") == 0);
+    CHECK(MASTER_ITEMS[5].name != NULL &&
+          strcmp(MASTER_ITEMS[5].name, "OSC C") == 0);
+    CHECK(MASTER_ITEMS[3].si == 0 && MASTER_ITEMS[4].si == 1 &&
+          MASTER_ITEMS[5].si == 2);
+    CHECK(strcmp(MASTER_SECTIONS[1].label, "MIX") == 0);  /* title unchanged */
+
+    /* ---- P5 (PLAN_OSC_NAMING.md §1.0/R0e, §1.4): the DEST ladder max
+     * is 7 (off/pitch/phase/amp/flt_cut/flt_res/ring/fm — the ladder
+     * gains flt_res); still a 0-based wrapping selector. Red until
+     * seq_items.c raises the max. ---- */
+    CHECK(item_spec(IT_XMOD_DEST)->min == 0);
+    CHECK(item_spec(IT_XMOD_DEST)->max == 7);
+    CHECK(item_spec(IT_XMOD_DEST)->wrap == 1);
+
+    /* ---- P3 (PLAN_OSC_NAMING.md §1.3, §1.4): the TGT item's fmt is
+     * the NEW ITF_TGT (ui_draw.c formats "OSC %d", v+1); min 0 / max 2
+     * / wrap 1 / tgt ITT_XMOD unchanged. Compile-red until seq_items.h
+     * gains ITF_TGT. ---- */
+    CHECK(item_spec(IT_XMOD_TGT)->fmt == ITF_TGT);
+    CHECK(item_spec(IT_XMOD_TGT)->min == 0 &&
+          item_spec(IT_XMOD_TGT)->max == 2 &&
+          item_spec(IT_XMOD_TGT)->wrap == 1);
+    CHECK(item_spec(IT_XMOD_TGT)->tgt == ITT_XMOD);
+
+    /* ---- P4 (PLAN_OSC_NAMING.md §1.3, §1.4): ui_xsrc_display — the
+     * frozen 10-entry source-name table (R3): ids 1..3 = chain B =
+     * OSC 2, 4..6 = C = OSC 3, 7..9 = A = OSC 1 (A ids APPENDED, M2);
+     * id 0 = OFF. Compile-red until the implementer adds the pure
+     * SDL-free function to seq_items.c. ---- */
+    {
+        char nb[32];
+        ui_xsrc_display(0, nb, (int)sizeof nb);
+        CHECK(strcmp(nb, "OFF") == 0);
+        ui_xsrc_display(1, nb, (int)sizeof nb);
+        CHECK(strcmp(nb, "OSC 2") == 0);
+        ui_xsrc_display(2, nb, (int)sizeof nb);
+        CHECK(strcmp(nb, "OSC 2 SUB 1") == 0);
+        ui_xsrc_display(6, nb, (int)sizeof nb);
+        CHECK(strcmp(nb, "OSC 3 SUB 2") == 0);
+        ui_xsrc_display(7, nb, (int)sizeof nb);
+        CHECK(strcmp(nb, "OSC 1") == 0);
+        ui_xsrc_display(9, nb, (int)sizeof nb);
+        CHECK(strcmp(nb, "OSC 1 SUB 2") == 0);
+    }
+
+    /* ---- P1 (PLAN_HZ_EDIT.md §1.4, PR-G): the pure odometer helpers.
+     * hz_digits — 5-digit zero-padded splitter, digits[0] = 10000s place;
+     * hz_digit_step(hz, place, dir, floor, ceil) — value ± place with
+     * TRUE odometer carry and roll-over at [floor, ceil] (R4/R5, PR-C/
+     * PR-H). Red until seq_items.c/h gains both (compile-red:
+     * undeclared). ---- */
+    {
+        int d[5];
+        hz_digits(220, d);                     /* 00220 */
+        CHECK(d[0] == 0 && d[1] == 0 && d[2] == 2 &&
+              d[3] == 2 && d[4] == 0);
+        hz_digits(20000, d);                   /* 20000: the ceiling */
+        CHECK(d[0] == 2 && d[1] == 0 && d[2] == 0 &&
+              d[3] == 0 && d[4] == 0);
+        hz_digits(1, d);                       /* 00001: the floor */
+        CHECK(d[0] == 0 && d[1] == 0 && d[2] == 0 &&
+              d[3] == 0 && d[4] == 1);
+
+        CHECK(hz_digit_step(220, 10, +1, 1, 20000) == 230);
+        CHECK(hz_digit_step(90, 10, +1, 1, 20000) == 100);   /* carry 9->0 */
+        CHECK(hz_digit_step(100, 10, -1, 1, 20000) == 90);   /* borrow 0->9 */
+        CHECK(hz_digit_step(1, 1, -1, 1, 20000) == 20000);   /* FREQ floor
+                                                                roll-over */
+        CHECK(hz_digit_step(20000, 1, +1, 1, 20000) == 1);   /* ceiling ->
+                                                                FREQ floor */
+        CHECK(hz_digit_step(20000, 1, +1, 20, 20000) == 20); /* ceiling ->
+                                                                CUT/TONE
+                                                                floor */
+        CHECK(hz_digit_step(20, 1, -1, 20, 20000) == 20000); /* CUT floor
+                                                                roll-over */
+    }
+
+    HARNESS_REPORT();
+}
