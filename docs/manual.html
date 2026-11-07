@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ophis-drone — user manual</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", serif; max-width: 52rem;
+         margin: 2rem auto; padding: 0 1rem; line-height: 1.5;
+         color: #1a1a2e; background: #fdfcff; }
+  h1, h2, h3 { font-family: "Helvetica Neue", Arial, sans-serif; }
+  h1 { border-bottom: 2px solid #4a3654; padding-bottom: .3rem; }
+  h2 { margin-top: 2rem; border-bottom: 1px solid #cfc3d8; padding-bottom: .2rem; }
+  code, pre { font-family: "SF Mono", Consolas, monospace; font-size: .9em; }
+  pre { background: #efe9f4; padding: .8rem 1rem; overflow-x: auto;
+        border-radius: 4px; }
+  code { background: #efe9f4; padding: 0 .25rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid #cfc3d8; padding: .35rem .6rem; text-align: left;
+           font-size: .92em; }
+  th { background: #e8dff0; }
+  .note { font-style: italic; color: #555; }
+</style>
+</head>
+<body>
+
+<h1>ophis-drone</h1>
+<p>User manual. Sources: <code>PLAN.md</code> (binding design),
+<code>IMPLEMENTATION.md</code>, <code>src/config.h</code>,
+<code>src/ui/ui.c</code>, <code>src/dsp/</code>, <code>src/preset/schema.c</code>,
+<code>Makefile</code>, <code>BUILD_NOTES.md</code>,
+<code>CHECKLIST_R36S.md</code>.</p>
+
+<h2>1. What it is</h2>
+<p>ophis-drone is a three-chain drone synthesizer for Linux, written in C11
+against SDL2 (video) and ALSA (audio). It runs as a desktop application and
+as a native build for the R36S handheld (Rockchip RK3326, ArkOS). The UI is
+a single fixed 640&times;480 logical screen (SDL2, desktop window 1280&times;960
+at scale&nbsp;2, handheld fullscreen at scale&nbsp;1) rendered with a built-in
+bitmap font — no external assets.</p>
+<p>Each of the three chains (A, B, C) has one main oscillator, two
+sub-oscillators that modulate the main one, an ADSR envelope, a
+mode-selectable filter (LP/HP/BP/BR) and level/velocity. Chains B and C sum
+into the master bus and can simultaneously modulate any chain (A, B or C)
+via a cross-mod matrix whose slots carry a routing TARGET; each chain also
+has its own MIX VOLUME master send (MASTER page). After the mixer, the signal passes through a stereo delay and a
+reverb, then a master safety filter, master level and master gate. Three
+sequencers (one per chain, togglable) send frequency (Hz) and velocity steps
+to their chains. All parameters except the RUN transport flag are saved and
+loaded as JSON preset files.</p>
+<p>There are no musical notes or scales anywhere: every pitch parameter is a
+frequency in Hz (0.1&nbsp;Hz&ndash;20&nbsp;kHz).</p>
+<p>Architecture: one process, two threads (host/engine/audio and UI),
+communicating only through lock-free channels — a double-buffered parameter
+mailbox, atomic event flags (TRIGGER/PANIC; RUN travels in the mailbox) and
+an atomic-pointer status snapshot. Audio: 44100&nbsp;Hz, float32, stereo,
+256-frame periods. The desktop gate requires a measured ALSA xrun count of
+exactly 0.</p>
+
+<h2>2. Features</h2>
+
+<h3>2.1 Tabs</h3>
+<p>Five top tabs (Q/E on desktop, L/R shoulder on R36S; wraps):
+<strong>OSC&nbsp;1 | OSC&nbsp;2 | OSC&nbsp;3 | MOD | MASTER</strong>.
+Each OSC tab has three sub-tabs: <strong>OSC | ENV+FLT | SEQ</strong>.
+MOD and MASTER have no sub-tab row. Arrows start on the sub-tab row
+(LEFT/RIGHT cycles sub-tabs, DOWN enters content, UP returns to the row);
+inside content UP/DOWN move the cursor (wrap), Z/X (desktop) / X/Y (R36S)
+edit (slider &plusmn;1 step, label cycles one option); LEFT/RIGHT is
+navigation only (sub-tab row; on SEQ pages it selects/moves the step
+rectangle from anywhere in content, elsewhere in content it is inert).
+Cursor/focus persist per tab+sub-tab.</p>
+<p>Every page except SEQ is split into labeled sections: a gray
+non-selectable section label row at the left margin, the section's items
+indented (two spaces) below it, and ONE empty 16&nbsp;px row between a
+section's last item and the next section label (none after the last
+section). Labels and gaps are visual only — the cursor walks the page's
+flat item list (0..N&minus;1, wrap) and skips over them visually.</p>
+
+<h3>2.2 Parameters and ranges</h3>
+
+<h4>OSC tab — OSC sub-tab (per chain)</h4>
+<p>Sections: <strong>MAIN</strong> (5 items), then <strong>SUB 1</strong>
+and <strong>SUB 2</strong> (4 items each; identical sets) — 13 items in
+one flat list. The ADSR controls are NOT on this page (they live in the
+ENV+FLT sub-tab's ADSR section).</p>
+<table>
+<tr><th>Item</th><th>Range / options</th></tr>
+<tr><td>FREQ</td><td>0.1 Hz – 20 kHz, log, 1/12-octave steps (0.1&nbsp;&times;&nbsp;2<sup>pos/12</sup>, pos 0..212); dimmed/inert for noise waves</td></tr>
+<tr><td>WAVE</td><td>sine · tri · saw · square · white · pink (all normalized −1..1)</td></tr>
+<tr><td>DUTY</td><td>square pulse width, 5–95&nbsp;% (default 50); dimmed unless wave is square</td></tr>
+<tr><td>LEVEL</td><td>0–100&nbsp;%, 1&nbsp;pp steps</td></tr>
+<tr><td>VEL</td><td>0–100&nbsp;% — retrigger level used by TRIGGER and by direct mode when RUN is ON</td></tr>
+</table>
+
+<h4>OSC tab — SUB 1 / SUB 2 sections (identical sets)</h4>
+<p>The two SUB sections of the OSC sub-tab (formerly their own SUB
+sub-tab), each with:</p>
+<table>
+<tr><th>Item</th><th>Range / options</th></tr>
+<tr><td>DIV</td><td>subharmonic divider 1..16 — the sub plays <em>parent_f&nbsp;/&nbsp;div</em> (Subharmonicon-style integer division; 1 = unison, 2 = one octave down, …)</td></tr>
+<tr><td>WAVE</td><td>sine · tri · saw · square (subs are tonal voices — no noise)</td></tr>
+<tr><td>DUTY</td><td>square pulse width 5–95&nbsp;%, dimmed unless WAVE = square</td></tr>
+<tr><td>LEVEL</td><td>0–100&nbsp;% — the sub's audio mixed into the chain's OSC sum (0 = inaudible); level never changes what the MOD matrix taps</td></tr>
+</table>
+<p>Subs are Spice/Subharmonicon-style AUDIO voices (PLAN_OPTIMIZATION.md
+O2): they sum into the oscillator output BEFORE the envelope and filter
+and carry no destination knobs — a sub modulates through the MOD
+matrix (SRC = B.SUB1 etc.), which is unaffected by its LEVEL.</p>
+
+<h4>OSC tab — ENV+FLT sub-tab (per chain)</h4>
+<p>Sections: <strong>ADSR</strong> (4 items) then <strong>FILTER</strong>
+(5 items) — 9 items in one flat list. The envelope controls live here
+(the OSC page's MAIN section has none).</p>
+<table>
+<tr><th>Item</th><th>Range / options</th></tr>
+<tr><td>ATTACK / DECAY / RELEASE</td><td>0–60&nbsp;s, log/exp: pos&nbsp;0 = 0&nbsp;s; pos 1..50 = 0.001&nbsp;s &times; 60000<sup>(pos−1)/49</sup></td></tr>
+<tr><td>SUSTAIN</td><td>0–100&nbsp;%</td></tr>
+</table>
+<table>
+<tr><th>Item</th><th>Range / options</th></tr>
+<tr><td>MODE</td><td>LP · HP · BP · BR (RBJ biquad)</td></tr>
+<tr><td>CUTOFF</td><td>0.1 Hz – 20 kHz, log 1/12-octave; internally clamped 30 Hz – 18 kHz</td></tr>
+<tr><td>RES</td><td>0–100&nbsp;% → Q 0.5–20, log (Q = 0.5&nbsp;&times;&nbsp;40<sup>pos/50</sup>)</td></tr>
+<tr><td>ENV</td><td>−100..+100&nbsp;% — the chain ADSR additionally scales cutoff</td></tr>
+<tr><td>POLES</td><td>12DB (one biquad) or 24DB (two identical cascaded biquads, shared cutoff/Q)</td></tr>
+</table>
+
+<h4>OSC tab — SEQ sub-tab (per chain, step page)</h4>
+<p>Single column, one parameter per row (cursor order = visual order):
+<strong>SEQ ON</strong> (ON/OFF — a UI parameter, never a button),
+<strong>DIV</strong> (clock divider, integer 1–16, default 1; step period =
+60/BPM/4&nbsp;&times;&nbsp;div seconds), <strong>MODE</strong>,
+<strong>ONCE</strong>. Then — after two blank lines under a gray
+<strong>“Steps”</strong> label — the row of eight step rectangles
+(LEFT/RIGHT — desktop arrows / R36S d-pad — selects/moves the rectangle
+from anywhere on the SEQ page; the <strong>selected</strong> step — the
+one PITCH/VEL edit — has a <strong>thicker border</strong>; the step
+<strong>playing now</strong> is marked by an <strong>orange dot</strong>
+inside the square; cells are filled when vel&nbsp;&gt;&nbsp;0, empty when
+vel&nbsp;=&nbsp;0; value edits are Z/X (desktop) / X/Y (R36S)). Then
+<strong>PITCH</strong> (0.1 Hz – 20 kHz, log 1/12-oct) and <strong>VEL</strong>
+(0–100&nbsp;%) sliders bound to the selected rectangle; editing changes that
+step live. <strong>BPM is not here</strong>: the tempo is one
+<strong>global</strong> integer 1–500 for the whole synth, visible and
+edited on the <a href="#master-tab">MASTER tab</a>. There is no per-step
+active flag — vel&nbsp;0 is a silent step (no event, the drone sustains).
+Sequencers run only while RUN is ON.</p>
+
+<h4>SEQ modes (5) and ONCE</h4>
+<ul>
+<li><strong>fwd</strong> (default): steps 1→8, repeats.</li>
+<li><strong>pingpong</strong>: 1→8 then 8→1, bouncing.</li>
+<li><strong>oddeven</strong>: 1,3,5,7 then 2,4,6,8.</li>
+<li><strong>random</strong>: deterministic per-instance PRNG, never repeating the same step immediately.</li>
+<li><strong>markov</strong>: equally weighted 1-D random walk (&plusmn;1 at p&nbsp;=&nbsp;0.5), reflecting at the edges.</li>
+</ul>
+<p><strong>ONCE</strong>: <strong>loop</strong> (default) repeats the mode's
+order forever; <strong>once</strong> plays one pass through the order, then
+stays silent until restarted (RUN off→on, sequencer off→on, or PANIC reset;
+for random/markov a pass is a fixed count of 8 steps).</p>
+
+<h4>MOD tab</h4>
+<p>Sections <strong>MOD 1</strong>, <strong>MOD 2</strong> and
+<strong>MOD 3</strong>: three cross-mod slots, each with
+<strong>SRC</strong> (OFF · B.OSC · B.SUB1 · B.SUB2 · C.OSC · C.SUB1 ·
+C.SUB2 · A.OSC · A.SUB1 · A.SUB2 — any chain's raw osc/sub output;
+self-routing is legal), <strong>TGT</strong> (A · B · C — which chain
+the slot's modulation and ADD feed; default A), <strong>DEST</strong>
+(OFF · PITCH · PHASE · AMP · FILTER · RING · FM), <strong>AMT</strong>
+(same ranges/rules as sub AMT; the knob reads +50&nbsp;Hz under PITCH,
+100&nbsp;% under RING, +4&nbsp;IDX under FM) and <strong>MIX</strong>
+(the slot's ADD knob — the source's audio blended into the TARGET,
+0–100&nbsp;% wet, independent of DEST; a slot can add AND modulate, or
+either alone). Cross-chain sources are read one sample late. The
+modulation is applied at the TARGET's oscillator stage — before the
+target's own ADSR and filter. Mixer output:
+tanh(1.5&nbsp;&times;&nbsp;Σ&nbsp;(mixvol[c]/100&nbsp;×&nbsp;out[c])).</p>
+
+<h4 id="master-tab">MASTER tab</h4>
+<p>Sections: <strong>MASTER</strong> — <strong>MASTER</strong> level
+(0–100&nbsp;%), <strong>SAFETY</strong> (boolean, default ON) and
+<strong>BPM</strong> — the one <strong>global</strong> tempo (integer
+1–500) shared by all three sequencers, visible and edited here, never on
+the SEQ pages — then <strong>DELAY</strong> and <strong>REVERB</strong>,
+the master-path delay and reverb controls (the former dedicated FX
+page, removed in the tab reorg). The
+master path runs, in fixed order:
+<strong>chains (each scaled by its MIX VOLUME) → mixer (sum + tanh +
+cross-mod) → delay → reverb → safety filter → master level → master
+gate</strong>. MIX VOLUME (0–100&nbsp;%, default 100) is the chain's
+master send: it scales the chain's post-ADSR/FILTER signal into the
+master sum and NEVER touches modulation — a chain with MIX 0 is silent
+at master but still drives mod slots as a source. Safety ON = 4th-order
+rolloff via cascaded biquads (HP 60&nbsp;Hz + LP 18&nbsp;kHz); OFF =
+bypass. The master gate (10&nbsp;ms ramp) is applied after master level,
+per sample. Items (flat cursor order):</p>
+<table>
+<tr><th>Item</th><th>Range</th></tr>
+<tr><td>MIX A / MIX B / MIX C</td><td>per-chain master send, 0–100&nbsp;% (default 100)</td></tr>
+<tr><td>DELAY TIME L</td><td>0–2&nbsp;s, 0.01&nbsp;s steps (stereo lines of 2&nbsp;s; TIME R is a preset field)</td></tr>
+<tr><td>DELAY FEEDBACK</td><td>0–100&nbsp;%</td></tr>
+<tr><td>DELAY TONE</td><td>LP cutoff in the feedback loop, 20 Hz – 20 kHz, log 1/12-octave</td></tr>
+<tr><td>DELAY MIX</td><td>0–100&nbsp;% (0 = dry passthrough)</td></tr>
+<tr><td>REVERB SIZE</td><td>0–100&nbsp;% (FDN/Schroeder class)</td></tr>
+<tr><td>REVERB DAMP</td><td>0–100&nbsp;% (damping LP inside the loop)</td></tr>
+<tr><td>REVERB MIX</td><td>0–100&nbsp;%</td></tr>
+<tr><td>REVERB WIDTH</td><td>0–100&nbsp;% (mid/side spread)</td></tr>
+</table>
+<p>Factory defaults make both FX silent (all wet values 0).</p>
+
+<h3>2.3 Transport</h3>
+<p><strong>RUN</strong> toggles the transport: ON opens the gate (10&nbsp;ms
+ramp) and runs the sequencers (or direct mode — one retrigger at the chain's
+VEL on the oscillator's parametrized frequency, for chains whose sequencer is
+OFF); OFF closes the gate, stops the sequencers and releases all chains.
+<strong>TRIGGER</strong> fires all three chains once at their VEL, overrides
+RUN OFF by holding the gate open until all envelopes reach zero (30&nbsp;s
+safety timeout), and never touches the sequencers. <strong>PANIC</strong>
+(menu item, immediate, no ramp): RUN cleared, gate 0 instantly, all envelopes
+idle, all oscillator phases and biquads and sequencer clocks and FX state
+reset. Exit is menu-only — there is no quit key.</p>
+
+<h3>2.4 Menu</h3>
+<p>Opened by Start (R36S) / Esc (desktop) on any screen; overlay. Items:
+NEW (confirm prompt — reset to factory defaults), SAVE (name entry),
+LOAD (folder navigator), PANIC (immediate), EXIT (quits after a 1&nbsp;s
+flash), BACK. Inside the menu and its sub-windows the CONFIRM key
+selects (Enter on desktop, A on R36S) and Esc cancels/closes — on desktop
+Esc is the only cancel (Space and T do nothing inside menus); Q/E are
+inactive. Preset names: 1–32 characters
+from A–Z, a–z, 0–9, space, <code>_</code>, <code>-</code>. Desktop SAVE:
+type on the keyboard, Enter saves, Esc cancels. R36S SAVE: character grid —
+d-pad selects a cell, X inserts, Y deletes, A saves, B cancels. LOAD lists
+subdirectories (suffix <code>/</code>, <code>..</code> to go up) and
+<code>*.json</code> presets alphabetically and can navigate any readable
+folder. The default presets folder is created on first LOAD; a folder
+that cannot be opened falls back to its parent, like any file picker.</p>
+
+<h3>2.5 Preset files (JSON version 1)</h3>
+<p>One JSON file per preset, stored in <code>presets/</code> next to the
+executable (resolved at runtime from /proc/self/exe). A preset
+serializes everything in <code>synth_params_t</code>
+except the <code>run</code> flag. Written and parsed by the schema layer
+<code>src/preset/schema.c</code> over the vendored
+<code>third_party/json.h</code> (no system JSON dependency). Field
+list, as implemented in <code>src/preset/schema.c</code>:</p>
+<pre>
+{
+  "app": "ophis-drone", "version": 1,
+  "master": 70,                     // percent 0..100 (REQUIRED)
+  "bpm": 120,                       // GLOBAL tempo 1..500 (REQUIRED)
+  "safety": true,                   // master safety filter (REQUIRED)
+  "chain": [ 3 objects ],
+  "seq":   [ 3 objects ],
+  "xmod":  [ 3 objects ],
+  "delay":  { "time_l": 0.0, "time_r": 0.0,     // seconds 0..2 (REQUIRED)
+              "feedback": 35, "tone": 4500.0, "mix": 30 },
+  "reverb": { "size": 85, "damp": 35, "mix": 30, "width": 100 }
+}
+</pre>
+<ul>
+<li><strong>chain</strong> object (exactly 3, in order A, B, C):
+<code>freq_hz</code>, <code>wave</code>, <code>duty</code>, <code>level</code>,
+<code>vel</code>, <code>sub</code> (exactly 2), <code>adsr</code>,
+<code>filter</code>.</li>
+<li><strong>sub</strong> object: <code>div</code> (1..16),
+<code>wave</code>, <code>duty</code> (5..95),
+<code>level</code> (0..100).</li>
+<li><strong>adsr</strong>: <code>a</code>, <code>d</code>, <code>r</code>
+(seconds, 0..60) and <code>s</code> (percent 0..100).</li>
+<li><strong>filter</strong>: <code>mode</code> (<code>"lp"|"hp"|"bp"|"br"</code>),
+<code>fc</code>, <code>res</code> (0..100), <code>env</code> (−100..+100),
+<code>poles</code> (<code>"12db"|"24db"</code>).</li>
+<li><strong>seq</strong> object: <code>on</code>, <code>div</code> (1..16),
+<code>mode</code>
+(<code>"fwd"|"pingpong"|"oddeven"|"random"|"markov"</code>), <code>once</code>
+(boolean; true = once, false = loop), <code>steps</code> (exactly 8 objects:
+<code>pitch_hz</code>, <code>vel</code> 0..100). No per-seq
+<code>bpm</code> — the tempo is the top-level <code>bpm</code>.</li>
+<li><strong>xmod</strong> slot: <code>src</code>
+(<code>"off"|"b_osc"|"b_sub1"|"b_sub2"|"c_osc"|"c_sub1"|"c_sub2"|"a_osc"|"a_sub1"|"a_sub2"</code>),
+<code>tgt</code> (0..2, default 0 = A — which chain the slot feeds),
+<code>dest</code>
+(<code>"off"|"pitch"|"phase"|"amp"|"filter"|"ring"|"fm"</code>),
+<code>amount</code>, <code>mix</code> (0–100: the source's audio blended
+into the slot's TARGET, independent of <code>dest</code>). The legacy
+stage-3 <code>"dest": "mix"</code> is GONE (files were rewritten).</li>
+<li><strong>chain</strong> also carries optional <code>mixvol</code>
+(0..100, default 100 — the chain's MASTER send; scales the
+post-ADSR/filter signal into the master sum, never modulation).</li>
+<li>Wave strings: <code>"sine"|"tri"|"saw"|"square"|"white"|"pink"</code>.
+Integer percent fields: <code>master</code>, <code>level</code>, <code>vel</code>,
+<code>s</code>, step <code>vel</code>, filter <code>res</code> and the
+delay/reverb percent fields.</li>
+</ul>
+<p>The loader requires every listed field; unknown keys are ignored; any
+parse, version, range or array-length error rejects the whole file (no
+partial load). Array lengths are fixed: 3 chains, 2 subs, 8 steps, 3 xmod
+slots.</p>
+
+<h3>2.6 Keys / buttons</h3>
+<table>
+<tr><th>Action</th><th>Desktop (config.h, TARGET_DESKTOP)</th><th>R36S (proposed, verify on device)</th></tr>
+<tr><td>Tab back / next</td><td>Q / E</td><td>L shoulder / R shoulder</td></tr>
+<tr><td>Selection up / down</td><td>Up / Down arrows</td><td>d-pad up / down</td></tr>
+<tr><td>Navigation (sub-tab row; on SEQ pages selects/moves the step rectangle from anywhere in content)</td><td>Left / Right arrows</td><td>d-pad left / right</td></tr>
+<tr><td>Value −/+ / cycle</td><td>Z / X</td><td>Y / X</td></tr>
+<tr><td>TRIGGER</td><td>T</td><td>B</td></tr>
+<tr><td>RUN</td><td>Space</td><td>A</td></tr>
+<tr><td>CONFIRM (menu select)</td><td>Enter</td><td>A (with RUN)</td></tr>
+<tr><td>MENU</td><td>Esc</td><td>Start</td></tr>
+<tr><td>SAVE name entry</td><td>keyboard typing, Backspace deletes, Enter saves, Esc cancels</td><td>d-pad selects grid cell, X insert, Y delete, A save, B cancel</td></tr>
+</table>
+<p>Z/X are value keys on desktop and X/Y on R36S (SAVE name entry reuses the
+value keys: value inc inserts, value dec deletes); Select is unassigned. A
+hint bar at the
+bottom of every screen shows the keymap in effect; a status strip at the top
+shows the centered OPHIS DRONE title, RUN state, gate value,
+TRIGGER/PANIC flashes, the live envelope bar
+(chain tabs) and the live sequencer step cursor (SEQ pages). R36S bindings
+are the proposed values in <code>src/config.h</code> and must be verified
+against the physical device — see <code>CHECKLIST_R36S.md</code>.</p>
+
+<h2>3. Installation</h2>
+
+<h3>R36S / ArkOS</h3>
+<p>Build (or obtain) the deploy zip
+<code>build/deploy/ophis-drone-r36s.zip</code> (see §4). Copy its contents to
+the SD card so that <code>ports/</code> lands at the <code>roms/</code> root,
+giving <code>roms/ports/Ophis-Drone.sh</code> (launcher, must stay
+executable — re-<code>chmod +x</code> if the transfer stripped the bit) and
+<code>roms/ports/ophis-drone/ophis-drone</code> (binary). The zip also ships
+the factory presets (<code>ports/ophis-drone/presets/*.json</code>).
+Restart
+EmulationStation; "Ophis Drone" appears in the Ports menu. The launcher
+changes into its own directory and execs the binary. No WiFi is assumed —
+transfer via SD card or USB OTG. Presets are written to
+<code>presets/</code> beside the executable on the device. Presets saved
+under the old <code>$HOME/ophis-drone/presets</code> location remain
+reachable via the LOAD navigator's <code>..</code> traversal. Acceptance
+questions
+(video driver, audio device, buttons, preset persistence) are in
+<code>CHECKLIST_R36S.md</code>.</p>
+
+<h3>Desktop</h3>
+<p>Run the prebuilt binary <code>build/desktop/ophis-drone</code>, or build
+from source with <code>make</code> (§4). ALSA is the mandatory audio backend.</p>
+
+<h2>4. Building</h2>
+
+<h3>Requirements</h3>
+<p><strong>Desktop:</strong> gcc, make, SDL2 and ALSA development packages
+(<code>pkg-config</code> must find <code>sdl2</code> and <code>alsa</code>;
+measured at M0: SDL 2.32.10, alsa 1.2.15.3), plus <code>zip</code> is not
+needed for desktop. <strong>Handheld:</strong> the
+<code>aarch64-linux-gnu-gcc</code> cross toolchain plus the arm64 SDL2/ALSA
+libraries and headers installed via multiarch
+(<code>libsdl2-dev:arm64</code>, <code>libasound2-dev:arm64</code> under
+<code>/usr/lib/aarch64-linux-gnu</code>), and <code>zip</code> for the deploy
+archive.</p>
+
+<h3>Make targets</h3>
+<table>
+<tr><th>Target</th><th>Output</th></tr>
+<tr><td><code>make</code> (default <code>all</code>)</td><td><code>build/desktop/ophis-drone</code> — native desktop build, <code>-DTARGET_DESKTOP</code></td></tr>
+<tr><td><code>make test</code></td><td>builds and runs all 16 unit test binaries under <code>build/tests/</code>, prints <code>TOTAL: N/M passed</code> (all DSP/seq/preset tests are SDL-free; only <code>test_engine</code> links ALSA, on device <code>"null"</code>)</td></tr>
+<tr><td><code>make handheld</code></td><td><code>build/r36s/ophis-drone</code> (aarch64, <code>-DTARGET_R36S</code>) plus the deploy layout and <code>build/deploy/ophis-drone-r36s.zip</code></td></tr>
+<tr><td><code>make clean</code></td><td>removes <code>build/</code></td></tr>
+</table>
+
+<h3>The GLIBC ≤ 2.28 gate</h3>
+<p>ArkOS userspace derives from Ubuntu 19.10 (glibc&nbsp;2.28). The handheld
+build links fully dynamically against the arm64 SDL2/ALSA but pins the
+symbols a modern host toolchain would bind too new:
+<code>src/compat/glibc_symver.c</code> provides <code>.symver</code> aliases
+for <code>pow</code>, <code>log2</code> (@GLIBC_2.29→2.17) and
+<code>pthread_create</code>, <code>pthread_join</code> (@GLIBC_2.34→2.17),
+redirected with <code>-Wl,--wrap</code>; <code>src/compat/crt0.s</code>
+replaces the toolchain start file (<code>-nostartfiles</code>) so
+<code>__libc_start_main</code> is required at @GLIBC_2.17.
+<code>tools/handheld_gate.sh</code>, run automatically at the end of
+<code>make handheld</code>, machine-checks the result: the binary must be an
+aarch64 ELF and <code>readelf -V</code> must show no required glibc version
+above GLIBC_2.28. Measured output (BUILD_NOTES.md): max required version
+GLIBC_2.17. Details in <code>BUILD_NOTES.md</code>.</p>
+
+<h3>Deploy outputs</h3>
+<p><code>make handheld</code> stages:</p>
+<pre>
+build/deploy/ports/ophis-drone/ophis-drone   # program folder
+build/deploy/ports/Ophis-Drone.sh            # launcher, OUTSIDE the folder
+build/deploy/ports/ophis-drone/presets/*.json # factory presets, IN the folder
+build/deploy/ophis-drone-r36s.zip            # zip of the above "ports" tree
+</pre>
+<p>The launcher template is <code>tools/r36s-launcher.sh</code>. Copy the zip
+contents so <code>ports/</code> sits at the SD <code>roms/</code> root
+(§3).</p>
+
+<h2>5. On-device verification</h2>
+<p>On-device behavior (Ports menu visibility, launch, video driver, audio,
+button mapping, preset save/load, stability) is manual and covered by the
+question checklist in <code>CHECKLIST_R36S.md</code>; it is not
+machine-verified. The machine-verified part is the host gate in
+<code>tools/handheld_gate.sh</code> and the desktop zero-xrun test
+(<code>make test</code>, <code>test_engine</code>).</p>
+
+</body>
+</html>
