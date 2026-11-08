@@ -174,8 +174,8 @@ int main(void)
         m3.src[0] = 0.5;
         double post[3];
         matrix_render(&m3, &mp3, hot, post);
-        CHECK(post[2] == 0.5);                 /* C ringed by 0.5 */
-        CHECK(post[0] == 1.0 && post[1] == 1.0);
+        CHECK(fexact(post[2], 0.5));           /* C ringed by 0.5 */
+        CHECK(fexact(post[0], 1.0) && fexact(post[1], 1.0));
         memset(&sp3.chain[0].mixvol, 0, sizeof sp3.chain[0].mixvol);
         sp3.chain[1].mixvol = 0;               /* only C's send open */
         double ms = master_sum(&mp3, post);

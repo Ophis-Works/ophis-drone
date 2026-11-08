@@ -61,7 +61,7 @@ int main(void)
     biquad_set(&b, FILT_LP, 1000.0f, SR, 0.707f);
     for (int i = 0; i < 100; i++) (void)biquad_next(&b, 0.3);
     biquad_set(&b, FILT_LP, 1000.0f, SR, 0.707f);
-    CHECK(biquad_next(&b, 0.0) == 0.0);
+    CHECK(fexact(biquad_next(&b, 0.0), 0.0));
 
     /* ---- resonance (filter expansion, PLAN §5): higher Q raises the
      * measured gain at fc, same topology ---- */
@@ -77,43 +77,47 @@ int main(void)
      * coefficients while the filter keeps ringing); biquad_set = set_coefs
      * + state clear; the cascade helper keeps its old contract ---- */
     {
-        biquad_t b;
-        biquad_set(&b, FILT_LP, 1000.0f, SR, 0.707f);
-        for (int i = 0; i < 64; i++) (void)biquad_next(&b, 0.3);
-        CHECK(b.z1 != 0.0 || b.z2 != 0.0);        /* state built up */
-        double z1 = b.z1, z2 = b.z2;
+        biquad_t bs;   /* not the outer b (shadow fix) */
+        biquad_set(&bs, FILT_LP, 1000.0f, SR, 0.707f);
+        for (int i = 0; i < 64; i++) (void)biquad_next(&bs, 0.3);
+        CHECK(!fexact(bs.z1, 0.0) || !fexact(bs.z2, 0.0)); /* state built up */
+        double z1 = bs.z1, z2 = bs.z2;
 
         /* set_coefs: coefficients change, state is preserved */
-        biquad_set_coefs(&b, FILT_LP, 3000.0f, SR, 2.0f);
-        CHECK(b.z1 == z1 && b.z2 == z2);
+        biquad_set_coefs(&bs, FILT_LP, 3000.0f, SR, 2.0f);
+        CHECK(fexact(bs.z1, z1) && fexact(bs.z2, z2));
         biquad_t r3000;
         biquad_set(&r3000, FILT_LP, 3000.0f, SR, 2.0f);
-        CHECK(b.b0 == r3000.b0 && b.b1 == r3000.b1 && b.b2 == r3000.b2 &&
-              b.a1 == r3000.a1 && b.a2 == r3000.a2);
+        CHECK(fexact(bs.b0, r3000.b0) && fexact(bs.b1, r3000.b1) &&
+              fexact(bs.b2, r3000.b2) && fexact(bs.a1, r3000.a1) &&
+              fexact(bs.a2, r3000.a2));
 
         /* set_coefs matches biquad_set's coefficients for ANY mode */
-        biquad_set_coefs(&b, FILT_BP, 800.0f, SR, 3.0f);
+        biquad_set_coefs(&bs, FILT_BP, 800.0f, SR, 3.0f);
         biquad_set(&r3000, FILT_BP, 800.0f, SR, 3.0f);
-        CHECK(b.b0 == r3000.b0 && b.b1 == r3000.b1 && b.b2 == r3000.b2 &&
-              b.a1 == r3000.a1 && b.a2 == r3000.a2);
+        CHECK(fexact(bs.b0, r3000.b0) && fexact(bs.b1, r3000.b1) &&
+              fexact(bs.b2, r3000.b2) && fexact(bs.a1, r3000.a1) &&
+              fexact(bs.a2, r3000.a2));
 
         /* biquad_set still clears the state (after streaming) */
         for (int i = 0; i < 64; i++) (void)biquad_next(&r3000, 0.5);
-        CHECK(r3000.z1 != 0.0 || r3000.z2 != 0.0);
+        CHECK(!fexact(r3000.z1, 0.0) || !fexact(r3000.z2, 0.0));
         biquad_set(&r3000, FILT_BP, 900.0f, SR, 3.0f);
-        CHECK(r3000.z1 == 0.0 && r3000.z2 == 0.0);
+        CHECK(fexact(r3000.z1, 0.0) && fexact(r3000.z2, 0.0));
 
         /* cascade helper unchanged: both stages get the shared
          * coefficients AND zeroed state (full set clears history) */
         biquad_t s1, s2;
         biquad_cascade_set(&s1, &s2, FILT_LP, 1000.0f, SR, 0.707f);
         biquad_set(&r3000, FILT_LP, 1000.0f, SR, 0.707f);
-        CHECK(s1.b0 == r3000.b0 && s1.b1 == r3000.b1 && s1.b2 == r3000.b2 &&
-              s1.a1 == r3000.a1 && s1.a2 == r3000.a2 &&
-              s1.z1 == 0.0 && s1.z2 == 0.0);
-        CHECK(s2.b0 == r3000.b0 && s2.b1 == r3000.b1 && s2.b2 == r3000.b2 &&
-              s2.a1 == r3000.a1 && s2.a2 == r3000.a2 &&
-              s2.z1 == 0.0 && s2.z2 == 0.0);
+        CHECK(fexact(s1.b0, r3000.b0) && fexact(s1.b1, r3000.b1) &&
+              fexact(s1.b2, r3000.b2) && fexact(s1.a1, r3000.a1) &&
+              fexact(s1.a2, r3000.a2) &&
+              fexact(s1.z1, 0.0) && fexact(s1.z2, 0.0));
+        CHECK(fexact(s2.b0, r3000.b0) && fexact(s2.b1, r3000.b1) &&
+              fexact(s2.b2, r3000.b2) && fexact(s2.a1, r3000.a1) &&
+              fexact(s2.a2, r3000.a2) &&
+              fexact(s2.z1, 0.0) && fexact(s2.z2, 0.0));
     }
 
     /* ---- poles 24 dB/oct (PLAN §5): cascade of two identical biquads

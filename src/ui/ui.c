@@ -237,7 +237,8 @@ double param_get(const synth_params_t *d, param_kind_t kind, int ci,
     case PK_RVB_DAMP:     return (double)d->reverb.damp;
     case PK_RVB_MIX:      return (double)d->reverb.mix;
     case PK_RVB_WIDTH:    return (double)d->reverb.width;
-    default:              return 0.0;   /* PK_NONE / ITT_UI */
+    case PK_NONE:                        /* no param slot: read as 0 */
+    default:              return 0.0;   /* ITT_UI items never reach here */
     }
 }
 
@@ -287,7 +288,8 @@ void param_set(synth_params_t *d, param_kind_t kind, int ci, int si,
     case PK_RVB_DAMP:     d->reverb.damp = (int)v; break;
     case PK_RVB_MIX:      d->reverb.mix = (int)v; break;
     case PK_RVB_WIDTH:    d->reverb.width = (int)v; break;
-    default:              break;        /* PK_NONE / ITT_UI */
+    case PK_NONE:                        /* no param slot: write is inert */
+    default:              break;        /* ITT_UI items never reach here */
     }
 }
 
@@ -377,6 +379,21 @@ void edit_item(ui_t *ui, item_t it, int dir)
     case ITF_POLES:                        /* 12 <-> 24 dB/oct toggle */
         v = ((int)v == sp->max) ? sp->min : sp->max;
         break;
+    case ITF_WAVE:                         /* wrapping selectors + integer */
+    case ITF_DUTY:                         /* fields: the same R11 roll-over */
+    case ITF_PCT:                          /* formula as before — these */
+    case ITF_SPCT:                         /* formats had no case label and */
+    case ITF_DIV:                          /* reached the default group */
+    case ITF_DEST:
+    case ITF_TGT:
+    case ITF_FILT:
+    case ITF_XSRC:
+    case ITF_ONOFF:
+    case ITF_SEQMODE:
+    case ITF_SEQONCE:
+    case ITF_STEPSEL:
+    case ITF_INT:
+    case ITF_XDIV:
     default:                               /* R11: uniform roll-over —
                                             * percent, signed percent,
                                             * DUTY, BPM, XDIV and every
@@ -505,10 +522,14 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
     case ACT_NAV_RIGHT: {
         int dir = act == ACT_NAV_RIGHT ? +1 : -1;
         if (is_osc_tab(ui) && !ui->focus[ui->tab]) {
-            /* LEFT/RIGHT on the sub-tab row cycles sub-tabs */
+            /* LEFT/RIGHT on the sub-tab row cycles sub-tabs; the sum is
+             * kept in int (sub 0..2, dir ±1 — always in range) and the %
+             * result 0..SUB_COUNT-1 makes the unsigned cast
+             * value-preserving */
             int ci = chain_of(ui);
-            ui->sub[ci] = (sub_tab_t)((ui->sub[ci] + dir + SUB_COUNT) %
-                                      SUB_COUNT);
+            ui->sub[ci] = (sub_tab_t)(unsigned int)
+                (((int)ui->sub[ci] + dir + (int)SUB_COUNT) %
+                 (int)SUB_COUNT);
         } else {
             /* R12/R12a (PLAN_HZ_EDIT.md): the row-dependent NAV dispatch
              * is TABLE-DRIVEN — the item spec's nav mode decides what
@@ -520,10 +541,11 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
             case NAV_STEPSEL: {        /* STEP row: move the rectangle,
                                         * wrapping across the spec's
                                         * min..max (0..7) */
-                int n = sp->max - sp->min + 1;
+                int sn = sp->max - sp->min + 1;   /* not the outer n:
+                                                     page item count */
                 int s = ui->seq_sel[chain_of(ui)] - sp->min;
                 ui->seq_sel[chain_of(ui)] =
-                    sp->min + (((s + dir) % n) + n) % n;
+                    sp->min + (((s + dir) % sn) + sn) % sn;
                 break;
             }
             case NAV_DIGITS:           /* digit box: move the digit
@@ -537,7 +559,8 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
                      * the 10000s; clamped 0..6 (R3) */
                     ui->freq_digit = clampi(ui->freq_digit + dir, 0, 6);
                 break;
-            default:                   /* NAV_NONE: inert (as today) */
+            case NAV_NONE:             /* no nav spec (and the NULL-spec
+            default:                   * guard): inert (as today) */
                 break;
             }
         }
@@ -568,7 +591,7 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
  * owns its input policy), not in main.c. */
 int ui_event_filter(const ui_t *ui, const SDL_Event *e)
 {
-    if (e->type == SDL_KEYDOWN && ui_text_entry_active((ui_t *)ui) &&
+    if (e->type == SDL_KEYDOWN && ui_text_entry_active(ui) &&
         e->key.keysym.sym != SDLK_ESCAPE &&
         e->key.keysym.sym != SDLK_RETURN)
         return 0;                      /* swallowed by text entry */

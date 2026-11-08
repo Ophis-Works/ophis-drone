@@ -476,10 +476,10 @@ static void test_freq_fractional_rounding(void)
     char b[32];
     item_value(&u, it, b, (int)sizeof b);
     CHECK(strcmp(b, "00055.50 Hz") == 0);  /* fraction displayed */
-    CHECK(item_get(&u, it) == 55.5);       /* value keeps the fraction */
+    CHECK(fexact(item_get(&u, it), 55.5));  /* value keeps the fraction */
 
     edit_item(&u, it, +1);                 /* one 1s-digit step */
-    CHECK(item_get(&u, it) == 56.5);       /* 5550 +100 centi-Hz */
+    CHECK(fexact(item_get(&u, it), 56.5));  /* 5550 +100 centi-Hz */
 }
 
 /* ---- P6 (PLAN_HZ_EDIT.md §1.4, R11): EVERY numeric edit field rolls
@@ -499,55 +499,55 @@ static void test_edit_rollover(void)
     it = (item_t){ NULL, IT_VEL, 0 };
     param_set(&u.draft, PK_CHAIN_VEL, 0, 0, 100);
     edit_item(&u, it, +1);
-    CHECK(item_get(&u, it) == 0);
+    CHECK(fexact(item_get(&u, it), 0));
     param_set(&u.draft, PK_CHAIN_VEL, 0, 0, 0);
     edit_item(&u, it, -1);
-    CHECK(item_get(&u, it) == 100);
+    CHECK(fexact(item_get(&u, it), 100));
 
     /* ENV: signed percent -100..+100 (+1 above 100 -> -100) */
     it = (item_t){ NULL, IT_FILT_ENV, 0 };
     param_set(&u.draft, PK_CHAIN_ENV, 0, 0, 100);
     edit_item(&u, it, +1);
-    CHECK(item_get(&u, it) == -100);
+    CHECK(fexact(item_get(&u, it), -100));
 
     /* DUTY: 5..95 (95 -> 5, R11) */
     it = (item_t){ NULL, IT_OSC_DUTY, 0 };
     param_set(&u.draft, PK_CHAIN_DUTY, 0, 0, 95);
     edit_item(&u, it, +1);
-    CHECK(item_get(&u, it) == 5);
+    CHECK(fexact(item_get(&u, it), 5));
 
     /* BPM: 1..500 (500 -> 1) */
     it = (item_t){ NULL, IT_BPM, 0 };
     param_set(&u.draft, PK_TOP_BPM, 0, 0, 500);
     edit_item(&u, it, +1);
-    CHECK(item_get(&u, it) == 1);
+    CHECK(fexact(item_get(&u, it), 1));
 
     /* MASTER: percent 0..100 (0 -> 100) */
     it = (item_t){ NULL, IT_MASTER, 0 };
     param_set(&u.draft, PK_TOP_MASTER, 0, 0, 0);
     edit_item(&u, it, -1);
-    CHECK(item_get(&u, it) == 100);
+    CHECK(fexact(item_get(&u, it), 100));
 
     /* SEQ DIV: 1..16 (guards the uniform rule on the "already wraps" row) */
     it = (item_t){ NULL, IT_SEQ_DIV, 0 };
     param_set(&u.draft, PK_SEQ_DIV, 0, 0, 16);
     edit_item(&u, it, +1);
-    CHECK(item_get(&u, it) == 1);
+    CHECK(fexact(item_get(&u, it), 1));
 
     /* ADSR S: percent 0..100 (top -> 0) */
     it = (item_t){ NULL, IT_S, 0 };
     param_set(&u.draft, PK_ADSR_S, 0, 0, 100);
     edit_item(&u, it, +1);
-    CHECK(item_get(&u, it) == 0);
+    CHECK(fexact(item_get(&u, it), 0));
 
     /* MIXVOL: percent 0..100 per chain (si IS the chain index) */
     it = (item_t){ NULL, IT_MIXVOL, 1 };
     param_set(&u.draft, PK_CHAIN_MIXVOL, 0, 1, 100);
     edit_item(&u, it, +1);
-    CHECK(item_get(&u, it) == 0);
+    CHECK(fexact(item_get(&u, it), 0));
     param_set(&u.draft, PK_CHAIN_MIXVOL, 0, 1, 0);
     edit_item(&u, it, -1);
-    CHECK(item_get(&u, it) == 100);
+    CHECK(fexact(item_get(&u, it), 100));
 }
 
 /* ---- P7 (PLAN_HZ_EDIT.md §1.1a, R12/R12a): the SEQ page joins the
@@ -619,9 +619,9 @@ static void test_seq_nav_rows(void)
         ui_handle_action(&u, ACT_NAV_RIGHT);
         CHECK(u.freq_digit == 6);      /* 5 -> 6: the 0.01s digit */
         ui_handle_action(&u, ACT_VAL_INC);
-        CHECK(u.draft.seq[0].steps[3].pitch_hz == 220.01f);
-        CHECK(u.draft.seq[0].steps[0].pitch_hz == 0.0f);
-        CHECK(u.draft.seq[0].steps[4].pitch_hz == 0.0f);
+        CHECK(fexactf(u.draft.seq[0].steps[3].pitch_hz, 220.01f));
+        CHECK(fexactf(u.draft.seq[0].steps[0].pitch_hz, 0.0f));
+        CHECK(fexactf(u.draft.seq[0].steps[4].pitch_hz, 0.0f));
     }
 
     /* PITCH row: LEFT walks toward the 10000s digit (index 0) and a
@@ -640,7 +640,7 @@ static void test_seq_nav_rows(void)
         CHECK(u.freq_digit == 0);      /* 1 -> 0: the 10000s digit */
         CHECK(u.seq_sel[0] == 3);      /* the rectangle must not move */
         ui_handle_action(&u, ACT_VAL_INC);
-        CHECK(u.draft.seq[0].steps[3].pitch_hz == 10220.0f);
+        CHECK(fexactf(u.draft.seq[0].steps[3].pitch_hz, 10220.0f));
     }
 
     /* STEP row: NAV moves the rectangle (unchanged R12 behavior), 0..7
@@ -680,9 +680,9 @@ static void test_seq_nav_rows(void)
         ui_t u = seq_ui(5, 4, 3);      /* freq_digit 4 = the 1s digit */
         u.draft.seq[0].steps[3].pitch_hz = 220.0f;
         ui_handle_action(&u, ACT_VAL_INC);
-        CHECK(u.draft.seq[0].steps[3].pitch_hz == 221.0f);
-        CHECK(u.draft.seq[0].steps[0].pitch_hz == 0.0f);
-        CHECK(u.draft.seq[0].steps[4].pitch_hz == 0.0f);
+        CHECK(fexactf(u.draft.seq[0].steps[3].pitch_hz, 221.0f));
+        CHECK(fexactf(u.draft.seq[0].steps[0].pitch_hz, 0.0f));
+        CHECK(fexactf(u.draft.seq[0].steps[4].pitch_hz, 0.0f));
     }
 }
 
@@ -853,8 +853,8 @@ int main(void)
         for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
             param_set(&d, cases[i].k, cases[i].ci, cases[i].si,
                       cases[i].v);
-            CHECK(param_get(&d, cases[i].k, cases[i].ci, cases[i].si)
-                  == cases[i].v);
+            CHECK(fexact(param_get(&d, cases[i].k, cases[i].ci,
+                                   cases[i].si), cases[i].v));
         }
     }
 

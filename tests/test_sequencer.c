@@ -27,7 +27,7 @@ static seq_params_t mkseq(int on)
     p.on  = on;
     p.div = 1;                          /* factory default (PLAN §6) */
     for (int i = 0; i < 8; i++) {
-        p.steps[i].pitch_hz = 100.0f + 10.0f * i;
+        p.steps[i].pitch_hz = 100.0f + 10.0f * (float)i;  /* i <= 7: exact */
         p.steps[i].vel      = 50;
     }
     return p;
@@ -91,7 +91,7 @@ int main(void)
     {
         seq_state_t s; seq_params_t p = mkseq(1);   /* bpm 60: period 0.25 s */
         for (int i = 0; i < 8; i++) {
-            p.steps[i].pitch_hz = 200.0f + i;
+            p.steps[i].pitch_hz = 200.0f + (float)i;  /* i <= 7: exact */
             p.steps[i].vel      = 40 + i;
         }
         double pitch[64]; int vel[64];

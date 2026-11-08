@@ -36,11 +36,12 @@ static void fill_params(synth_params_t *p, int tag)
     p->run    = tag & 1;
     p->safety = (tag >> 1) & 1;
     for (int c = 0; c < 3; c++) {
-        p->chain[c].freq_hz         = 100.0f * tag + c;
+        /* tag <= TAG_MAX (small), c <= 2: int->float conversions exact */
+        p->chain[c].freq_hz         = 100.0f * (float)tag + (float)c;
         p->chain[c].level           = tag;
-        p->seq[c].steps[0].pitch_hz = 200.0f * tag + c;
+        p->seq[c].steps[0].pitch_hz = 200.0f * (float)tag + (float)c;
         p->seq[c].steps[0].vel      = tag;
-        p->seq[c].steps[7].pitch_hz = 300.0f * tag + c;
+        p->seq[c].steps[7].pitch_hz = 300.0f * (float)tag + (float)c;
     }
     p->delay.feedback = tag;
     p->reverb.mix     = tag;
@@ -66,11 +67,13 @@ static int params_valid(const synth_params_t *p)
         p->safety != ((tag >> 1) & 1))
         return 0;
     for (int c = 0; c < 3; c++)
-        if (p->chain[c].freq_hz != 100.0f * tag + c ||
+        if (!fexactf(p->chain[c].freq_hz, 100.0f * (float)tag + (float)c) ||
             p->chain[c].level != tag ||
-            p->seq[c].steps[0].pitch_hz != 200.0f * tag + c ||
+            !fexactf(p->seq[c].steps[0].pitch_hz,
+                     200.0f * (float)tag + (float)c) ||
             p->seq[c].steps[0].vel != tag ||
-            p->seq[c].steps[7].pitch_hz != 300.0f * tag + c)
+            !fexactf(p->seq[c].steps[7].pitch_hz,
+                     300.0f * (float)tag + (float)c))
             return 0;
     return p->delay.feedback == tag && p->reverb.mix == tag &&
            p->xmod[0].src == tag;
@@ -96,10 +99,10 @@ static int status_valid(const ui_status_t *s)
     }
     if (tag < 1 || tag > TAG_MAX)
         return 0;
-    if (s->run != (tag & 1) || s->gate != (float)tag)
+    if (s->run != (tag & 1) || !fexactf(s->gate, (float)tag))
         return 0;
     for (int c = 0; c < 3; c++)
-        if (s->env[c] != (float)tag || s->step[c] != tag)
+        if (!fexactf(s->env[c], (float)tag) || s->step[c] != tag)
             return 0;
     return 1;
 }

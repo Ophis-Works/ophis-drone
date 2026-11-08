@@ -147,7 +147,8 @@ int main(void)
             osc_init(&b, (wave_t)w, 4242); b.duty = 95;
             int differ = 0;
             for (int s = 0; s < N; s++)
-                if (osc_next(&a, 440.0, SR) != osc_next(&b, 440.0, SR))
+                if (!fexact(osc_next(&a, 440.0, SR),
+                            osc_next(&b, 440.0, SR)))
                     { differ = 1; break; }
             CHECK(differ == 0);
         }

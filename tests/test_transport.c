@@ -54,9 +54,9 @@ int main(void)
         transport_state_t t = mkT();
         double now = BASE;
         blocks(&t, 0, 0, 0, env_zero, 10, &now);
-        CHECK(t.gate == 0.0f);
+        CHECK(fexactf(t.gate, 0.0f));
         CHECK(t.one_shot == 0);
-        CHECK(t.one_shot_deadline == 0.0);
+        CHECK(fexact(t.one_shot_deadline, 0.0));
     }
 
     /* ---- RUN on -> gate 1 after the 10 ms ramp ---- */
@@ -67,12 +67,12 @@ int main(void)
         blocks(&t, 1, 0, 0, env_zero, 1, &now);
         CHECK(fabs(t.gate - per_block) < 0.01f);
         blocks(&t, 1, 0, 0, env_zero, 1, &now);
-        CHECK(t.gate == 1.0f);           /* 2*per_block > 1: clamped */
+        CHECK(fexactf(t.gate, 1.0f));           /* 2*per_block > 1: clamped */
         blocks(&t, 1, 0, 0, env_zero, 3, &now);   /* > 441 samples total */
-        CHECK(t.gate == 1.0f);
+        CHECK(fexactf(t.gate, 1.0f));
         /* RUN off again: gate ramps back down to 0 in 10 ms */
         blocks(&t, 0, 0, 0, env_zero, 10, &now);
-        CHECK(t.gate == 0.0f);
+        CHECK(fexactf(t.gate, 0.0f));
     }
 
     /* ---- TRIGGER while RUN off: gate opens (one-shot), exactly one
@@ -93,13 +93,13 @@ int main(void)
             int trig = (i == 0) ? 1 : 0;
             transport_process(&t, 0, trig, 0, env_mid, BLK, now, SR);
             if (i == 0)
-                CHECK(t.one_shot_deadline == now + 30.0); /* absolute */
+                CHECK(fexact(t.one_shot_deadline, now + 30.0)); /* absolute */
             if (t.one_shot && !prev) { edges++; n_events += 3; }
             prev = t.one_shot;
             now += BLK / SR;
             /* only the first block carries the trigger flag */
         }
-        CHECK(t.gate == 1.0f);               /* one-shot holds gate open */
+        CHECK(fexactf(t.gate, 1.0f));               /* one-shot holds gate open */
         CHECK(t.one_shot == 1);
         CHECK(t.one_shot_deadline > 39.99 && t.one_shot_deadline <= 40.0);
         CHECK(edges == 1);                   /* exactly one retrigger edge */
@@ -107,17 +107,17 @@ int main(void)
 
         /* envelopes still up -> stays held */
         blocks(&t, 0, 0, 0, env_mid, 5, &now);
-        CHECK(t.gate == 1.0f);
+        CHECK(fexactf(t.gate, 1.0f));
         CHECK(t.one_shot == 1);
 
         /* all envelopes reach 0 -> one-shot clears, gate closes (ramp) */
         blocks(&t, 0, 0, 0, env_zero, 5, &now);
         CHECK(t.one_shot == 0);
-        CHECK(t.gate == 0.0f);
+        CHECK(fexactf(t.gate, 0.0f));
 
         /* sequencer untouched by the whole TRIGGER episode */
         CHECK(sq.cursor == 0);
-        CHECK(sq.next_step_time == 0.0);
+        CHECK(fexact(sq.next_step_time, 0.0));
     }
 
     /* ---- 30 s safety deadline is ABSOLUTE: envelopes never fall ->
@@ -127,7 +127,7 @@ int main(void)
         double now = BASE;
         transport_process(&t, 0, 1, 0, env_mid, BLK, now, SR);
         CHECK(t.one_shot == 1);
-        CHECK(t.one_shot_deadline == now + 30.0);   /* == 40.0, absolute */
+        CHECK(fexact(t.one_shot_deadline, now + 30.0));   /* == 40.0, absolute */
         /* step now across the deadline; deadline expires at now >= 40.0 */
         double close_time = -1.0;
         for (int i = 0; i < 32; i++) {
@@ -139,8 +139,8 @@ int main(void)
                                               * deadline */
         CHECK(close_time < 40.0 + 1.0);      /* within the expiry block */
         CHECK(t.one_shot == 0);
-        CHECK(t.one_shot_deadline == 0.0);
-        CHECK(t.gate == 0.0f);
+        CHECK(fexact(t.one_shot_deadline, 0.0));
+        CHECK(fexactf(t.gate, 0.0f));
     }
 
     /* ---- PANIC: gate 0 instant, one-shot cleared, run cleared,
@@ -157,13 +157,13 @@ int main(void)
         CHECK(t.gate > 0.0f);
         CHECK(t.one_shot_deadline > 0.0);
         transport_process(&t, 1, 0, 1, env_mid, BLK, now, SR);  /* PANIC */
-        CHECK(t.gate == 0.0f);               /* instant, no ramp */
+        CHECK(fexactf(t.gate, 0.0f));               /* instant, no ramp */
         CHECK(t.one_shot == 0);
-        CHECK(t.one_shot_deadline == 0.0);   /* PANIC -> deadline 0 */
+        CHECK(fexact(t.one_shot_deadline, 0.0));   /* PANIC -> deadline 0 */
         now += BLK / SR;
         /* run cleared: a follow-up block with run=0 keeps gate 0 */
         blocks(&t, 0, 0, 0, env_mid, 5, &now);
-        CHECK(t.gate == 0.0f);
+        CHECK(fexactf(t.gate, 0.0f));
         CHECK(t.one_shot == 0);
         /* sequencer state untouched by transport (PANIC resets are the
          * engine's job, transport itself never writes seq state) */

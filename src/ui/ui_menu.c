@@ -254,6 +254,8 @@ void menu_action(ui_t *ui, ui_action_t act)
         case ACT_NAV_RIGHT:
         case ACT_VAL_DEC:
         case ACT_VAL_INC: break;   /* U4: NAV/VAL inert (used to close) */
+        case ACT_TRIGGER:          /* labeled: was falling to default */
+        case ACT_MENU:             /* labeled: was falling to default */
         default:
             /* Start/Esc always close; TRIGGER closes only where the
              * B-button cancel is part of the map (handheld) — desktop
@@ -279,6 +281,8 @@ void menu_action(ui_t *ui, ui_action_t act)
         case ACT_NAV_RIGHT:
         case ACT_VAL_DEC:
         case ACT_VAL_INC: break;   /* U4: NAV/VAL inert (used to close) */
+        case ACT_TRIGGER:          /* labeled: was falling to default */
+        case ACT_MENU:             /* labeled: was falling to default */
         default:
             if (act == ACT_TRIGGER && !KB_TRIGGER_CANCELS_MENU) break;
             menu_close(ui);
@@ -310,6 +314,8 @@ void menu_action(ui_t *ui, ui_action_t act)
             break;
         case ACT_TAB_BACK:
         case ACT_TAB_NEXT: break;      /* Q/E inactive in menu windows */
+        case ACT_TRIGGER:              /* labeled: was falling to default */
+        case ACT_MENU:                 /* labeled: was falling to default */
         default:
             if (act == ACT_TRIGGER && !KB_TRIGGER_CANCELS_MENU) break;
             menu_close(ui);            /* Esc cancel (TRIGGER on handheld) */
@@ -339,6 +345,12 @@ void menu_action(ui_t *ui, ui_action_t act)
             case ACT_NAV_RIGHT:
             case ACT_VAL_DEC:
             case ACT_VAL_INC: break;   /* U4: NAV/VAL inert (used to close) */
+            case ACT_TRIGGER:          /* labeled: was falling to default
+                                        * (TAB_BACK/NEXT already excluded
+                                        * above; MENU inert as before) */
+            case ACT_TAB_NEXT:
+            case ACT_TAB_BACK:
+            case ACT_MENU:
             default:
                 if (act == ACT_TRIGGER && !KB_TRIGGER_CANCELS_MENU) break;
                 menu_close(ui);        /* Esc (TRIGGER on handheld) */

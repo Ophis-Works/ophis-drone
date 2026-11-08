@@ -12,9 +12,9 @@ int main(void)
     /* ADSR seconds ladder (D6, R9 untouched): pos 0 = 0 s;
      * 1..50 = 0.001*60000^((pos-1)/49), so pos 1 = 0.001 s and
      * pos 50 = 60 s (0.001 * 60000^1). */
-    CHECK(adsr_pos_to_s(0) == 0.0);
-    CHECK(adsr_pos_to_s(1) == 0.001);
-    CHECK(adsr_pos_to_s(50) == 60.0);
+    CHECK(fexact(adsr_pos_to_s(0), 0.0));      /* exact ladder endpoints */
+    CHECK(fexact(adsr_pos_to_s(1), 0.001));
+    CHECK(fexact(adsr_pos_to_s(50), 60.0));
     {
         double prev = -1.0;                /* strictly monotonic */
         for (int pos = 0; pos <= 50; pos++) {

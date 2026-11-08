@@ -14,10 +14,12 @@
 static adsr_params_t mkp(void)
 {
     adsr_params_t p;
-    p.a = 1000.0 / SR;
-    p.d = 2000.0 / SR;
+    /* the params are float by design: the double quotient rounds once,
+     * intentionally (documented per -Wconversion rule) */
+    p.a = (float)(1000.0 / SR);
+    p.d = (float)(2000.0 / SR);
     p.s = 50;
-    p.r = 1000.0 / SR;
+    p.r = (float)(1000.0 / SR);
     return p;
 }
 
@@ -59,7 +61,7 @@ int main(void)
     }
     CHECK(fabs(lv[5499] - 0.25) < 0.02);       /* halfway down */
     CHECK(lv[5999] < 0.02f);                   /* 1000 release samples done */
-    CHECK(lv[6599] == 0.0f);                   /* finished holds zero */
+    CHECK(fexactf(lv[6599], 0.0f));            /* finished holds zero */
     CHECK(mx <= 1.0f && mn >= 0.0f);
 
     /* ---- release from ATTACK via gate falling edge mid-attack ---- */
@@ -69,7 +71,7 @@ int main(void)
     for (int n = 500; n < 1700; n++) lv[n] = adsr_next(&e, &p, SR, 0);
     CHECK(fabs(lv[999]  - 0.25) < 0.02);       /* linear from level .5 */
     CHECK(lv[1499] < 0.02f);                   /* zero 1000 samples after edge */
-    CHECK(lv[1699] == 0.0f);
+    CHECK(fexactf(lv[1699], 0.0f));
     for (int n = 500; n < 1700; n++) CHECK(lv[n] >= 0.0f && lv[n] <= 1.0f);
 
     /* ---- retrigger while gate held: re-enters ATTACK from current level ---- */
@@ -103,7 +105,7 @@ int main(void)
     adsr_reset(&e);
     CHECK(adsr_next(&e, &p, SR, 1) > 0.0f);    /* gate rises -> attack */
     adsr_reset(&e);
-    CHECK(adsr_next(&e, &p, SR, 0) == 0.0f);   /* reset -> idle, level 0 */
+    CHECK(fexactf(adsr_next(&e, &p, SR, 0), 0.0f));   /* reset -> idle, level 0 */
 
     /* ---- Phase 5 item 6 (PLAN_CODE_REVIEW_FIXES.md): adsr_trigger()
      * mid-RELEASE restarts the attack EXACTLY like a gate rising edge —
@@ -120,7 +122,7 @@ int main(void)
                                                   crosses into decay */
         float a = adsr_next(&e_trig, &p, SR, 0);   /* gate held low */
         float b = adsr_next(&e_edge, &p, SR, 1);   /* rising edge */
-        CHECK(a == b);
+        CHECK(fexactf(a, b));   /* sample-exact equality is the pin */
     }
 
     HARNESS_REPORT();

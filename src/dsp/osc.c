@@ -51,6 +51,10 @@ double osc_next(osc_t *o, double freq_hz, double sr)
         return white_sample(o);
     case WAVE_PINK:
         return pink_sample(o);
+    case WAVE_SINE:                    /* tonal: fall through to the */
+    case WAVE_TRIANGLE:                /* phase-accumulated path below */
+    case WAVE_SAW:                     /* (PLAN §5) */
+    case WAVE_SQUARE:
     default:
         break;
     }
@@ -81,6 +85,8 @@ double osc_next(osc_t *o, double freq_hz, double sr)
             x = (o->phase < (double)d / 100.0) ? 1.0 : -1.0;
         }
         break;
+    case WAVE_WHITE:                   /* unreachable: returned above */
+    case WAVE_PINK:
     default:
         x = 0.0;
         break;

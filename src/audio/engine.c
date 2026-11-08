@@ -18,10 +18,12 @@ void engine_init(engine_t *e, double sr)
     e->sr = sr;
     e->now = 0.0;
     for (int c = 0; c < 3; c++) {
-        chain_init(&e->ch[c], 0x9E3779B97F4A7C15ull + (uint64_t)c * 0x1000ull);
+        chain_init(&e->ch[c], 0x9E3779B97F4A7C15ull
+                              + (uint64_t)c * (uint64_t)0x1000ull);
         /* owner-ordered modes amendment: per-instance deterministic seed,
          * same pattern as chain_init (random/markov PRNG, PLAN §6) */
-        seq_init(&e->sq[c], 0x9E3779B97F4A7C15ull + (uint64_t)c * 0x1000ull);
+        seq_init(&e->sq[c], 0x9E3779B97F4A7C15ull
+                            + (uint64_t)c * (uint64_t)0x1000ull);
         e->prev_seq_on[c] = 0;
     }
     e->tr.gate = 0.0f;          /* memset covers: no one-shot, deadline 0 */
@@ -42,8 +44,10 @@ void engine_seq_steps(const engine_t *e, int out[3])
 void engine_panic_reset(engine_t *e)
 {
     for (int c = 0; c < 3; c++) {
-        chain_init(&e->ch[c], 0x9E3779B97F4A7C15ull + (uint64_t)c * 0x1000ull);
-        seq_init(&e->sq[c], 0x9E3779B97F4A7C15ull + (uint64_t)c * 0x1000ull);
+        chain_init(&e->ch[c], 0x9E3779B97F4A7C15ull
+                              + (uint64_t)c * (uint64_t)0x1000ull);
+        seq_init(&e->sq[c], 0x9E3779B97F4A7C15ull
+                            + (uint64_t)c * (uint64_t)0x1000ull);
         e->prev_seq_on[c] = e->p.seq[c].on;
         e->cur_valid[c] = 0;       /* PANIC: full state reset (PLAN §6) */
     }

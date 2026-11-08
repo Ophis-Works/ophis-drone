@@ -43,7 +43,7 @@ static void fill_params(synth_params_t *p)
         p->chain[c].vel     = 33 * (c + 1);
         p->chain[c].adsr.a  = 0.01f; p->chain[c].adsr.d = 0.3f;
         p->chain[c].adsr.s  = 44;    p->chain[c].adsr.r = 1.5f;
-        p->chain[c].fmode   = FILT_HP;  p->chain[c].fc = 500.0f * (c + 1);
+        p->chain[c].fmode   = FILT_HP;  p->chain[c].fc = 500.0f * (float)(c + 1);
         p->chain[c].res     = 25 * (c + 1);          /* 25/50/75 */
         p->chain[c].envamt  = (c == 1) ? -75 : 50;
         p->chain[c].poles   = (c == 1) ? 12 : 24;
@@ -176,28 +176,31 @@ int main(void)
     /* GLOBAL tempo (AMENDED, owner order, PLAN §6): one top-level bpm 60 */
     CHECK(d->bpm == 60);
     /* A: 55.0 saw, level 100, vel 100, subs off, A.05/D.2/S100/R.5, LP800 */
-    CHECK(d->chain[0].freq_hz == 55.0f && d->chain[0].wave == WAVE_SAW);
+    CHECK(fexactf(d->chain[0].freq_hz, 55.0f) && d->chain[0].wave == WAVE_SAW);
     CHECK(d->chain[0].level == 100 && d->chain[0].vel == 100);
-    CHECK(d->chain[0].adsr.a == 0.05f && d->chain[0].adsr.d == 0.2f &&
-          d->chain[0].adsr.s == 100 && d->chain[0].adsr.r == 0.5f);
-    CHECK(d->chain[0].fmode == FILT_LP && d->chain[0].fc == 800.0f);
+    CHECK(fexactf(d->chain[0].adsr.a, 0.05f) &&
+          fexactf(d->chain[0].adsr.d, 0.2f) &&
+          d->chain[0].adsr.s == 100 && fexactf(d->chain[0].adsr.r, 0.5f));
+    CHECK(d->chain[0].fmode == FILT_LP && fexactf(d->chain[0].fc, 800.0f));
     /* B: 55.5 square, level 50, vel 100, subs silent (O2 voices:
        div 1 sine level 0), A.05/D.2/S100/R.5, LP600 */
-    CHECK(d->chain[1].freq_hz == 55.5f && d->chain[1].wave == WAVE_SQUARE);
+    CHECK(fexactf(d->chain[1].freq_hz, 55.5f) && d->chain[1].wave == WAVE_SQUARE);
     CHECK(d->chain[1].level == 50 && d->chain[1].vel == 100);
-    CHECK(d->chain[1].adsr.a == 0.05f && d->chain[1].adsr.d == 0.2f &&
-          d->chain[1].adsr.s == 100 && d->chain[1].adsr.r == 0.5f);
-    CHECK(d->chain[1].fmode == FILT_LP && d->chain[1].fc == 600.0f);
+    CHECK(fexactf(d->chain[1].adsr.a, 0.05f) &&
+          fexactf(d->chain[1].adsr.d, 0.2f) &&
+          d->chain[1].adsr.s == 100 && fexactf(d->chain[1].adsr.r, 0.5f));
+    CHECK(d->chain[1].fmode == FILT_LP && fexactf(d->chain[1].fc, 600.0f));
     CHECK(d->chain[1].sub[0].div == 1 &&
           d->chain[1].sub[0].wave == WAVE_SINE &&
           d->chain[1].sub[0].level == 0);
     CHECK(d->chain[1].sub[1].level == 0);
     /* C: 110.0 sine, level 30, vel 100, subs off, A.1/D.3/S80/R1.0, LP1200 */
-    CHECK(d->chain[2].freq_hz == 110.0f && d->chain[2].wave == WAVE_SINE);
+    CHECK(fexactf(d->chain[2].freq_hz, 110.0f) && d->chain[2].wave == WAVE_SINE);
     CHECK(d->chain[2].level == 30 && d->chain[2].vel == 100);
-    CHECK(d->chain[2].adsr.a == 0.1f && d->chain[2].adsr.d == 0.3f &&
-          d->chain[2].adsr.s == 80 && d->chain[2].adsr.r == 1.0f);
-    CHECK(d->chain[2].fmode == FILT_LP && d->chain[2].fc == 1200.0f);
+    CHECK(fexactf(d->chain[2].adsr.a, 0.1f) &&
+          fexactf(d->chain[2].adsr.d, 0.3f) &&
+          d->chain[2].adsr.s == 80 && fexactf(d->chain[2].adsr.r, 1.0f));
+    CHECK(d->chain[2].fmode == FILT_LP && fexactf(d->chain[2].fc, 1200.0f));
     CHECK(d->chain[2].sub[0].level == 0 &&
           d->chain[2].sub[1].level == 0);
     /* A subs silent too */
@@ -219,7 +222,7 @@ int main(void)
     /* delay / reverb factory defaults (approved change, exact recorded
      * values — silent: time 0 s, feedback 0, tone 20000 Hz, mix 0;
      * reverb all-zero) */
-    CHECK(d->delay.time_l == 0.0f && d->delay.time_r == 0.0f);
+    CHECK(fexactf(d->delay.time_l, 0.0f) && fexactf(d->delay.time_r, 0.0f));
     CHECK(d->delay.feedback == 0 && d->delay.tone == 20000 &&
           d->delay.mix == 0);
     CHECK(d->reverb.size == 0 && d->reverb.damp == 0 &&
@@ -234,13 +237,13 @@ int main(void)
         CHECK(d->seq[s].div == 1);
         CHECK(d->seq[s].mode == 0 && d->seq[s].once == 0);
         for (int st = 0; st < 8; st++)
-            CHECK(d->seq[s].steps[st].pitch_hz == 55.0f &&
+            CHECK(fexactf(d->seq[s].steps[st].pitch_hz, 55.0f) &&
                   d->seq[s].steps[st].vel == 100);
     }
     /* xmod: all OFF */
     for (int x = 0; x < 3; x++)
         CHECK(d->xmod[x].src == 0 && d->xmod[x].dest == 0 &&
-              d->xmod[x].amount == 0.0f);
+              fexactf(d->xmod[x].amount, 0.0f));
 
     /* 6. preset_dir() — THE ONLY rule (user-set): presets/ next to the
      * running executable, computed at runtime from /proc/self/exe.
@@ -291,10 +294,11 @@ int main(void)
         struct stat st;
         CHECK(stat(deep, &st) == 0 && S_ISDIR(st.st_mode));
         CHECK(preset_ensure_dir(base) == 0);
-        /* a FILE in the middle of the path is not creatable */
-        FILE *f = fopen("build/tests/ensure_file", "w");
-        CHECK(f != NULL);
-        if (f) fclose(f);
+        /* a FILE in the middle of the path is not creatable (ff: not the
+         * outer FILE *f) */
+        FILE *ff = fopen("build/tests/ensure_file", "w");
+        CHECK(ff != NULL);
+        if (ff) fclose(ff);
         CHECK(preset_ensure_dir("build/tests/ensure_file/x") == -1);
         unlink("build/tests/ensure_file");
         /* cleanup */

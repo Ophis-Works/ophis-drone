@@ -16,8 +16,6 @@
 #define SR 44100.0
 #define BLK 256
 #define NB2C 44100            /* 1 s */
-static double bbuf_on[NB2C], bbuf_off[NB2C];
-static double last_b_raw_on = 0.0;
 
 static engine_t e;
 
@@ -30,8 +28,8 @@ static void setup(int step_vel)
     for (int c = 0; c < 3; c++)
         e.p.chain[c].level = (c == 0) ? 100 : 0;   /* mute B and C */
     e.p.chain[0].wave = WAVE_SINE;
-    e.p.chain[0].adsr.a = 0.005;       /* fast attack for clean windows */
-    e.p.chain[0].adsr.d = 0.01;
+    e.p.chain[0].adsr.a = (float)0.005;    /* float params: intended rounding */
+    e.p.chain[0].adsr.d = (float)0.01;
     e.p.chain[0].adsr.s = 100;
     e.p.seq[0].on = 1;
     e.p.seq[0].div = 1;                /* step period = 60/60/4 = 0.25 s */
@@ -263,8 +261,8 @@ int main(void)
         for (int b = 0; b < 10; b++)
             engine_render_block(&e, sink2, BLK, 0, 0, 1 << 1); /* chain B */
         CHECK(e.ch[1].env.level > 0.0f);       /* B retrigs, rises */
-        CHECK(e.ch[0].env.level == 0.0f);      /* A untouched */
-        CHECK(e.ch[2].env.level == 0.0f);      /* C untouched */
+        CHECK(fexactf(e.ch[0].env.level, 0.0f));   /* A untouched */
+        CHECK(fexactf(e.ch[2].env.level, 0.0f));   /* C untouched */
     }
 
     /* ---- P2 (PLAN_MOD_ROUTING.md M1): TARGET routing end-to-end —

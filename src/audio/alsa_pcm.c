@@ -25,9 +25,13 @@ alsa_pcm_t *alsa_open(const char *dev, int rate, int period_frames)
         return NULL;
     }
     /* Buffer = 4 periods (soft period = period_frames): 256 frames @ 44100
-     * ≈ 5.8 ms period, ≈ 23 ms total buffer. */
+     * ≈ 5.8 ms period, ≈ 23 ms total buffer. period_frames/rate are
+     * positive (main.c SR/PERIOD constants), so the casts above are
+     * value-preserving. */
     unsigned int latency_us =
-        (unsigned int)(period_frames * 4 * 1000000ULL / (unsigned long)rate);
+        (unsigned int)((unsigned long long)period_frames * 4ull
+                       * 1000000ull
+                       / (unsigned long long)(unsigned int)rate);
     int rc = snd_pcm_set_params(a->pcm, SND_PCM_FORMAT_FLOAT_LE,
                                 SND_PCM_ACCESS_RW_INTERLEAVED,
                                 2, (unsigned int)rate, 1, latency_us);

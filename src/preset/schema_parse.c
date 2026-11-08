@@ -103,13 +103,18 @@ static int val_range(double d, double lo, double hi,
     return 0;
 }
 
-/* integer per the old parser: integral value within int range */
+/* integer per the old parser: integral value within int range.
+ * -Wfloat-equal approach: no ==/!= on doubles — the NaN-safe range guard
+ * (NaN fails the >=/<= pair; ±inf fail the bounds) subsumes the old
+ * NaN/inf rejection, and for finite values floor(d) < d || floor(d) > d
+ * is exactly d != floor(d). Same accept/reject set as the old check. */
 static int val_int(const json_value_t *v, int *out, ps_t *j,
                    const char *path)
 {
     double d = val_number(v, j, path);
     if (j->failed) return -1;
-    if (d != floor(d) || d < -2147483648.0 || d > 2147483647.0) {
+    if (!(d >= -2147483648.0 && d <= 2147483647.0) ||
+        floor(d) < d || floor(d) > d) {
         perr(j, path);
         return -1;
     }
@@ -213,7 +218,10 @@ static int walk_keys(ps_t *j, const char *path, const char *key,
             return 0;
         }
         case KT_ENUM:
-            return val_enum(v, (const ent_t *)tab[i].tab, tab[i].lo,
+            /* tab[i].lo carries the enum count as an integral double
+             * (6/4/2/5/10/8 literals): exactly representable, cast is
+             * value-preserving */
+            return val_enum(v, (const ent_t *)tab[i].tab, (int)tab[i].lo,
                             (int *)m, j, path)
                    ? -1 : (set_bit(arg, i), 0);
         case KT_DUTY:

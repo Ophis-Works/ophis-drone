@@ -389,18 +389,18 @@ int main(void)
         biquad_t ref_hp, ref_lp;
         biquad_set(&ref_hp, FILT_HP, 60.0f, (double)SR, 0.7071f);
         biquad_set(&ref_lp, FILT_LP, 18000.0f, (double)SR, 0.7071f);
-        CHECK(st.hp1.b0 == ref_hp.b0 && st.hp1.b1 == ref_hp.b1 &&
-              st.hp1.b2 == ref_hp.b2 && st.hp1.a1 == ref_hp.a1 &&
-              st.hp1.a2 == ref_hp.a2);
-        CHECK(st.lp1.b0 == ref_lp.b0 && st.lp1.b1 == ref_lp.b1 &&
-              st.lp1.b2 == ref_lp.b2 && st.lp1.a1 == ref_lp.a1 &&
-              st.lp1.a2 == ref_lp.a2);
+        CHECK(fexact(st.hp1.b0, ref_hp.b0) && fexact(st.hp1.b1, ref_hp.b1) &&
+              fexact(st.hp1.b2, ref_hp.b2) && fexact(st.hp1.a1, ref_hp.a1) &&
+              fexact(st.hp1.a2, ref_hp.a2));
+        CHECK(fexact(st.lp1.b0, ref_lp.b0) && fexact(st.lp1.b1, ref_lp.b1) &&
+              fexact(st.lp1.b2, ref_lp.b2) && fexact(st.lp1.a1, ref_lp.a1) &&
+              fexact(st.lp1.a2, ref_lp.a2));
 
         static double outL2[N];
         run_fx(&st, &p, in, outL2, N);
         int differs = 0;
         for (int i = 0; i < N; i++)
-            if (outL[i] != outL2[i]) { differs = 1; break; }
+            if (!fexact(outL[i], outL2[i])) { differs = 1; break; }
         CHECK(differs == 0);
     }
 

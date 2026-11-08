@@ -21,8 +21,6 @@ static void fill_params(synth_params_t *p)
 {
     static const wave_t waves[6] = { WAVE_SINE, WAVE_TRIANGLE, WAVE_SAW,
                                      WAVE_SQUARE, WAVE_WHITE, WAVE_PINK };
-    static const mod_dest_t dests[5] = { MOD_OFF, MOD_PITCH, MOD_PHASE,
-                                         MOD_AMP, MOD_FILTER };
     static const filt_mode_t fmode[4] = { FILT_LP, FILT_HP, FILT_BP, FILT_BR };
     memset(p, 0, sizeof *p);
     p->master = 73;
@@ -31,7 +29,7 @@ static void fill_params(synth_params_t *p)
     p->run = 1; /* excluded from JSON — must not break the roundtrip */
     for (int c = 0; c < 3; c++) {
         chain_params_t *ch = &p->chain[c];
-        ch->freq_hz = 55.0f + c * 13.25f;
+        ch->freq_hz = 55.0f + (float)c * 13.25f;   /* c <= 2: exact */
         ch->wave    = waves[c % 6];
         ch->duty    = 5 + ((10 + 30 * c) % 91);  /* distinct values 5..95 */
         ch->level   = 10 + c * 30;
@@ -122,35 +120,35 @@ static int build_doc(char *buf, int n_chains, int n_subs, int n_steps,
         "{\"app\":\"ophis-drone\",\"version\":1,\"master\":70,\"bpm\":60,"
         "\"chain\":[");
     for (int c = 0; c < n_chains; c++) {
-        n += snprintf(buf + n, 16384 - n,
+        n += snprintf(buf + n, (size_t)(16384 - n),
             "%s{\"freq_hz\":55.0,\"wave\":\"saw\",\"duty\":50,"
             "\"level\":100,\"vel\":100,"
             "\"sub\":[", c ? "," : "");
         for (int s = 0; s < n_subs; s++)
-            n += snprintf(buf + n, 16384 - n,
+            n += snprintf(buf + n, (size_t)(16384 - n),
                 "%s{\"div\":1,\"wave\":\"sine\","
                 "\"duty\":50,\"level\":0}", s ? "," : "");
-        n += snprintf(buf + n, 16384 - n,
+        n += snprintf(buf + n, (size_t)(16384 - n),
             "],\"adsr\":{\"a\":0.05,\"d\":0.2,\"s\":100,\"r\":0.5},"
             "\"filter\":{\"mode\":\"lp\",\"fc\":800.0,\"res\":10,"
             "\"env\":0,\"poles\":\"12db\"}}");
     }
-    n += snprintf(buf + n, 16384 - n, "],\"seq\":[");
+    n += snprintf(buf + n, (size_t)(16384 - n), "],\"seq\":[");
     for (int q = 0; q < 3; q++) {
-        n += snprintf(buf + n, 16384 - n,
+        n += snprintf(buf + n, (size_t)(16384 - n),
             "%s{\"on\":false,\"div\":1,\"mode\":\"fwd\","
             "\"once\":false,\"steps\":[", q ? "," : "");
         for (int st = 0; st < n_steps; st++)
-            n += snprintf(buf + n, 16384 - n,
+            n += snprintf(buf + n, (size_t)(16384 - n),
                 "%s{\"pitch_hz\":55.0,\"vel\":100}", st ? "," : "");
-        n += snprintf(buf + n, 16384 - n, "]}");
+        n += snprintf(buf + n, (size_t)(16384 - n), "]}");
     }
-    n += snprintf(buf + n, 16384 - n, "],\"xmod\":[");
+    n += snprintf(buf + n, (size_t)(16384 - n), "],\"xmod\":[");
     for (int x = 0; x < n_xmod; x++)
-    n += snprintf(buf + n, 16384 - n,
+    n += snprintf(buf + n, (size_t)(16384 - n),
         "%s{\"src\":\"off\",\"dest\":\"off\",\"amount\":0.0}",
             x ? "," : "");
-    n += snprintf(buf + n, 16384 - n,
+    n += snprintf(buf + n, (size_t)(16384 - n),
         "],\"delay\":{\"time_l\":0.38,\"time_r\":0.51,\"feedback\":35,"
         "\"tone\":4500.0,\"mix\":30},"
         "\"reverb\":{\"size\":85,\"damp\":35,\"mix\":30,\"width\":100},"
@@ -268,7 +266,7 @@ int main(void)
                 for (int c = 0; c < 3; c++) {
                     const char *w = (c == 0) ? wtab[i].s
                                   : (c == 1 ? "tri" : "pink");
-                    k += snprintf(doc + k, sizeof doc - k,
+                    k += snprintf(doc + k, sizeof doc - (size_t)k,
                         "%s{\"freq_hz\":55.0,\"wave\":\"%s\",\"duty\":50,"
                         "\"level\":0,"
                         "\"vel\":0,\"sub\":[{\"div\":1,\"wave\":\"sine\","
@@ -278,19 +276,19 @@ int main(void)
                         "\"filter\":{\"mode\":\"lp\",\"fc\":1000.0,\"res\":10,\"env\":0,\"poles\":\"12db\"}}",
                         c ? "," : "", w);
                 }
-                k += snprintf(doc + k, sizeof doc - k,
+                k += snprintf(doc + k, sizeof doc - (size_t)k,
                     "],\"seq\":[");
                 for (int sq = 0; sq < 3; sq++) {
-                    k += snprintf(doc + k, sizeof doc - k,
+                    k += snprintf(doc + k, sizeof doc - (size_t)k,
                         "%s{\"on\":false,\"div\":1,"
                         "\"mode\":\"fwd\",\"once\":false,\"steps\":[",
                         sq ? "," : "");
                     for (int st = 0; st < 8; st++)
-                        k += snprintf(doc + k, sizeof doc - k,
+                        k += snprintf(doc + k, sizeof doc - (size_t)k,
                             "%s{\"pitch_hz\":55.0,\"vel\":0}", st ? "," : "");
-                    k += snprintf(doc + k, sizeof doc - k, "]}");
+                    k += snprintf(doc + k, sizeof doc - (size_t)k, "]}");
                 }
-                snprintf(doc + k, sizeof doc - k,
+                snprintf(doc + k, sizeof doc - (size_t)k,
                     "],\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
                     "\"amount\":0.0},{\"src\":\"off\",\"dest\":\"off\","
                     "\"amount\":0.0},{\"src\":\"off\",\"dest\":\"off\","
@@ -528,7 +526,7 @@ int main(void)
         CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                                 err, sizeof err) == 0);
         CHECK(q.master == 70 && q.bpm == 60 &&
-              q.chain[0].freq_hz == 55.0f);
+              fexactf(q.chain[0].freq_hz, 55.0f));  /* 55.0 is exact */
 
         /* stray per-seq "bpm" is an UNKNOWN key now (AMENDED, PLAN §6:
          * BPM is global) — ignored, global bpm untouched */
@@ -661,7 +659,8 @@ int main(void)
             /* fix the placeholder to the real target string */
             snprintf(err, sizeof err, "\"mode\":\"%s\"", mtab[i].s);
             {
-                char from[128], to[128];
+                /* err-sized targets: no truncation of the err content */
+                char from[256], to[256];
                 snprintf(from, sizeof from, "\"mode\":\"x\"");
                 snprintf(to, sizeof to, "%s", err);
                 CHECK(replace_once(buf, from, to) == 0);
@@ -805,7 +804,7 @@ int main(void)
     memset(&q, 0, sizeof q);
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                             err, sizeof err) == 0);
-    CHECK(q.delay.time_l == 0.0f && q.delay.time_r == 2.0f &&
+    CHECK(fexactf(q.delay.time_l, 0.0f) && fexactf(q.delay.time_r, 2.0f) &&
           q.delay.feedback == 100 && q.delay.tone == 20000 &&
           q.delay.mix == 0);
     CHECK(q.reverb.size == 0 && q.reverb.damp == 100 &&
@@ -1096,7 +1095,7 @@ int main(void)
     memset(&q, 0, sizeof q);
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                               err, sizeof err) == 0);
-    CHECK(q.chain[0].freq_hz == 55.0f);       /* chain parsed normally */
+    CHECK(fexactf(q.chain[0].freq_hz, 55.0f));  /* 55.0 exact; parsed normally */
 
     /* tgt (PLAN_MOD_ROUTING.md M1): optional 0..2, default 0 = A;
      * out-of-range rejects (P5 tgt part / P7) */
