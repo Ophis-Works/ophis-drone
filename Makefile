@@ -28,6 +28,7 @@ TESTS   = test_sanity test_osc test_adsr test_filter test_chain \
           test_autoquit
 
 .PHONY: all handheld test clean
+.DELETE_ON_ERROR:
 
 all: build/desktop/ophis-drone
 

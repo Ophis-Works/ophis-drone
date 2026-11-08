@@ -206,3 +206,59 @@ Verified (this session, `make clean && make handheld`):
 - RED for this increment was the direct gate run exit 1 recorded above
   (GLIBC_2.38 required); GREEN is the passing clean rebuild. Nothing
   committed (no order to commit).
+
+### Commit fbc589e — committer (2026-11-08)
+
+Committed src/compat/glibc_symver.c and LOG_DEAD_VARS.md as
+fbc589e "Declare the handheld linker-wrap shims; the R36S build
+passes its gate under -Werror" (unsigned, single line, 2 files,
++117/-1). PLAN_*.md and .zcode/ left untracked/unstaged. Committer's
+own verification in the commit session: `tools/handheld_gate.sh
+build/r36s/ophis-drone` exit 0, max required version GLIBC_2.17;
+`touch src/compat/glibc_symver.c && make handheld` exit 0 with 0
+"warning" lines — the TU recompiled under the full flag line
+(-std=c23 -Wall -Wextra ... -Werror -Wmissing-prototypes ...), gate
+ran inside the link rule on the fresh binary (GATE PASS, aarch64,
+<= GLIBC_2.28), zip rebuilt ("HANDHELD OK").
+
+## PLAN_DEAD_VARS.md §2c / M3 — .DELETE_ON_ERROR: false-pass fix (2026-11-08)
+
+Change (single): Makefile — one added line `.DELETE_ON_ERROR:` directly
+below `.PHONY: all handheld test clean` (now Makefile:31). Rationale:
+the handheld link rule runs tools/handheld_gate.sh LAST (Makefile:73
+pre-fix numbering), so a gate failure left the just-linked binary in
+place, newer than its objects; a second `make handheld` then exited 0
+without re-running the gate and shipped the rejected binary in the zip
+(FALSE PASS, reproduced at LOG_DEAD_VARS.md:159-163). GNU make's
+.DELETE_ON_ERROR deletes a target whose recipe fails, so the stale
+binary can no longer survive a failed gate. Global special target, no
+recipe, no flags — R6 met, R7 met (git diff: Makefile +1 line only;
+WARNFLAGS/CFLAGS/HCFLAGS untouched, R3/R5 stand). NOTHING else changed.
+
+Verified (this session):
+- RED (given by the workflow ask): scratch worktree /tmp/ophis-m3red at
+  fbc589e — injected gate `exit 1`, `rm -rf build && make handheld`
+  failed (make exit 2) but the binary SURVIVED (219216 bytes, mtime
+  22:09:05); after restoring the gate the second make exited 0 with
+  "HANDHELD OK", mtime UNCHANGED, 0 GATE lines — gate never re-ran.
+- GREEN, real repo: `make handheld` first reported "Nada a fazer"
+  (target up to date at HEAD, recipe did not run — recorded as such);
+  then `make clean && make handheld` -> EXIT=0, "HANDHELD OK",
+  build/deploy/ophis-drone-r36s.zip rebuilt; full WARNFLAGS active with
+  -Werror, so EXIT=0 implies zero warnings (any warning would have
+  aborted the build). Direct gate run `tools/handheld_gate.sh
+  build/r36s/ophis-drone` -> "GATE PASS: ... (aarch64, <= GLIBC_2.28)",
+  max required version GLIBC_2.17, exit 0.
+- GREEN, plan 2c.3 pin, scratch worktree /tmp/ophis-m3red (same one
+  line added there via Edit): injected gate `exit 1` + `rm -rf build &&
+  make handheld` -> make exit 2 AND make itself deleted the target
+  ("a eliminar ficheiro build/r36s/ophis-drone"); stat confirms the
+  binary is GONE. Gate restored (`git checkout --
+  tools/handheld_gate.sh`) -> second make relinked and RE-RAN the gate
+  (3 GATE lines, GATE PASS, HANDHELD OK, EXIT=0). The false pass is
+  structurally impossible now: a failed gate leaves no binary for the
+  second make to consider up to date.
+- Desktop suite: `make test` -> TOTAL: 11203/11203 passed, exit 0.
+
+Scratch worktree /tmp/ophis-m3red left in place (untracked evidence;
+scratch only). Nothing committed (no order to commit).
