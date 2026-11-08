@@ -360,7 +360,7 @@ make handheld   → build/r36s/ophis-drone      (-DTARGET_R36S, aarch64 cross)
 make test       → build/tests + run all, print "N/M passed"
 make clean
 ```
-- `CFLAGS = -std=c11 -O2 -Wall -Wextra -D_POSIX_C_SOURCE=200809L`
+- `CFLAGS = -std=c23 -O2 $(WARNFLAGS) -D_POSIX_C_SOURCE=200809L`
 - deps via `pkg-config --cflags --libs sdl2 alsa` (desktop).
 - Cross: `CC = aarch64-linux-gnu-gcc`; SDL2/ALSA aarch64 libraries +
   static-link strategy decided in M0, recorded in `BUILD_NOTES.md`

@@ -1,6 +1,7 @@
 # ophis-drone build (IMPLEMENTATION.md §5)
-CFLAGS  = -std=c11 -O2 -Wall -Wextra -D_POSIX_C_SOURCE=200809L \
-          -Ithird_party
+WARNFLAGS = -Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wfloat-equal -Wcast-qual -Wcast-align -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wundef -Wpointer-arith -Wwrite-strings -Wredundant-decls -Wold-style-definition -Wmissing-field-initializers -Wswitch-enum -Wformat=2
+CFLAGS  = -std=c23 -O2 $(WARNFLAGS) -D_POSIX_C_SOURCE=200809L \
+          -isystem third_party
 DEPS    = $(shell pkg-config --cflags --libs sdl2 alsa)
 CC      = gcc
 
@@ -52,8 +53,8 @@ build/desktop build/r36s build/tests build/r36s/obj/compat build/deploy/ports:
 # Outputs: build/r36s/ophis-drone, build/deploy/ports/ layout and
 # build/deploy/ophis-drone-r36s.zip (build/ is gitignored).
 CROSS       = aarch64-linux-gnu-gcc
-HCFLAGS     = -std=c11 -O2 -Wall -Wextra -D_POSIX_C_SOURCE=200809L \
-              -Isrc -Ithird_party -isystem /usr/include/SDL2 -DTARGET_R36S
+HCFLAGS     = -std=c23 -O2 $(WARNFLAGS) -D_POSIX_C_SOURCE=200809L \
+              -Isrc -isystem third_party -isystem /usr/include/SDL2 -DTARGET_R36S
 HANDHELD_SRC = $(SRC_APP) $(AUDIO_SRC) $(UI_SRC) $(DSP_SRC) $(SEQ_SRC) \
                $(PRESET_SRC) src/compat/glibc_symver.c
 HANDHELD_OBJ = $(patsubst src/%.c,build/r36s/obj/%.o,$(HANDHELD_SRC)) \

@@ -1,6 +1,6 @@
 # ophis-drone
 
-Three-chain drone synthesizer for Linux, C11 + SDL2 + ALSA. Runs as a desktop
+Three-chain drone synthesizer for Linux, C23 + SDL2 + ALSA. Runs as a desktop
 application (640×480 UI at scale 2 → 1280×960 window) and natively on the
 R36S handheld (RK3326, ArkOS, 640×480 fullscreen at scale 1). Audio:
 44.1 kHz, float32, stereo, ALSA only; desktop runs are gated on a measured
