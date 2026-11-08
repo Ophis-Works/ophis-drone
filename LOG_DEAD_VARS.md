@@ -126,3 +126,83 @@ passed (run in this session).
   FILE *f; same behavior).
 - test_engine_seq.c: dead vars deleted (above) + adsr casts +
   fexactf pins.
+
+## PLAN_DEAD_VARS.md §2b / M2 — handheld -Wmissing-prototypes fix (2026-11-08)
+
+Change (single): src/compat/glibc_symver.c — explicit prototypes for the
+five linker-called wrappers added immediately before the first
+definition, signatures byte-identical to the definitions
+(__wrap_pow, __wrap_log2, __wrap_exp, __wrap_pthread_create,
+__wrap_pthread_join). Rationale: the wrappers are called only by
+-Wl,--wrap (linker), never by C code, so they had no prototypes and
+-Wmissing-prototypes + -Werror killed the TU (the ask's 5 red errors).
+Nothing else changed — no Makefile edit, no flags, no other file.
+
+Verified in this session:
+- RED (given by the workflow ask): 5 missing-prototypes errors,
+  glibc_symver.c:41/46/51/56/62.
+- GREEN compile: `make handheld` recompiled the TU under the FULL
+  WARNFLAGS (-Wmissing-prototypes active) + -Werror with ZERO warnings;
+  link succeeded (build/r36s/ophis-drone, aarch64 ELF, 219152 bytes).
+- GATE FAIL (new, out of scope): `tools/handheld_gate.sh
+  build/r36s/ophis-drone` exits 1 — max required version GLIBC_2.38
+  exceeds the GLIBC_2.28 ceiling. Cause (readelf -sW):
+  __isoc23_strtol@GLIBC_2.38 and __isoc23_strtoumax@GLIBC_2.38 are
+  imported UND — the host glibc >= 2.39 headers redirect
+  strtol/strtoumax to the C23 __isoc23_* variants under strict
+  -std=c23, and those symbols exist only since glibc 2.38 (R36S has
+  2.28). Call sites: src/app/autoquit.c:16 (strtol, base 10) and
+  third_party/json.h:2622/2851 (strtoumax from <inttypes.h>).
+  This is unrelated to the prototypes fix — the same binary would have
+  failed the gate even with the old file (the TU never compiled
+  before, so the gate was unreachable).
+- Run-2 artefact, NOT a pass: a second `make handheld` exited 0 with
+  "HANDHELD OK" but never ran the gate (binary mtime newer than its
+  objects after run 1's failed gate — no .DELETE_ON_ERROR in the
+  Makefile). The direct gate run above (exit 1) is the authoritative
+  result; the current zip contains a binary the gate rejects.
+
+Blocked: fixing the gate requires more than the five prototypes
+(e.g. .symver pins/wrappers for strtol/strtoumax in glibc_symver.c
+after the owner rules on C23-vs-2.17 semantics, or a Makefile/flag
+change, or replacing strtol in autoquit.c) — all outside this ask's
+scope ("change NOTHING else"). Escalated for the owner's decision;
+not committed.
+
+### M2 follow-up — strtol/strtoumax GLIBC_2.38 pins (owner ruling, option (a))
+
+Ruling: extend src/compat/glibc_symver.c only, no Makefile/flag change;
+pin strtol/strtoumax to their GLIBC_2.17 aliases following the file's
+existing symver pattern (semantics match: autoquit.c:16 uses base 10;
+json.h integer parsing; C23 differences concern base 0/2 "0b" literals
+only).
+
+Change: added <stdint.h>; two .symver pins in the existing asm block
+(compat_strtol_ref -> strtol@GLIBC_2.17, compat_strtoumax_ref ->
+strtoumax@GLIBC_2.17); two extern _ref decls in the existing extern
+block. Interception point differs from the __wrap_* five BY NECESSITY:
+the Makefile's --wrap list is fixed, and the references in the other
+objects are to the C23-redirected names, so the shims are DEFINED here
+as `__isoc23_strtol` / `__isoc23_strtoumax` (prototypes first for
+-Wmissing-prototypes); the linker then binds autoquit.o / the json TU
+to these definitions instead of libc's GLIBC_2.38 versions. Same
+symver mechanism, definition-based instead of wrap-based.
+
+Verified (this session, `make clean && make handheld`):
+- EXIT 0; zero "warning" lines in the full log (full WARNFLAGS active,
+  -Werror).
+- Gate ran inside the link rule on the fresh binary:
+  "GATE PASS: build/r36s/ophis-drone (aarch64, <= GLIBC_2.28)",
+  max required version = GLIBC_2.17.
+- readelf -sW: 0 symbols bound to any glibc > 2.19; 0 UND isoc23
+  references (the 4 remaining isoc23 entries are these definitions
+  themselves, GLOBAL DEFAULT).
+- Zip rebuilt: build/deploy/ophis-drone-r36s.zip (fresh mtime, after
+  the passing gate), "HANDHELD OK".
+- Scope: git diff --stat = src/compat/glibc_symver.c + LOG_DEAD_VARS.md
+  only. Desktop build structurally unaffected (glibc_symver.c is in
+  HANDHELD_SRC only, not in the `all` target's sources) — desktop
+  suite NOT re-run in this ask (not ordered by the ruling).
+- RED for this increment was the direct gate run exit 1 recorded above
+  (GLIBC_2.38 required); GREEN is the passing clean rebuild. Nothing
+  committed (no order to commit).
