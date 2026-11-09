@@ -11,12 +11,14 @@
 #include "filter.h"
 
 typedef struct {
-  float detune_hz, amp_mod, filter_mod;
-  float phase_mod;   /* INTERFACE ADDITION to IMPLEMENTATION.md §2 (flagged,
+  /* double accumulators: mod_apply adds double products with a single
+     rounding per term (no per-term float rounding) */
+  double detune_hz, amp_mod, filter_mod;
+  double phase_mod;  /* INTERFACE ADDITION to IMPLEMENTATION.md §2 (flagged,
                      approved plan change eacb368+fix): normalized PM input
                      amount/100 × m (-1..1); chain adds phase_mod × pi rad
                      to the carrier phase (A.PHASE xmod dest, PLAN §5). */
-  float res_mod;     /* FLT_RES dest (owner order 2026-11-07,
+  double res_mod;    /* FLT_RES dest (owner order 2026-11-07,
                      PLAN_OSC_NAMING.md R0c): normalized resonance input
                      amount/100 × m (-1..1); the chain adds res_mod × 100
                      percent to the RES knob (clamped 0..100). 0 = the

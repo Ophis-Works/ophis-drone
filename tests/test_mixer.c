@@ -228,6 +228,29 @@ int main(void)
     CHECK(fabs(m.xm[0].res_mod - 0.5) < 1e-6);     /* 100/100 × 0.5 */
     CHECK(fabs(m.xm[0].filter_mod) < 1e-9);        /* FLT_CUT untouched */
 
+    /* ---- P1 (PLAN_MOD_MATRIX_16.md §1.3): the detune accumulator is
+     * EXACT at the reachable maximum — all 3 slots target chain A with
+     * dest MOD_PITCH, amount 0.1f, source 1.0; the accumulated
+     * detune_hz must be BIT-EQUAL to the double reference
+     * 3.0 × (double)0.1f. RED with float xmod_in_t fields: the float
+     * accumulator rounds 3×0.1f to 0.30000001192092896, which is not
+     * the double reference 0.30000000447034836. ---- */
+    memset(&m, 0, sizeof m);
+    m.src[0] = 1.0;                            /* B.osc: id 1 -> src[0] */
+    sp0 = mksp();
+    mp = mkp(&sp0);
+    for (int i = 0; i < 3; i++) {
+        sp0.xmod[i].src = 1;
+        sp0.xmod[i].dest = MOD_PITCH;
+        sp0.xmod[i].amount = 0.1f;
+        sp0.xmod[i].tgt = 0;                   /* all three land on A */
+    }
+    {
+        double post[3];
+        matrix_render(&m, &mp, hot, post);
+        CHECK(fexact((double)m.xm[0].detune_hz, 3.0 * (double)0.1f));
+    }
+
     /* ---- cross-mod B→A detune measurable end-to-end: 200 → 202 Hz ---- */
     chain_params_t cp;
     memset(&cp, 0, sizeof cp);

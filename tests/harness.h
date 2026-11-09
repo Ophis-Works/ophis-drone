@@ -8,22 +8,10 @@
 #include <math.h>
 #include <string.h>
 
-static int h_total = 0, h_passed = 0;
+#include "dsp/exact_eq.h"   /* fexact/fexactf: the shared exact-equality
+                               helpers (-Wfloat-equal convention lives there) */
 
-/* -Wfloat-equal approach (PLAN_DEAD_VARS.md R4): the pins below assert
- * EXACT float equality on purpose (sample-exact envelopes, coefficient
- * identity, round-trip bit equality, determinism) — a tolerance would
- * weaken the pin. Equality is therefore expressed through the integer
- * representation. fexactf: float operands; fexact: double (a float
- * argument promotes exactly, so it stays injective). */
-static int __attribute__((unused)) fexactf(float a, float b)
-{
-    return memcmp(&a, &b, sizeof a) == 0;
-}
-static int __attribute__((unused)) fexact(double a, double b)
-{
-    return memcmp(&a, &b, sizeof a) == 0;
-}
+static int h_total = 0, h_passed = 0;
 
 #define CHECK(cond) do { \
     h_total++; \

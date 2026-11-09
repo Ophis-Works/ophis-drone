@@ -34,28 +34,28 @@ static void mod_apply(xmod_in_t *acc, mod_dest_t dest, float amount,
         /* PITCH = VIBRATO (owner order 2026-11-05): depth amount Hz ×
          * the source signal, like every other dest (was: static
          * amount, source frequency irrelevant). */
-        acc->detune_hz += (float)(amount * s);
+        acc->detune_hz += amount * s;
         break;
     case MOD_AMP:
-        acc->amp_mod += (float)((double)amount / 100.0 * s);
+        acc->amp_mod += (double)amount / 100.0 * s;
         break;
     case MOD_PHASE:
-        acc->phase_mod += (float)((double)amount / 100.0 * s);
+        acc->phase_mod += (double)amount / 100.0 * s;
         break;
     case MOD_FILTER:
-        acc->filter_mod += (float)((double)amount / 100.0 * s);
+        acc->filter_mod += (double)amount / 100.0 * s;
         break;
     case MOD_FRES:
         /* FLT_RES (owner order 2026-11-07, PLAN_OSC_NAMING.md R0c): the
          * source sweeps the target's RES percent — accumulate into the
          * cutoff channel's sibling; chain.c clamps res + 100×res_mod. */
-        acc->res_mod += (float)((double)amount / 100.0 * s);
+        acc->res_mod += (double)amount / 100.0 * s;
         break;
     case MOD_FM:
         /* operator FM (owner order 2026-11-06): DX-style index
          * amount/25 cycles × the source (shares the phase channel
          * with the PHASE dest; both accumulate). */
-        acc->phase_mod += (float)((double)amount / 25.0 * s);
+        acc->phase_mod += (double)amount / 25.0 * s;
         break;
     case MOD_RING:
     case MOD_OFF:

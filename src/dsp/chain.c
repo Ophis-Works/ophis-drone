@@ -15,19 +15,9 @@
 #include <math.h>
 
 #include "chain.h"
+#include "exact_eq.h"
 
 #define OPHIS_2PI 6.28318530717958647692
-
-/* EXACT float equality, on purpose (cache-invalidation test): the biquad
- * coefficients must recompute whenever the fc input changes at all — a
- * tolerance would either thrash the cache or skip needed updates. Float
- * equality is expressed through the integer representation
- * (-Wfloat-equal-clean). -0.0f/+0.0f differ in representation; treating
- * that as "changed" only forces one harmless extra coefficient pass. */
-static int fc_cache_eq(float a, float b)
-{
-    return memcmp(&a, &b, sizeof a) == 0;
-}
 
 void chain_init(chain_state_t *c, uint64_t seed)
 {
@@ -53,15 +43,15 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
 
     /* 1. frequency with cross-mod detune, PLAN §5 step 1 (subs no
      * longer modulate — they are voices; PLAN_OPTIMIZATION.md O2) */
-    double f = (double)p->freq_hz + (double)xm->detune_hz;
-    double amp_mod    = (double)xm->amp_mod;
-    double filter_mod = (double)xm->filter_mod;
+    double f = (double)p->freq_hz + xm->detune_hz;
+    double amp_mod    = xm->amp_mod;
+    double filter_mod = xm->filter_mod;
     /* PHASE (PM, approved plan change eacb368+fix): the modulator adds to
      * the carrier phase — phase += (amount/100 × pi) × m per sample, m the
      * normalized (-1..1) modulator; amount ±100 % = ±pi rad. Applied to
      * the main osc phase in step 2 below; xmod A.PHASE arrives via
      * xm->phase_mod with the same mapping. */
-    double phase_mod  = (double)xm->phase_mod;
+    double phase_mod  = xm->phase_mod;
 
     /* subs: raw audio voices at parent_f / div, captured for the matrix
      * sources (raw pre-level — a silent sub still modulates) */
@@ -119,9 +109,9 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
      * biquad_set_coefs: history preserved, same as the ENV-cutoff path);
      * res_mod == 0 keeps the existing cache paths EXACTLY (no cost, no
      * behavior change for static-res chains). */
-    int res_mod_active = !fc_cache_eq(xm->res_mod, 0.0f);
+    int res_mod_active = !fexact(xm->res_mod, 0.0);
     if (res_mod_active) {
-        double res_eff = clampd((double)p->res + (double)xm->res_mod * 100.0,
+        double res_eff = clampd((double)p->res + xm->res_mod * 100.0,
                                 0.0, 100.0);
         int pos = (int)(res_eff / 2.0);           /* 0..100 -> pos 0..50 */
         float q = (float)(0.5 * pow(40.0, (double)pos / 50.0));
@@ -137,7 +127,7 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
         c->last_mode  = p->fmode;
         c->last_res   = p->res;
         c->last_poles = poles;
-    } else if (!fc_cache_eq((float)fc, c->last_fc) ||
+    } else if (!fexactf((float)fc, c->last_fc) ||
         p->fmode != c->last_mode ||
         p->res != c->last_res || poles != c->last_poles) {
         /* S2 (review): Q depends only on the res knob — computed here,
@@ -148,7 +138,7 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
          * KEEP the filter history (the ENV-driven cutoff sweeps here per
          * sample — a state-clearing set would wipe z1/z2 every sample);
          * mode/res/poles changes still take the full clearing set */
-        int only_fc = (!fc_cache_eq((float)fc, c->last_fc)
+        int only_fc = (!fexactf((float)fc, c->last_fc)
                        && p->fmode == c->last_mode &&
                        p->res == c->last_res && poles == c->last_poles);
         if (poles == 24) {
