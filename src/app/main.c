@@ -140,10 +140,11 @@ int main(void)
         }
     }
     /* Fallback (PLAN_RG28XX_BUILD M3): firmware SDL2 with no mapping for
-     * the pad — register one from the runtime GUID and retry. Raw indices
-     * match the mainline H700 gpio-keys (BTN_SOUTH..BTN_START contiguous
-     * with BTN_C/BTN_Z skipped by SDL): south=0 east=1 north=2 west=3,
-     * L1=4 R1=5 L2=6 R2=7 select=8 start=9 menu=10; D-pad as hat. */
+     * the pad — register one from the runtime GUID and retry. Raw
+     * indices measured on the device (owner test): printed A=0 B=1 Y=2
+     * X=3, L1=4 R1=5 L2=6 R2=7, Select=8 Start=9 Menu=10 (the firmware
+     * maps the top Menu key to BTN_START, so MENU opens on M); D-pad is
+     * a hat (probe: buttons=15 hats=1). */
     if (!g_ctrl) {
         for (int i = 0; i < SDL_NumJoysticks(); i++) {
             SDL_Joystick *js = SDL_JoystickOpen(i);
@@ -159,7 +160,7 @@ int main(void)
                     SDL_JoystickNumAxes(js));
             char map[512];
             snprintf(map, sizeof map,
-                     "%s,H700 Pad,a:b1,b:b0,x:b3,y:b2,"
+                     "%s,H700 Pad,a:b0,b:b1,x:b3,y:b2,"
                      "back:b8,start:b9,guide:b10,"
                      "leftshoulder:b4,rightshoulder:b5,"
                      "lefttrigger:b6,righttrigger:b7,"
@@ -306,8 +307,13 @@ int main(void)
             ui_draw(&ui, ren, &st);          /* event-driven redraw */
 #if defined(TARGET_R36S)
             if (scene) {
+                /* Present rotated with the pre-rotation bounding box as
+                 * dst: after the quarter turn the quad covers the output
+                 * exactly. NULL dst would stretch the texture into the
+                 * portrait rect first (squeeze + bars + crop). */
+                SDL_Rect rotated_fit = { -80, 80, 640, 480 };
                 SDL_SetRenderTarget(ren, NULL);
-                SDL_RenderCopyEx(ren, scene, NULL, NULL, (double)rot,
+                SDL_RenderCopyEx(ren, scene, NULL, &rotated_fit, (double)rot,
                                  NULL, SDL_FLIP_NONE);
                 SDL_RenderPresent(ren);
             }

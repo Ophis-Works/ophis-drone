@@ -65,6 +65,21 @@
 - Verification: make handheld gate PASS (GLIBC_2.17), tests 11253/11253,
   desktop build clean; direction confirmed on-device pending.
 
+## 2026-11-09 — Milestone 3c (A/B swap + exact-fit blit)
+- On-device test 4 (owner report): rotation direction correct; buttons
+  work but printed A and B are swapped; MENU opens on the top M key
+  (expected — the firmware maps it to BTN_START); Select = MENU2 to be
+  confirmed. Video: content squeezed, two bars at the sides, top/bottom
+  cropped.
+- Input fix: measured raw indices differ from the mainline DTS pairing —
+  mapping changed to a:b0,b:b1 (phys A=0, phys B=1); x:b3,y:b2 kept
+  (values +/- untested by the owner — pending confirmation).
+- Video fix: RenderCopyEx with NULL dst stretches the 640x480 texture
+  into the 480x640 output BEFORE rotating (squeeze/bars/crop artifact).
+  Present now uses the pre-rotation bounding box (-80,80,640,480) as
+  dst; after the quarter turn the quad covers the output exactly.
+- Verification: gate PASS, tests 11253/11253; on-device retest pending.
+
 ## Open items
 - On-device retest on the RG28XX (audio + full button matrix for the
   keymap check: A=RUN, B=TRIGGER, X/Y value +/-, L/R pages, Start=MENU,
