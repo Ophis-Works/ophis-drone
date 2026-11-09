@@ -28,7 +28,7 @@ static alsa_pcm_t *g_pcm = NULL;
 static _Atomic int quit  = 0;
 static _Atomic int audio_ready = 0;
 static int         g_log = 0;
-#if defined(TARGET_R36S)
+#if defined(TARGET_R36S) || defined(TARGET_RG28XX)
 static SDL_GameController *g_ctrl = NULL;
 #endif
 
@@ -126,8 +126,10 @@ int main(void)
             fclose(f);
         }
     }
+#endif
     /* Explicitly open any attached gamepad so events flow even if the
      * mapping was registered after the device was already present. */
+#if defined(TARGET_R36S) || defined(TARGET_RG28XX)
     for (int i = 0; i < SDL_NumJoysticks(); i++) {
         if (SDL_IsGameController(i)) {
             g_ctrl = SDL_GameControllerOpen(i);
@@ -139,12 +141,14 @@ int main(void)
                         SDL_GetError());
         }
     }
-    /* Fallback (PLAN_RG28XX_BUILD M3): firmware SDL2 with no mapping for
-     * the pad — register one from the runtime GUID and retry. Raw
-     * indices measured on the device (owner test): printed A=0 B=1 Y=2
-     * X=3, L1=4 R1=5 L2=6 R2=7, Select=8 Start=9 Menu=10 (the firmware
-     * maps the top Menu key to BTN_START, so MENU opens on M); D-pad is
-     * a hat (probe: buttons=15 hats=1). */
+#endif
+#if defined(TARGET_RG28XX)
+    /* EmuELEC-family firmware SDL2 ships no mapping for the H700 pad —
+     * register one from the runtime GUID and retry. Raw indices measured
+     * on the device (owner test): printed A=0 B=1 Y=2 X=3, L1=4 R1=5
+     * L2=6 R2=7, Select=8 Start=9 Menu=10 (the firmware maps the top
+     * Menu key to BTN_START, so MENU opens on M); D-pad is a hat
+     * (probe: buttons=15 hats=1). */
     if (!g_ctrl) {
         for (int i = 0; i < SDL_NumJoysticks(); i++) {
             SDL_Joystick *js = SDL_JoystickOpen(i);
@@ -195,12 +199,11 @@ int main(void)
         SDL_Quit();
         return 1;
     }
-#if defined(TARGET_R36S)
-    /* RG28XX portrait panel (PLAN_RG28XX_BUILD M3): the SDL output is
-     * 480x640, so the 640x480 UI renders into an offscreen texture and
-     * is presented rotated. OPHIS_ROT=90 flips the direction (default
-     * 270 = CCW quarter turn). R36S panels are native landscape: NULL
-     * scene = direct rendering, unchanged. */
+#if defined(TARGET_RG28XX)
+    /* Portrait panel (PLAN_RG28XX_BUILD M3): the output is 480x640, so
+     * the 640x480 UI renders into an offscreen texture and is presented
+     * rotated. OPHIS_ROT=90 flips the direction (default 270 = CCW
+     * quarter turn). R36S and desktop keep direct rendering. */
     SDL_Texture *scene = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGBA8888,
                                            SDL_TEXTUREACCESS_TARGET, 640, 480);
     int rot = 270;
@@ -217,21 +220,6 @@ int main(void)
     }
 #else
     SDL_RenderSetLogicalSize(ren, 640, 480);
-#endif
-
-#if defined(TARGET_R36S)
-    /* Rotation diagnostics (PLAN_RG28XX_BUILD M3): the RG28XX panel is
-     * natively portrait — record what SDL actually presents before any
-     * rotation decision. */
-    {
-        SDL_DisplayMode dm;
-        int ow = 0, oh = 0;
-        if (SDL_GetDesktopDisplayMode(0, &dm) == 0)
-            fprintf(stderr, "display mode: %dx%d driver=%s\n",
-                    dm.w, dm.h, SDL_GetCurrentVideoDriver());
-        if (SDL_GetRendererOutputSize(ren, &ow, &oh) == 0)
-            fprintf(stderr, "renderer output: %dx%d\n", ow, oh);
-    }
 #endif
 
     mailbox_init(&mb);
@@ -300,12 +288,12 @@ int main(void)
         if (autoquit && SDL_GetTicks() - t0 >= autoquit)
             atomic_store(&quit, 1);
         if (dirty) {
-#if defined(TARGET_R36S)
+#if defined(TARGET_RG28XX)
             if (scene)
                 SDL_SetRenderTarget(ren, scene);
 #endif
             ui_draw(&ui, ren, &st);          /* event-driven redraw */
-#if defined(TARGET_R36S)
+#if defined(TARGET_RG28XX)
             if (scene) {
                 /* Present rotated with the pre-rotation bounding box as
                  * dst: after the quarter turn the quad covers the output
@@ -315,9 +303,9 @@ int main(void)
                 SDL_SetRenderTarget(ren, NULL);
                 SDL_RenderCopyEx(ren, scene, NULL, &rotated_fit, (double)rot,
                                  NULL, SDL_FLIP_NONE);
-                SDL_RenderPresent(ren);
             }
 #endif
+            SDL_RenderPresent(ren);
         }
         SDL_Delay(5);
     }
@@ -328,9 +316,11 @@ int main(void)
     long x = g_pcm ? alsa_xruns(g_pcm) : -1;
     if (g_pcm)
         alsa_close(g_pcm);
-#if defined(TARGET_R36S)
+#if defined(TARGET_R36S) || defined(TARGET_RG28XX)
     if (g_ctrl)
         SDL_GameControllerClose(g_ctrl);
+#endif
+#if defined(TARGET_RG28XX)
     if (scene)
         SDL_DestroyTexture(scene);
 #endif

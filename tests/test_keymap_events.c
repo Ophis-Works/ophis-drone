@@ -126,7 +126,7 @@ int main(void)
     e = cbutton(200);
     CHECK(keymap_action(&e, &a) == 0);
 
-#elif defined(TARGET_R36S)
+#elif defined(TARGET_R36S) || defined(TARGET_RG28XX)
 
     /* KB_* are button constants: controller events map as configured
      * (behavior unchanged by F6). */
@@ -169,7 +169,7 @@ int main(void)
     CHECK(a == ACT_VAL_INC);
 
 #else
-    #error "compile with -DTARGET_DESKTOP or -DTARGET_R36S"
+    #error "compile with -DTARGET_DESKTOP, -DTARGET_R36S or -DTARGET_RG28XX"
 #endif
     HARNESS_REPORT();
 }

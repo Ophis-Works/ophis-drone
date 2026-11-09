@@ -79,6 +79,24 @@ there.
   implementation, then green; full suite green.
 - UI/UX: none; desktop path unchanged (FLOAT still first).
 
+### Milestone 4 — separate compile target (owner order)
+- Owner order: TARGET_R36S must not share code paths with the RG28XX;
+  it reverts to the exact main-state behaviour.
+- Makefile: `make rg28xx` builds build/rg28xx/ophis-drone with
+  -DTARGET_RG28XX (own objects, same glibc pinning + gate) and packages
+  build/deploy/ophis-drone-rg28xx.zip with the device's Roms/PORTS/
+  layout (owner-confirmed). HCFLAGS no longer bakes a target define.
+- config.h: dedicated TARGET_RG28XX block (same SDL logical-button
+  KB_* values as R36S; MENU opens on the top Menu key, which the
+  firmware maps to SDL START).
+- main.c: H700 pad self-mapping, portrait rendering (offscreen 640x480
+  texture + rotated present, OPHIS_ROT env override) and diagnostics
+  compile under TARGET_RG28XX only. ui_draw.c no longer presents; the
+  main loop presents after every redraw (desktop/R36S behaviour
+  identical to main).
+- Tests: test_keymap_rg28xx + test_keymap_events_rg28xx (same sources,
+  -DTARGET_RG28XX).
+
 ### Milestone 3 — commit
 - Commit code + docs on branch rg28xx-build after M1 verification passes.
   Message: imperative, unsigned.

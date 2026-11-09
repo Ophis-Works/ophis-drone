@@ -1,8 +1,8 @@
 /* config.h — THE ONLY TARGET DIFFERENCE (PLAN.md §9, IMPLEMENTATION.md §5).
  *
- * The Makefile passes exactly one macro per target (-DTARGET_DESKTOP or
- * -DTARGET_R36S); this file is the only place that macro is read.
- * Every other source file is byte-identical between the two builds.
+ * The Makefile passes exactly one macro per target (-DTARGET_DESKTOP,
+ * -DTARGET_R36S or -DTARGET_RG28XX); this file is the only place that
+ * macro is read.
  *
  * Binding values (KB_*) are the sanctioned change point (PLAN.md §9):
  * the R36S values below are PROPOSED until verified against the physical
@@ -40,6 +40,37 @@
    * role via KB_RUN_CONFIRMS_MENU below (owner order 2026-11-05).
    * Select = second MENU key (owner demand 2026-11-05): with Start dead
    * on the device, MENU -> EXIT must not depend on it. */
+  #define KB_CONFIRM              (-1)
+  #define KB_MENU2                4  /* Select (SDL_CONTROLLER_BUTTON_BACK) */
+  #define KB_RUN_CONFIRMS_MENU    1
+  #define KB_TRIGGER_CANCELS_MENU 1
+  /* Select: unassigned (X/Y are value keys; SAVE name entry uses X insert, Y delete). */
+
+#elif defined(TARGET_RG28XX)
+
+  /* Handheld (Allwinner H700, EmuELEC-family firmware): the panel is
+   * natively portrait 480x640 — main.c renders the 640x480 UI offscreen
+   * and presents it rotated (PLAN_RG28XX_BUILD M3). Scale 1, fullscreen. */
+  #define UI_SCALE      1
+  #define KB_FULLSCREEN 1
+
+  /* RG28XX bindings — SDL *logical* gamepad button constants, same
+   * convention as the R36S block. SDL translates the pad's raw bN
+   * buttons via the self-registered mapping in main.c (mainline H700
+   * pad measured on-device: printed A=0 B=1 Y=2 X=3, L1=4 R1=5,
+   * Select=8 Start=9 Menu=10, D-pad = hat 0). MENU opens on the top
+   * Menu key (the firmware maps it to BTN_START/SDL START). */
+  #define KB_TRIGGER    1  /* B = TRIGGER/RETRIG (printed B)             */
+  #define KB_RUN        0  /* A = RUN/STOP (printed A)                   */
+  #define KB_SEL_UP     11 /* d-pad up   (SDL_CONTROLLER_BUTTON_DPAD_UP)   */
+  #define KB_SEL_DOWN   12 /* d-pad down (SDL_CONTROLLER_BUTTON_DPAD_DOWN) */
+  #define KB_NAV_LEFT   13 /* d-pad left (SDL_CONTROLLER_BUTTON_DPAD_LEFT)  */
+  #define KB_NAV_RIGHT  14 /* d-pad right(SDL_CONTROLLER_BUTTON_DPAD_RIGHT) */
+  #define KB_VAL_DEC    3  /* Y = value -1 / cycle (printed Y)           */
+  #define KB_VAL_INC    2  /* X = value +1 / cycle (printed X)           */
+  #define KB_TAB_BACK   9  /* L shoulder (SDL_CONTROLLER_BUTTON_LEFTSHOULDER) */
+  #define KB_TAB_NEXT   10 /* R shoulder (SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) */
+  #define KB_MENU       6  /* top Menu key (SDL_CONTROLLER_BUTTON_START) */
   #define KB_CONFIRM              (-1)
   #define KB_MENU2                4  /* Select (SDL_CONTROLLER_BUTTON_BACK) */
   #define KB_RUN_CONFIRMS_MENU    1

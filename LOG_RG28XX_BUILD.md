@@ -80,6 +80,29 @@
   dst; after the quarter turn the quad covers the output exactly.
 - Verification: gate PASS, tests 11253/11253; on-device retest pending.
 
+## 2026-11-09 — Milestone 4 (RG28XX as a separate compile target)
+- Owner order: TARGET_R36S must stay byte-equal in behaviour to main —
+  no shared handheld code path. TARGET_R36S now reverts to the exact
+  main-state sequence (db load -> controller open -> logical size ->
+  draw -> present -> close; the only shared change is SDL_RenderPresent
+  moved from ui_draw.c into the main loop immediately after ui_draw —
+  same call, same order). ALSA: R36S takes the FLOAT first-attempt path,
+  unchanged.
+- New compile target: -DTARGET_RG28XX, own object dir build/rg28xx/, own
+  binary + gate + deploy zip (Roms/PORTS/ layout, owner-confirmed).
+  HCFLAGS no longer bakes a target define; each obj rule passes its own.
+- config.h: TARGET_RG28XX block (same KB_* logical-button values as the
+  R36S block, RG28XX-specific comments: MENU on the top Menu key,
+  portrait rendering note).
+- main.c: pad self-mapping + scene/rotation + probe/diagnostic lines now
+  compile under TARGET_RG28XX only; the explicit controller-open loop is
+  shared by both handheld targets; desktop untouched.
+- Tests: test_keymap_rg28xx + test_keymap_events_rg28xx added (same
+  sources compiled with -DTARGET_RG28XX; guards updated to accept the
+  new macro). Suite: 11323/11323 passed.
+- Verification: clean rebuild of all three targets — desktop (0 errors),
+  R36S gate PASS, RG28XX gate PASS (GLIBC_2.17), both zips packaged.
+
 ## Open items
 - On-device retest on the RG28XX (audio + full button matrix for the
   keymap check: A=RUN, B=TRIGGER, X/Y value +/-, L/R pages, Start=MENU,

@@ -26,9 +26,10 @@ TESTS   = test_sanity test_osc test_adsr test_filter test_chain \
           test_keymap_events test_keymap_events_r36s \
           test_theme \
           test_range test_seq_items test_font test_ui_menu \
-          test_autoquit test_f32tos16
+          test_autoquit test_f32tos16 \
+          test_keymap_rg28xx test_keymap_events_rg28xx
 
-.PHONY: all handheld test clean
+.PHONY: all handheld rg28xx test clean
 .DELETE_ON_ERROR:
 
 all: build/desktop/ophis-drone
@@ -40,7 +41,9 @@ build/desktop/ophis-drone: $(SRC_APP) src/config.h $(AUDIO_SRC) $(UI_SRC) \
 	    $(UI_SRC) $(DSP_SRC) $(SEQ_SRC) $(PRESET_SRC) $(DEPS) \
 	    -lpthread -lm -o $@
 
-build/desktop build/r36s build/tests build/r36s/obj/compat build/deploy/ports:
+build/desktop build/r36s build/tests build/r36s/obj/compat \
+build/rg28xx build/rg28xx/obj/compat build/deploy/ports \
+build/deploy/Roms/PORTS:
 	mkdir -p $@
 
 # --- handheld (R36S, PLAN.md §11 M6, owner ruling) --------------------------
@@ -56,11 +59,13 @@ build/desktop build/r36s build/tests build/r36s/obj/compat build/deploy/ports:
 # build/deploy/ophis-drone-r36s.zip (build/ is gitignored).
 CROSS       = aarch64-linux-gnu-gcc
 HCFLAGS     = -std=c23 -O2 $(WARNFLAGS) -D_POSIX_C_SOURCE=200809L \
-              -Isrc -isystem third_party -isystem /usr/include/SDL2 -DTARGET_R36S
+              -Isrc -isystem third_party -isystem /usr/include/SDL2
 HANDHELD_SRC = $(SRC_APP) $(AUDIO_SRC) $(UI_SRC) $(DSP_SRC) $(SEQ_SRC) \
                $(PRESET_SRC) src/compat/glibc_symver.c
 HANDHELD_OBJ = $(patsubst src/%.c,build/r36s/obj/%.o,$(HANDHELD_SRC)) \
                build/r36s/obj/compat/crt0.o
+RG28XX_OBJ   = $(patsubst src/%.c,build/rg28xx/obj/%.o,$(HANDHELD_SRC)) \
+               build/rg28xx/obj/compat/crt0.o
 ARM64_LIB   = /usr/lib/aarch64-linux-gnu
 DEPLOY      = build/deploy
 
@@ -76,9 +81,29 @@ build/r36s/ophis-drone: $(HANDHELD_OBJ) | build/r36s/obj/compat
 
 build/r36s/obj/%.o: src/%.c
 	@mkdir -p $(@D)
-	$(CROSS) $(HCFLAGS) -c $< -o $@
+	$(CROSS) $(HCFLAGS) -DTARGET_R36S -c $< -o $@
 
 build/r36s/obj/compat/crt0.o: src/compat/crt0.s | build/r36s/obj/compat
+	$(CROSS) -c $< -o $@
+
+# --- RG28XX (Allwinner H700, EmuELEC-family firmware) -----------------------
+# Own compile target: -DTARGET_RG28XX (portrait-panel rendering, H700 pad
+# self-mapping, separate binary and zip). Same glibc pinning as the R36S.
+rg28xx: build/rg28xx/ophis-drone $(DEPLOY)/ophis-drone-rg28xx.zip
+
+build/rg28xx/ophis-drone: $(RG28XX_OBJ) | build/rg28xx/obj/compat
+	$(CROSS) -nostartfiles -no-pie $(RG28XX_OBJ) -L$(ARM64_LIB) \
+	    -Wl,--wrap=pow,--wrap=log2,--wrap=exp,--wrap=pthread_create,--wrap=pthread_join \
+	    -Wl,--no-as-needed \
+	    -lSDL2 -lasound -lm -lpthread -ldl \
+	    $(ARM64_LIB)/libpthread.so.0 -o $@
+	tools/handheld_gate.sh $@
+
+build/rg28xx/obj/%.o: src/%.c
+	@mkdir -p $(@D)
+	$(CROSS) $(HCFLAGS) -DTARGET_RG28XX -c $< -o $@
+
+build/rg28xx/obj/compat/crt0.o: src/compat/crt0.s | build/rg28xx/obj/compat
 	$(CROSS) -c $< -o $@
 
 # Deploy staging: program folder ports/ophis-drone/ with the binary, and the
@@ -115,6 +140,31 @@ $(DEPLOY)/ophis-drone-r36s.zip: $(DEPLOY)/ports/ophis-drone/ophis-drone \
 	rm -f $@
 	cd $(DEPLOY) && zip -r ophis-drone-r36s.zip ports
 	@echo "HANDHELD OK: $@"
+
+# RG28XX staging: same program-folder layout, zipped with the device's
+# Roms/PORTS/ paths (owner-confirmed layout) so the zip extracts at the
+# SD card's roms-partition root. The launcher template is generic.
+$(DEPLOY)/Roms/PORTS/ophis-drone/ophis-drone: build/rg28xx/ophis-drone \
+                                             | $(DEPLOY)/Roms/PORTS
+	@mkdir -p $(@D)
+	cp $< $@
+
+$(DEPLOY)/Roms/PORTS/Ophis-Drone.sh: tools/r36s-launcher.sh | $(DEPLOY)/Roms/PORTS
+	cp $< $@
+	chmod +x $@
+
+$(DEPLOY)/ophis-drone-rg28xx.zip: $(DEPLOY)/Roms/PORTS/ophis-drone/ophis-drone \
+                                  $(DEPLOY)/Roms/PORTS/Ophis-Drone.sh \
+                                  $(PRESETS)
+	rm -rf $(DEPLOY)/Roms/PORTS/ophis-drone/presets
+	mkdir -p $(DEPLOY)/Roms/PORTS/ophis-drone/presets
+	rm -f $(DEPLOY)/Roms/PORTS/ophis-drone/gamecontrollerdb.txt
+	for f in presets/*.json; do \
+	  if [ -e "$$f" ]; then cp "$$f" $(DEPLOY)/Roms/PORTS/ophis-drone/presets/; fi; \
+	done
+	rm -f $@
+	cd $(DEPLOY) && zip -r ophis-drone-rg28xx.zip Roms
+	@echo "RG28XX OK: $@"
 
 # Unit tests: src/dsp/* only — no SDL/ALSA (IMPLEMENTATION.md §5).
 test: $(TESTS:%=build/tests/%)
@@ -202,6 +252,24 @@ build/tests/test_keymap_events_r36s: tests/test_keymap_events.c \
                                      src/ui/keymap.h src/ui/keymap.c \
                                      | build/tests
 	$(CC) $(CFLAGS) -Isrc -DTARGET_R36S $(shell pkg-config --cflags sdl2) \
+	    tests/test_keymap_events.c src/ui/keymap.c -o $@ \
+	    $(shell pkg-config --libs sdl2)
+
+# test_keymap_rg28xx / test_keymap_events_rg28xx: the same compile-level
+# binding checks for the RG28XX target (PLAN_RG28XX_BUILD M3) — same
+# sources, compiled with -DTARGET_RG28XX against config.h's RG28XX block.
+build/tests/test_keymap_rg28xx: tests/test_keymap_r36s.c tests/harness.h \
+                                src/config.h src/ui/keymap.h src/ui/keymap.c \
+                                | build/tests
+	$(CC) $(CFLAGS) -Isrc -DTARGET_RG28XX $(shell pkg-config --cflags sdl2) \
+	    tests/test_keymap_r36s.c src/ui/keymap.c -o $@ \
+	    $(shell pkg-config --libs sdl2)
+
+build/tests/test_keymap_events_rg28xx: tests/test_keymap_events.c \
+                                       tests/harness.h src/config.h \
+                                       src/ui/keymap.h src/ui/keymap.c \
+                                       | build/tests
+	$(CC) $(CFLAGS) -Isrc -DTARGET_RG28XX $(shell pkg-config --cflags sdl2) \
 	    tests/test_keymap_events.c src/ui/keymap.c -o $@ \
 	    $(shell pkg-config --libs sdl2)
 

@@ -28,8 +28,8 @@
 
 int main(void)
 {
-#if !defined(TARGET_R36S)
-    #error "this test must be compiled with -DTARGET_R36S"
+#if !defined(TARGET_R36S) && !defined(TARGET_RG28XX)
+    #error "this test must be compiled with -DTARGET_R36S or -DTARGET_RG28XX"
 #endif
     /* Face buttons (SDL_CONTROLLER_BUTTON_A/B/X/Y). */
     CHECK(KB_RUN     == 0); /* A = RUN/STOP   */
