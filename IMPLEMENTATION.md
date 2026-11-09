@@ -75,7 +75,7 @@ typedef struct { int size, damp, mix, width; } reverb_params_t;
 typedef struct {
   chain_params_t chain[3];
   seq_params_t   seq[3];
-  xmod_params_t  xmod[3];
+  xmod_params_t  xmod[16];
   delay_params_t delay;      /* real DSP (FX milestone): stereo delay */
   reverb_params_t reverb;    /* real DSP (FX milestone): FDN reverb */
   int            bpm;         /* GLOBAL tempo 1..500 (AMENDED, owner order:
@@ -337,7 +337,7 @@ for each 256-frame block:
      out[c] = chain_render(&e.ch[c], &cp[c], &xm, &ev, sr)
   set mx.src[6] from e.ch[1], e.ch[2] raw osc/sub outputs
   AMENDED block loop (owner order — FX/master stage after the mixer):
-  mxp = {xmod[3]}            /* gate + master level are NOT here anymore */
+  mxp = {xmod[16]}           /* gate + master level are NOT here anymore */
   fxp = {p.delay, p.reverb, p.safety, p.master, gate: e.tr.gate}
   for f in 0..255:
     l = r = mixer_render(&e.mx, &mxp, out, sr)      /* ends at tanh(...) */
@@ -486,9 +486,10 @@ typedef struct {
     cell** (owner order). UP/DOWN move the cursor (wraps);
     Z/X (desktop) / X/Y (R36S) edit; LEFT/RIGHT moves the rectangle
     selection from anywhere on the page.
-  - MOD tab content (AMENDED, owner order — MIX renamed MOD): sections
-    **MOD 1** · **MOD 2** · **MOD 3**, each SRC · DEST · AMT (9 items —
-    the cross-mod matrix slots, dsp/mixer).
+  - MOD tab content (AMENDED, owner order — MIX renamed MOD; widened to
+    16 slots with a SLOT row, PLAN_MOD_MATRIX_16.md M3): section
+    **MOD** — **SLOT** (1..16, left/right rolls over) · SOURCE · TARGET ·
+    DEST · DEPTH · LEVEL (6 items editing the selected slot, dsp/mixer).
   - MASTER tab content (AMENDED, owner order — the FX tab is GONE; its
     parameters are MASTER sections): **MASTER** section — MASTER
     (percent 0..100) · SAFETY (boolean ON/OFF, default ON — master
@@ -555,8 +556,9 @@ int keymap_action(SDL_Event *e, ui_action_t *out);  /* 1 if mapped */
 
 ## 7. Presets (M3)
 
-- JSON format: exactly per PLAN.md §9 (version 1, enum strings,
-  fixed-length arrays, `run` excluded).
+- JSON format: exactly per PLAN.md §9 (version 2, enum strings,
+  fixed arrays 3 chains / 2 subs / 8 steps, `xmod` 0..16 active-slot
+  entries, `run` excluded).
 - All preset functions take explicit paths/dirs (testable); `main.c`
   resolves `presets/` beside the executable (via /proc/self/exe; no env
   var, no fallbacks) and creates the dir on first save (`mkdir -p`

@@ -161,15 +161,17 @@ stays silent until restarted (RUN off→on, sequencer off→on, or PANIC reset;
 for random/markov a pass is a fixed count of 8 steps).</p>
 
 <h4>MOD tab</h4>
-<p>Sections <strong>MOD 1</strong>, <strong>MOD 2</strong> and
-<strong>MOD 3</strong>: three cross-mod slots, each with
-<strong>SRC</strong> (OFF · B.OSC · B.SUB1 · B.SUB2 · C.OSC · C.SUB1 ·
-C.SUB2 · A.OSC · A.SUB1 · A.SUB2 — any chain's raw osc/sub output;
-self-routing is legal), <strong>TGT</strong> (A · B · C — which chain
-the slot's modulation and ADD feed; default A), <strong>DEST</strong>
-(OFF · PITCH · PHASE · AMP · FILTER · RING · FM), <strong>AMT</strong>
+<p>One section, <strong>MOD</strong>. The <strong>SLOT</strong> row
+selects the matrix slot (1–16; LEFT/RIGHT from any row on the page, or
+X/Z on the SLOT row, rolling over); the rows below edit the selected
+slot: <strong>SOURCE</strong> (OFF · B.OSC · B.SUB1 · B.SUB2 · C.OSC ·
+C.SUB1 · C.SUB2 · A.OSC · A.SUB1 · A.SUB2 — any chain's raw osc/sub
+output; self-routing is legal), <strong>TARGET</strong> (A · B · C —
+which chain the slot's modulation and ADD feed; default A),
+<strong>DEST</strong>
+(OFF · PITCH · PHASE · AMP · FILTER · RING · FM), <strong>DEPTH</strong>
 (same ranges/rules as sub AMT; the knob reads +50&nbsp;Hz under PITCH,
-100&nbsp;% under RING, +4&nbsp;IDX under FM) and <strong>MIX</strong>
+100&nbsp;% under RING, +4&nbsp;IDX under FM) and <strong>LEVEL</strong>
 (the slot's ADD knob — the source's audio blended into the TARGET,
 0–100&nbsp;% wet, independent of DEST; a slot can add AND modulate, or
 either alone). Cross-chain sources are read one sample late. The
@@ -237,7 +239,7 @@ subdirectories (suffix <code>/</code>, <code>..</code> to go up) and
 folder. The default presets folder is created on first LOAD; a folder
 that cannot be opened falls back to its parent, like any file picker.</p>
 
-<h3>2.5 Preset files (JSON version 1)</h3>
+<h3>2.5 Preset files (JSON version 2)</h3>
 <p>One JSON file per preset, stored in <code>presets/</code> next to the
 executable (resolved at runtime from /proc/self/exe). A preset
 serializes everything in <code>synth_params_t</code>
@@ -247,13 +249,13 @@ except the <code>run</code> flag. Written and parsed by the schema layer
 list, as implemented in <code>src/preset/schema.c</code>:</p>
 <pre>
 {
-  "app": "ophis-drone", "version": 1,
+  "app": "ophis-drone", "version": 2,
   "master": 70,                     // percent 0..100 (REQUIRED)
   "bpm": 120,                       // GLOBAL tempo 1..500 (REQUIRED)
   "safety": true,                   // master safety filter (REQUIRED)
   "chain": [ 3 objects ],
   "seq":   [ 3 objects ],
-  "xmod":  [ 3 objects ],
+  "xmod":  [ 0..16 objects ],   // ACTIVE slots only (absent slots = off)
   "delay":  { "time_l": 0.0, "time_r": 0.0,     // seconds 0..2 (REQUIRED)
               "feedback": 35, "tone": 4500.0, "mix": 30 },
   "reverb": { "size": 85, "damp": 35, "mix": 30, "width": 100 }
@@ -278,7 +280,8 @@ list, as implemented in <code>src/preset/schema.c</code>:</p>
 (boolean; true = once, false = loop), <code>steps</code> (exactly 8 objects:
 <code>pitch_hz</code>, <code>vel</code> 0..100). No per-seq
 <code>bpm</code> — the tempo is the top-level <code>bpm</code>.</li>
-<li><strong>xmod</strong> slot: <code>src</code>
+<li><strong>xmod</strong> entry (one per active slot):
+<code>src</code>
 (<code>"off"|"b_osc"|"b_sub1"|"b_sub2"|"c_osc"|"c_sub1"|"c_sub2"|"a_osc"|"a_sub1"|"a_sub2"</code>),
 <code>tgt</code> (0..2, default 0 = A — which chain the slot feeds),
 <code>dest</code>
@@ -296,8 +299,10 @@ delay/reverb percent fields.</li>
 </ul>
 <p>The loader requires every listed field; unknown keys are ignored; any
 parse, version, range or array-length error rejects the whole file (no
-partial load). Array lengths are fixed: 3 chains, 2 subs, 8 steps, 3 xmod
-slots.</p>
+partial load). Array lengths are fixed: 3 chains, 2 subs, 8 steps.
+<code>xmod</code> holds 0..16 entries — the ACTIVE slots only, in
+ascending slot order; slots absent from the array are off (an empty
+array = the matrix fully off).</p>
 
 <h3>2.6 Keys / buttons</h3>
 <table>

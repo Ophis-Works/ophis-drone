@@ -243,7 +243,8 @@ per-chain master send, PLAN_MOD_ROUTING.md M3 — preset key "mixvol"
 0..100 default 100, MASTER page MIX section; scales the post-ADSR/
 FILTER signal only, raw mod sources untouched). AMENDED — master_level
 × gate moved to the FX/master stage after the safety filter).
-Cross-mod matrix (PLAN_MOD_ROUTING.md): 3 slots; slot = {source ∈
+Cross-mod matrix (PLAN_MOD_ROUTING.md; widened to 16 slots by
+PLAN_MOD_MATRIX_16.md): 16 slots (MOD_SLOTS); slot = {source ∈
 {OFF, B.osc, B.sub1, B.sub2, C.osc, C.sub1, C.sub2, A.osc, A.sub1,
 A.sub2}, target ∈ {A, B, C}, dest ∈ {OFF, PITCH (vibrato — depth Hz ×
 the source signal), PHASE (PM, ±180° mapping), FILTER (ratio), AMP,
@@ -388,7 +389,7 @@ visual rows only — the cursor walks the flat item list of the page.
 | OSC 1/2/3 | OSC | **MAIN**: FREQ · WAVE · DUTY · LEVEL · VEL, then **SUB 1**: FMODE · FREQ · WAVE · DUTY · DEST · AMT, then **SUB 2**: same |
 | OSC 1/2/3 | ENV+FLT | **ADSR**: ATTACK · DECAY · SUSTAIN · RELEASE, then **FILTER**: MODE · CUTOFF · RES · ENV · POLES |
 | OSC 1/2/3 | SEQ | unchanged step page (below) |
-| MOD | — | **MOD 1**: SRC · DEST · AMT, then **MOD 2**: same, then **MOD 3**: same |
+| MOD | — | **MOD** (one section): **SLOT** (1..16, left/right rolls over), then **SOURCE** · **TARGET** · **DEST** · **DEPTH** · **LEVEL** — editing the selected slot |
 | MASTER | — | **MASTER**: MASTER · SAFETY · BPM (the GLOBAL tempo, §6), then **DELAY**: TIME L · FEEDBACK · TONE · MIX, then **REVERB**: SIZE · DAMP · MIX · WIDTH |
 
 MOD and MASTER have **no sub-tab row**.
@@ -565,11 +566,11 @@ Select=unassigned (SAVE name entry: X insert, Y delete).
 **R36S layout verified against the physical device in M0; the binding
 values in config.h are the sanctioned change point.**
 
-### Preset JSON format (version 1)
+### Preset JSON format (version 2)
 
 ```json
 {
-  "app": "ophis-drone", "version": 1, "master": 70, "bpm": 60,
+  "app": "ophis-drone", "version": 2, "master": 70, "bpm": 60,
   "safety": true,
   "chain": [
     { "freq_hz": 55.0, "wave": "saw", "level": 100, "vel": 100,
@@ -583,7 +584,8 @@ values in config.h are the sanctioned change point.**
   "seq": [ { "on": false, "div": 1,
               "mode": "fwd", "once": false,
               "steps": [ { "pitch_hz": 55.0, "vel": 100 } ] } ],
-  "xmod": [ { "src": "off", "dest": "off", "amount": 0.0 } ],
+  "xmod": [ { "src": "b_osc", "tgt": 0, "dest": "pitch", "amount": 35,
+             "mix": 0 } ],
   "delay": { "time_l": 0.38, "time_r": 0.51, "feedback": 35,
              "tone": 4500.0, "mix": 30 },
   "reverb": { "size": 85, "damp": 35, "mix": 30, "width": 100 }
@@ -594,8 +596,10 @@ values in config.h are the sanctioned change point.**
   `off|b_osc|b_sub1|b_sub2|c_osc|c_sub1|c_sub2`).
 - Integer percent fields (0..100): `master`, `level`, `vel`, `s`, step
   `vel`.
-- Fixed-length arrays (3 chains, 2 subs, **8 steps**, 3 xmod slots) — a
-  file with a different array length is invalid.
+- Fixed-length arrays (3 chains, 2 subs, **8 steps**) — a file with a
+  different array length is invalid. `xmod` instead holds 0..16 entries
+  — the ACTIVE slots only, in ascending slot order; slots absent from
+  the array are off; more than 16 entries is invalid.
 - Seq objects carry `div` (clock divider, integer 1..16, default 1 —
   REQUIRED per seq; step period = `60/BPM/4 × div`, §6 — BPM is the
   top-level GLOBAL tempo, REQUIRED, integer 1..500). Seq objects also
@@ -603,8 +607,8 @@ values in config.h are the sanctioned change point.**
   default fwd) and `once` (boolean; true = once, false = loop, default
   loop — §6).
 - Filter objects carry `res` (integer percent 0..100), `env` (integer
-  percent -100..+100) and `poles` ("12db"|"24db"). Format **version 1**
-  (unchanged version number — nothing was ever shipped in the old shape).
+  percent -100..+100) and `poles` ("12db"|"24db"). Format **version 2**
+  (version 1 files are rejected by the parser).
 - Osc and sub objects carry `duty` (integer percent 5..95, default 50,
   square only). `dest` gains "phase" (PM, amount percent ±100 = ±180°).
 - Top-level `delay` {time_l, time_r seconds 0..2; feedback, mix percent

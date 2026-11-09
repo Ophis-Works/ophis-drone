@@ -12,7 +12,7 @@ Each chain (A, B, C) has a main oscillator (sine/tri/saw/square/white/pink,
 DUTY for square), two modulating sub-oscillators (free Hz or ratio-to-main;
 destinations PITCH/PHASE/AMP/FILTER), ADSR, and an RBJ biquad filter
 (LP/HP/BP/BR, 12 or 24 dB/oct, resonance, envelope amount). B and C sum to
-the master bus and can cross-modulate A (3-slot matrix). After the mixer
+the master bus and can cross-modulate A (16-slot matrix). After the mixer
 (sum + tanh soft-clip): stereo delay → reverb → safety filter (HP 60 Hz +
 LP 18 kHz cascaded, ON by default) → master level → master gate. Three
 sequencers (one per chain, on/off as a UI parameter) send Hz + velocity
@@ -29,9 +29,10 @@ Tabs: `OSC 1 | OSC 2 | OSC 3 | MOD | MASTER`; OSC tabs have sub-tabs
 `OSC | ENV+FLT | SEQ` (MOD/MASTER have none). Every non-SEQ page is split
 into labeled sections (gray label row, items indented, one 16 px gap row
 between sections): the OSC page into MAIN/SUB 1/SUB 2, ENV+FLT into
-ADSR/FILTER, MOD into MOD 1..3 and MASTER into MASTER/DELAY/REVERB.
-MOD holds the 3-slot cross-mod matrix (each slot SRC/DEST/AMT, B/C
-sources modulating chain A); MASTER holds the master level, the safety
+ADSR/FILTER, MOD into MOD, and MASTER into MASTER/DELAY/REVERB.
+MOD holds the 16-slot cross-mod matrix (the SLOT row selects the slot,
+1–16 with roll-over; SOURCE · TARGET · DEST · DEPTH · LEVEL below edit
+it); MASTER holds the master level, the safety
 filter toggle, the global BPM and the delay/reverb controls.
 
 | Action | Desktop | R36S (proposed; verify per `CHECKLIST_R36S.md`) |
@@ -55,15 +56,18 @@ bar at the bottom of each screen shows the active keymap; the status strip at
 the top shows the centered OPHIS DRONE title, RUN, gate, envelope bar and
 live step cursor.
 
-Presets are JSON (version 1) written to `presets/` next to the executable
+Presets are JSON (version 2) written to `presets/` next to the executable
 (resolved at runtime from /proc/self/exe). A preset stores every parameter except
 the RUN flag; required fields per `src/preset/schema.c` (over the
 vendored `third_party/json.h`, see VENDORS below): `app`, `version`,
 `master`, `safety`, `chain[3]` (`freq_hz`, `wave`, `duty`, `level`, `vel`,
 `sub[2]`, `adsr`, `filter`), `seq[3]` (`on`, `bpm`, `div`, `mode`, `once`,
-`steps[8]` with `pitch_hz`/`vel`), `xmod[3]` (`src`, `dest`, `amount`),
+`steps[8]` with `pitch_hz`/`vel`), `xmod` (0..16 entries — the active
+slots only; `src`, `tgt`, `dest`, `amount`, `mix` per entry; slots
+absent from the array are off),
 `delay` (`time_l`, `time_r`, `feedback`, `tone`, `mix`), `reverb` (`size`,
-`damp`, `mix`, `width`). Fixed array lengths; unknown keys ignored; any other
+`damp`, `mix`, `width`). Fixed array lengths (chains, subs, steps —
+`xmod` is the variable-length exception); unknown keys ignored; any other
 error rejects the whole file.
 
 ## Installation

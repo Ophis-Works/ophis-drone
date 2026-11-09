@@ -662,3 +662,159 @@
   `make clean && make all` rc=0, `make test` 11243/11243, exit 0).
 - ASan on the UI tests: NOT run in any recorded M3 ask, not run here —
   remains open per PLAN_MOD_MATRIX_16.md §2.3.
+
+## M4 — R7 docs corrected (2026-11-09)
+
+### Edits (Edit tool only; scope = ARCHITECTURE.md + MANUAL.md)
+- ARCHITECTURE.md §2 diagram node: "3 matrix slots / SOURCE x OSC x
+  DEST x DEPTH + LEVEL" -> "16 matrix slots / SOURCE x TARGET x DEST
+  x DEPTH + LEVEL" (MOD_SLOTS 16 at src/dsp/types.h:82; the TARGET
+  row name at src/ui/seq_items.c:99).
+- ARCHITECTURE.md §4: heading "(version 1)" -> "(version 2)"; parser
+  line now states version 2 only, version 1 files reject
+  (src/preset/schema_parse.c:490); array lengths stated as exactly
+  3 chains / 2 subs / 8 steps (schema_parse.c:8 header) with "xmod"
+  0..16 entries — ACTIVE slots only, ascending, same 5 keys per
+  entry, absent slots OFF, empty array = matrix fully off
+  (writer emits active-only via xmod_is_off, schema_write.c:245-252;
+  version wnumd(w, 2) schema_write.c:176); the "(3 slots: ...)"
+  key-group text dropped.
+- MANUAL.md §6: "Three slots." -> "16 slots."; documents the SLOT row
+  selecting the slot (left/right or X/Z, roll-over) with the five
+  rows below — SOURCE · TARGET (renamed from OSC) · DEST · DEPTH ·
+  LEVEL — editing the selected slot (MOD_ITEMS order
+  src/ui/seq_items.c:98-101; 1-based "SLOT %d" display
+  src/ui/ui_draw.c:120; X/Z wrap verified by M3's value-key note,
+  roll-over by P5 legs 2-3).
+- No other lines touched in either file. NOT committed (per workflow
+  instruction). The other M4 steps (full suite + smoke + ASan +
+  make handheld zip + commit, plan §2.1) are separate scheduled asks,
+  not run here.
+
+### Check (the ask's named repo-wide grep, run post-edit)
+- Command: `grep -rniE 'three slots|3 slots|xmod\[3\]|3 xmod|xmod
+  \(3|3/2/8/3|3 objects'` and `grep -rniE 'version 1|fixed-length'`,
+  both over --include md/html/txt --exclude-dir .zcode,build
+  --exclude 'PLAN_*.md', rc=0 each.
+- The two scope docs are CLEAN: ARCHITECTURE.md's only "version 1"
+  hit is the new "version 1 files reject" sentence (no 3-slot hits);
+  MANUAL.md zero hits on both patterns.
+- Repo-wide the check still FAILS outside this ask's file scope —
+  stale current-state claims remain, NOT edited (outside the
+  two-doc Edit scope; flagged for owner dispatch):
+  README.md:58 "Presets are JSON (version 1)" + :64 "`xmod[3]`";
+  IMPLEMENTATION.md:78 + :340 "`xmod[3]`" + :558-559 "version 1,
+  ... fixed-length arrays"; docs/manual.html:240 "Preset files
+  (JSON version 1)" + :256 "xmod: [ 3 objects ]" + :299 "fixed:
+  ... 3 xmod"; PLAN.md:246 "3 slots" + :568 "Preset JSON format
+  (version 1)" + :597 fixed-length 3 xmod slots + :606 "Format
+  **version 1**".
+- Not stale, left alone: BUILD_NOTES.md:36 "version 1 (SYSV)" is an
+  ELF readout; LOG_MOD16.md and LOG_OSC_NAMING.md "3 slots" /
+  "version 1" lines are dated historical red-pin/session records
+  (LOG_MOD16.md:191 says "today's xmod[3]" of the pre-M2 state),
+  accurate as history.
+
+## M4 — AUDIT FIX: stale claims in README/PLAN/IMPLEMENTATION/manual.html (2026-11-09)
+
+### Audit findings — all nine verified this ask
+- Ran the auditor's greps; every quoted line reproduced exactly:
+  README.md 15/33/58/64; PLAN.md 246/568/597/606;
+  IMPLEMENTATION.md 78/340/558-559; docs/manual.html 240/256/299
+  (tracked, hand-maintained — no generator: `grep -n manual Makefile`
+  no match; repo-wide 'manual.html' script/Makefile reference grep no
+  match; tools/ = handheld_gate.sh, migrate_presets.c,
+  r36s-launcher.sh only). All outside the previous ask's two-doc scope
+  (LOG_MOD16.md M4 section had flagged them for owner dispatch).
+
+### Fixes (Edit tool only; the nine findings)
+- README.md:15 "(3-slot matrix)" -> "(16-slot matrix)".
+- README.md:33 the 3-slot SRC/DEST/AMT sentence -> 16-slot matrix with
+  the SLOT row (1-16, roll-over) + SOURCE · TARGET · DEST · DEPTH ·
+  LEVEL (the M3 model, src/ui/seq_items.c:97-99, ui_draw.c:119).
+- README.md:58 "(version 1)" -> "(version 2)".
+- README.md:64 "`xmod[3]` (`src`, `dest`, `amount`)" -> "`xmod`
+  (0..16 entries — the active slots only; `src`, `tgt`, `dest`,
+  `amount`, `mix` per entry; slots absent from the array are off)";
+  :66 "Fixed array lengths" scoped to chains/subs/steps with xmod the
+  variable-length exception.
+- PLAN.md:246 "3 slots" -> "16 slots (MOD_SLOTS)" with the widening
+  plan cited (src/dsp/types.h:82).
+- PLAN.md §9: heading :568 -> "(version 2)"; example `"version": 1`
+  :572 -> 2; example xmod :586 -> one 5-key active entry; :597
+  fixed-length bullet -> 3/2/8 fixed + `xmod` 0..16 active-only,
+  ascending, >16 invalid; :606 -> "Format **version 2** (version 1
+  files are rejected by the parser)".
+- IMPLEMENTATION.md:78 `xmod[3]` -> `xmod[16]`; :340 `mxp = {xmod[3]}`
+  -> `{xmod[16]}` (sketch style keeps literals, as chain[3]/seq[3]).
+- IMPLEMENTATION.md:558-559 -> "(version 2, enum strings, fixed arrays
+  3 chains / 2 subs / 8 steps, `xmod` 0..16 active-slot entries, `run`
+  excluded)".
+- docs/manual.html:240 heading -> version 2; :256 `"xmod": [ 3
+  objects ]` -> `[ 0..16 objects ]` + active-only comment; :299-300 ->
+  fixed 3/2/8 + `xmod` 0..16 active-only/ascending/empty=off.
+
+### Same-plan same-class fixes in the ask's files (NOT in the findings; logged for the record)
+- README.md:32 "MOD into MOD 1..3" -> "MOD into MOD" (M3:
+  MOD_SECTIONS_N 3 -> 1).
+- docs/manual.html:163-178 MOD tab: sections MOD 1/2/3, three slots,
+  SRC/TGT/DEST/AMT/MIX -> one MOD section, SLOT row (LEFT/RIGHT from
+  any row or X/Z, roll-over) + SOURCE/TARGET/DEST/DEPTH/LEVEL (row
+  names per seq_items.c; the AMT-range and ADD-knob facts kept);
+  :250 example `"version": 1` -> 2; xmod bullet retitled "entry (one
+  per active slot)".
+- IMPLEMENTATION.md:490-491 (§6 kept-current spec) MOD 1/2/3 9-item
+  bullet -> the M3 6-row SLOT model, widening cited.
+- PLAN.md:391 page table MOD row -> SLOT (1..16, rolls over) +
+  SOURCE · TARGET · DEST · DEPTH · LEVEL (P5 legs 2-3 prove the
+  roll-over; suite green 239/239 M3 log).
+
+### Check (this ask)
+- `grep -rniE 'three slots|3 slots|xmod\[3\]|3 xmod|xmod \(3|3/2/8/3|3
+  objects' --include='*.md' --include='*.html' --include='*.txt'
+  --exclude-dir=.zcode --exclude-dir=build --exclude='PLAN_*.md' .`
+  -> rc=0; and the same for `version 1|fixed-length` -> rc=0.
+- The four fixed files are clean: the ONLY pattern hit left in them is
+  PLAN.md:611 "(version 1 files are rejected by the parser)" — the
+  corrected statement itself. Remaining repo-wide hits, all verified
+  NOT stale: LOG_MOD16.md/LOG_OSC_NAMING.md dated historical records;
+  BUILD_NOTES.md:36 "version 1 (SYSV)" ELF readout;
+  ARCHITECTURE.md:83 the new "version 1 files reject" sentence;
+  docs/manual.html:256-257 `"chain"/"seq": [ 3 objects ]` — TRUE under
+  v2 (exactly 3 chains / 3 seq objects unchanged; parser bounds 3,3 /
+  3,3 / 2,2 / 8,8, xmod 0..16); PLAN.md:599 the corrected
+  fixed-length sentence scoped to 3/2/8.
+- Tree: `git status --porcelain` (tracked) -> ARCHITECTURE.md,
+  IMPLEMENTATION.md, LOG_MOD16.md, MANUAL.md, PLAN.md, README.md,
+  docs/manual.html — the prior M4 doc work plus this ask's four files;
+  NO code file touched, nothing staged.
+- Not run in this ask: build/tests/smoke/ASan/handheld — zero code
+  changes (docs only), no gate named by the ask; the M4 ship gates
+  remain scheduled asks per PLAN_MOD_MATRIX_16.md §2.1 and the M4 log
+  above. Also left alone (pre-existing, NOT this plan's staleness, not
+  flagged): README.md:60 + docs/manual.html:245,247 name
+  `src/preset/schema.c`, which no longer exists (schema.h/
+  schema_parse.c/schema_write.c/schema_tab.c/schema_priv.h); and
+  README.md:91 "all 16 unit test suites" (the suite is larger from
+  other plans' work). Flagged here for owner dispatch.
+
+## M4 — COMMIT (2026-11-09)
+
+### Commit
+- Message: "Document the 16-slot matrix and the active-only preset
+  format" (single line, imperative, unsigned).
+- Staged exactly (7 files): ARCHITECTURE.md, MANUAL.md, LOG_MOD16.md,
+  plus the four auditor-listed doc files from the M4 audit-fix findings
+  (README.md, PLAN.md, IMPLEMENTATION.md, docs/manual.html — the
+  stale-claim files the findings enumerated, fixes recorded above).
+- Left unstaged/untracked: all PLAN_*.md (19 untracked), .zcode/,
+  everything else. PLAN.md (tracked, modified, in the auditor's
+  findings list) is staged — it does not match the PLAN_*.md glob.
+- Pre-existing non-mod16 doc defects (schema.c references, "all 16
+  unit test suites"), flagged for owner dispatch above: left untouched,
+  committed as-is where already inside the staged files' edits.
+- Gates: not re-run in this commit ask (docs-only change, no gate
+  named); the M4 doc grep checks stand as recorded above (rc=0 both
+  patterns; the four fixed files clean except the corrected-statement
+  hit PLAN.md:611). M4 ship gates (full suite + smoke + ASan + make
+  handheld zip) remain scheduled asks per PLAN_MOD_MATRIX_16.md §2.1.

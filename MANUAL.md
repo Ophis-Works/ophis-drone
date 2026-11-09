@@ -47,11 +47,13 @@ fwd/pingpong/oddeven/random/markov; ONCE = one pass then silence.
 
 ## 6. MOD — the matrix
 
-Three slots. Each slot: **SOURCE** (any osc or sub, any chain) →
-**OSC** (the chain it acts on) → **DEST** (PITCH vibrato · PHASE · AMP ·
-FLT CUT · FLT RES · RING · FM) → **DEPTH**, plus **LEVEL** — the
-source's raw audio blended into that chain (works with DEST off).
-Self-routing is legal; sources read one sample late.
+16 slots. The **SLOT** row selects the slot (`←`/`→` or `X`/`Z`,
+rolls over); the five rows below edit it: **SOURCE** (any osc or sub,
+any chain) → **TARGET** (the chain it acts on) → **DEST** (PITCH
+vibrato · PHASE · AMP · FLT CUT · FLT RES · RING · FM) → **DEPTH**,
+plus **LEVEL** — the source's raw audio blended into that chain
+(works with DEST off). Self-routing is legal; sources read one
+sample late.
 
 ![MOD page](docs/screenshots/mod.png)
 

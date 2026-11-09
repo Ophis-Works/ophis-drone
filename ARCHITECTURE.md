@@ -50,7 +50,7 @@ flowchart TB
         OSC --> XM --> ENV --> FLT --> LVL --> OUT
     end
     RAW["raw taps: osc + subs<br/>(mod sources, 1 sample late)"] --> XM
-    SLOT["3 matrix slots:<br/>SOURCE x OSC x DEST x DEPTH<br/>+ LEVEL (source audio in)"] --> XM
+    SLOT["16 matrix slots:<br/>SOURCE x TARGET x DEST x DEPTH<br/>+ LEVEL (source audio in)"] --> XM
     OUT --> MV["MIX 1/2/3 master send"] --> SUM["tanh(1.5 x sum)"] --> FXN
 ```
 
@@ -76,11 +76,15 @@ flowchart TB
 | `tools/` | `migrate_presets` (parse->write->re-parse->memcmp), `handheld_gate.sh`, launcher |
 | `third_party/` | vendored `json.h` (Unlicense) |
 
-## 4. Preset format (version 1)
+## 4. Preset format (version 2)
 
-JSON, minified by the writer; strict parser (required keys, exact
-array lengths 3/2/8/3, enum strings, ranges, duplicate keys rejected,
-unknown keys skipped). Key groups: chain (osc + 2 subs + adsr +
-filter + mixvol), seq (8 steps), xmod (3 slots: src/tgt/dest/amount/
-mix), delay, reverb, bpm, master, safety. Shipped presets are
-canonical writer output, verified by re-parse + memcmp.
+JSON, minified by the writer; strict parser (required keys, enum
+strings, ranges, duplicate keys rejected, unknown keys skipped;
+version 2 only — version 1 files reject). Array lengths: exactly
+3 chains / 2 subs / 8 steps; `xmod` holds 0..16 entries — the ACTIVE
+slots only, in ascending slot order, same 5 keys per entry
+(src/tgt/dest/amount/mix); slots absent from the array are OFF
+(empty array = matrix fully off). Key groups: chain (osc + 2 subs +
+adsr + filter + mixvol), seq (8 steps), xmod, delay, reverb, bpm,
+master, safety. Shipped presets are canonical writer output,
+verified by re-parse + memcmp.
