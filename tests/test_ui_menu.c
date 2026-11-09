@@ -376,10 +376,21 @@ static void test_item_value_enum_rows(void)
     CHECK(strcmp(b, "SAW") == 0);
 
     u.tab = TAB_MOD;
-    it = content_item(&u, 2);              /* MOD_ITEMS[2] = DEST slot 0 */
+    it = content_item(&u, 3);              /* MOD_ITEMS[3] = DEST, slot 0
+                                            * (the 6-row SLOT model, R4:
+                                            * SLOT · SOURCE · TARGET ·
+                                            * DEST · DEPTH · LEVEL) */
     CHECK(it.id == IT_XMOD_DEST && it.si == 0);
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "RING") == 0);
+
+    /* R4 (PLAN_MOD_MATRIX_16.md): the SLOT row shows 1-based ("SLOT %d",
+     * v+1) — green-today guard (repo precedent, M2 log): written with
+     * the implementation, not red-first */
+    it = content_item(&u, 0);              /* MOD_ITEMS[0] = SLOT */
+    CHECK(it.id == IT_MOD_SLOT && it.si == 0);
+    item_value(&u, it, b, sizeof b);
+    CHECK(strcmp(b, "SLOT 1") == 0);
 
     u.tab = TAB_OSC1;
     u.sub[0] = SUB_ENVFLT;
@@ -395,12 +406,12 @@ static void test_item_value_enum_rows(void)
 
     /* P2: the previously-working direct cases stay correct */
     u.tab = TAB_MOD;
-    it = content_item(&u, 0);              /* SOURCE slot 0 */
+    it = content_item(&u, 1);              /* SOURCE, slot 0 */
     CHECK(it.id == IT_XMOD_SRC && it.si == 0);
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "OSC 2") == 0);        /* src 1 = chain B = OSC 2 */
 
-    it = content_item(&u, 1);              /* OSC (TGT) slot 0 */
+    it = content_item(&u, 2);              /* TARGET (TGT), slot 0 */
     CHECK(it.id == IT_XMOD_TGT && it.si == 0);
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "OSC 3") == 0);        /* tgt 2 -> "OSC %d" (v + 1) */
@@ -787,6 +798,95 @@ static void test_digit_marker_focus_gate(void)
     }
 }
 
+/* ---- P5 (PLAN_MOD_MATRIX_16.md §1.3, M3): the MOD page's SLOT row
+ * selects the slot the five rows below edit — NAV on the SLOT row rolls
+ * the selection 0..15 WITH roll-over (R4/PR-C), and DEPTH then edits
+ * the SELECTED slot's amount (PR-D: the slot rides the ui state at use
+ * time, exactly like SEQ PITCH/VEL). Driven through the real key path
+ * (ui_handle_action); the selection is ui_t-internal (PR-C), so it is
+ * observed ONLY through the DEPTH writes. A slot whose dest is OFF dims
+ * its DEPTH row (ui.c item_dim), so the edited slots are made live.
+ * Red today: no SLOT row exists — NAV is inert (NAV_NONE on every MOD
+ * row), and the edit lands on slot 0 (cursor row 4 = LEVEL today, DEPTH
+ * of the selected slot post-M3). ---- */
+static void test_mod_slot_row(void)
+{
+    /* SLOT 7 (index 6): six NAV_RIGHTs from fresh SLOT 1, then DEPTH
+     * writes xmod[6].amount — and only that slot's amount */
+    {
+        ui_t u;
+        memset(&u, 0, sizeof u);
+        u.mb = &mb;
+        u.tab = TAB_MOD;
+        u.cursor[(int)TAB_MOD * SUB_COUNT] = 0;   /* the SLOT row */
+        u.draft.xmod[6].dest = MOD_PITCH;         /* DEPTH live (not dim) */
+        for (int i = 0; i < 6; i++)
+            ui_handle_action(&u, ACT_NAV_RIGHT);  /* SLOT 1 -> SLOT 7 */
+        ui_handle_action(&u, ACT_SEL_DOWN);       /* cursor onto DEPTH */
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        item_t it = content_item(&u, 4);          /* DEPTH (flat 4) */
+        CHECK(it.id == IT_XMOD_AMT);              /* red today: LEVEL */
+        ui_handle_action(&u, ACT_VAL_INC);        /* edit DEPTH */
+        CHECK(fexactf(u.draft.xmod[6].amount, 1.0f));  /* red today */
+        CHECK(u.draft.xmod[0].mix == 0);               /* red today: the
+                                    * write lands on slot 0's LEVEL */
+        CHECK(fexactf(u.draft.xmod[0].amount, 0.0f));  /* slot 0 amount
+                                                          * untouched */
+    }
+
+    /* roll-over DOWN: NAV_LEFT from SLOT 1 wraps to SLOT 16 (index 15);
+     * DEPTH then writes xmod[15].amount */
+    {
+        ui_t u;
+        memset(&u, 0, sizeof u);
+        u.mb = &mb;
+        u.tab = TAB_MOD;
+        u.cursor[(int)TAB_MOD * SUB_COUNT] = 0;
+        u.draft.xmod[15].dest = MOD_PITCH;
+        ui_handle_action(&u, ACT_NAV_LEFT);       /* 0 -> 15 roll-over */
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        item_t it = content_item(&u, 4);
+        CHECK(it.id == IT_XMOD_AMT);
+        ui_handle_action(&u, ACT_VAL_INC);
+        CHECK(fexactf(u.draft.xmod[15].amount, 1.0f));  /* red today */
+        CHECK(u.draft.xmod[0].mix == 0);                /* red today */
+        CHECK(fexactf(u.draft.xmod[0].amount, 0.0f));   /* slot 0 untouched */
+    }
+
+    /* roll-over UP: fifteen NAV_RIGHTs from SLOT 1 reach SLOT 16 (15),
+     * one more wraps 15 -> 0, and DEPTH writes xmod[0].amount */
+    {
+        ui_t u;
+        memset(&u, 0, sizeof u);
+        u.mb = &mb;
+        u.tab = TAB_MOD;
+        u.cursor[(int)TAB_MOD * SUB_COUNT] = 0;
+        u.draft.xmod[15].dest = MOD_PITCH;
+        u.draft.xmod[0].dest = MOD_PITCH;
+        for (int i = 0; i < 15; i++)
+            ui_handle_action(&u, ACT_NAV_RIGHT);  /* 0 -> 15 */
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        ui_handle_action(&u, ACT_SEL_DOWN);
+        item_t it = content_item(&u, 4);
+        CHECK(it.id == IT_XMOD_AMT);
+        ui_handle_action(&u, ACT_VAL_INC);
+        CHECK(fexactf(u.draft.xmod[15].amount, 1.0f));  /* red today */
+        CHECK(u.draft.xmod[0].mix == 0);                /* red today */
+        ui_handle_action(&u, ACT_NAV_RIGHT);      /* 15 -> 0 roll-over */
+        ui_handle_action(&u, ACT_VAL_INC);
+        CHECK(fexactf(u.draft.xmod[0].amount, 1.0f));   /* red today */
+        CHECK(fexactf(u.draft.xmod[15].amount, 1.0f));  /* the second
+                                    * write must not touch slot 15 */
+    }
+}
+
 int main(void)
 {
     /* Headless SDL: dummy video driver so SDL_StartTextInput works. */
@@ -818,6 +918,9 @@ int main(void)
     test_text_entry_state_tracker();
     test_load_nav_val_inert();
     test_valkey_hold_retrig();
+    /* ---- PLAN_MOD_MATRIX_16.md §1.3: the MOD SLOT row (P5) — red
+     * first (before SDL_Quit: the val path reads SDL_GetTicks) ---- */
+    test_mod_slot_row();
     test_load_empty_shows_up();
     test_load_missing_dir_created();
     test_load_uncreatable_falls_back();

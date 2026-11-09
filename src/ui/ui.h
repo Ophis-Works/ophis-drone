@@ -46,6 +46,11 @@ typedef struct {
   int             cursor[TAB_COUNT * SUB_COUNT];
   int             seq_sel[3];          /* SEQ page: selected rectangle per
                                        * chain (PITCH/VEL bind to it) */
+  /* PR-C (PLAN_MOD_MATRIX_16.md): the MOD page's selected matrix slot
+   * 0..15 ("SLOT 1".."SLOT 16") — the SLOT row drives it (NAV_STEPSEL
+   * roll-over) and the five rows below resolve their si to it at use
+   * time. UI state only: never committed, not persisted. */
+  int             mod_slot;
   /* digit cursor of the 5-digit odometer boxes (PLAN_HZ_EDIT.md R3,
    * PR-E): index 0..4 into the value's digits counted from the RIGHT —
    * 0 = the 1s digit (place 10^0), 4 = the 10000s digit (place 10^4) —

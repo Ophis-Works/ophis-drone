@@ -113,6 +113,11 @@ void item_value(const ui_t *ui, item_t it, char *b, size_t blen)
     case ITF_SEQMODE: snprintf(b, blen, "%s", SEQMODE_NAMES[(int)v]); break;
     case ITF_SEQONCE: snprintf(b, blen, "%s", SEQONCE_NAMES[(int)v]); break;
     case ITF_STEPSEL: snprintf(b, blen, "STEP %d", (int)v + 1); break;
+    case ITF_SLOT:    /* R4 (PLAN_MOD_MATRIX_16.md): the matrix slot
+                       * shows 1-based ("SLOT 7" = ui mod_slot 6), like
+                       * the STEP row's 1-based rectangle number */
+                      snprintf(b, blen, "SLOT %d", (int)v + 1);
+    break;
     case ITF_INT:     snprintf(b, blen, "%d", (int)v); break;
     case ITF_XDIV:    snprintf(b, blen, "x%d", (int)v); break;
     case ITF_DUTY:

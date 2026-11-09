@@ -428,3 +428,237 @@
 - Gates: not re-run in this commit ask (no code change made here);
   the M2 gates stand as recorded above (full suite 11254/11254,
   migrate run-twice bytes-identical).
+
+## M3 — P4+P5 red pins (2026-11-09)
+
+### PIN (red)
+- Scope: tests/test_seq_items.c (+44) and tests/test_ui_menu.c (+92)
+  ONLY (Edit tool); this log. Tree verified: `git diff HEAD --numstat`
+  -> exactly those two files; nothing staged, nothing else modified.
+- Baseline (pre-edit, binaries up to date from M2):
+  `./build/tests/test_seq_items` -> 567/567, exit 0;
+  `./build/tests/test_ui_menu` -> 224/224, exit 0.
+- P4 (PLAN_MOD_MATRIX_16.md §1.3 lines 76-77), test_seq_items.c new
+  block before HARNESS_REPORT: MOD_ITEMS_N == 6; names SLOT · SOURCE ·
+  TARGET · DEST · DEPTH · LEVEL in order (owner order 2026-11-09, R4;
+  the plan's short forms SRC/TGT/AMT/MIX = the rows SOURCE/TARGET/
+  DEPTH/LEVEL); ids 1..5 = IT_XMOD_SRC/TGT/DEST/AMT/MIX; every row
+  si == 0 (PR-D: the slot rides the ui state at use time, exactly like
+  SEQ PITCH/VEL, whose table si is 0 — test_seq_items.c SEQ_ITEMS
+  precedent); the SLOT spec pinned WITHOUT naming the new id (none
+  exists yet — naming one would compile-red the whole file and hide
+  the semantic reds, against the M2 compile-red-avoidance precedent):
+  a scan demands EXACTLY ONE ITEM_SPECS entry with nav == NAV_STEPSEL
+  && min 0 && max 15 && wrap 1 (the SEQ STEPSEL stays 0..7, pinned at
+  :398-402, so the scan is unique post-M3), the SLOT row's id must BE
+  that spec's id, and the spec's tgt == ITT_UI (PR-C: the slot lives
+  in ui_t, no param commit).
+- P5 (PLAN_MOD_MATRIX_16.md §1.3 lines 78-79), test_ui_menu.c new
+  test_mod_slot_row(), called in main after test_valkey_hold_retrig()
+  (BEFORE SDL_Quit — the val path reads SDL_GetTicks via val_edit),
+  three legs on a raw memset ui (tab TAB_MOD, cursor slot
+  TAB_MOD*SUB_COUNT = 9 parked on the SLOT row, mb linked):
+  - leg 1: 6x ACT_NAV_RIGHT (SLOT 1 -> SLOT 7 = index 6), 4x
+    ACT_SEL_DOWN onto the DEPTH row (flat 4 post-M3; LEVEL today —
+    conveniently the same flat index), ACT_VAL_INC; assert
+    content_item(4).id == IT_XMOD_AMT, xmod[6].amount == 1.0f
+    (fexactf), xmod[0].mix == 0 (int compare — the LEVEL-row
+    misdirect), xmod[0].amount == 0.0f.
+  - leg 2 (roll-over 0 -> 15): one ACT_NAV_LEFT from fresh, then the
+    same DEPTH drive; assert xmod[15].amount == 1.0f, xmod[0].mix == 0,
+    xmod[0].amount == 0.0f.
+  - leg 3 (roll-over 15 -> 0): 15x ACT_NAV_RIGHT to 15, DEPTH ->
+    xmod[15].amount == 1.0f, then one more ACT_NAV_RIGHT (15 -> 0) and
+    a second DEPTH edit -> xmod[0].amount == 1.0f and xmod[15].amount
+    STILL 1.0f (the second write must not touch slot 15).
+  - Edited slots get dest = MOD_PITCH first: an OFF dest dims DEPTH
+    (ui.c item_dim IT_XMOD_AMT -> val_edit refuses), true today AND
+    post-M3 (R4 keeps off-slot behavior). The selection is ui_t-
+    internal (PR-C) and is observed ONLY through the DEPTH writes —
+    no new ui_t field is named (same compile-red avoidance as P4).
+- Green-today CHECKs, by design (repo precedent, M2 log): the two
+  xmod[0].amount == 0 guards in legs 1-2 — post-M3 they prove the
+  slot-6/15 edits don't touch slot 0; today they pass vacuously
+  because the misdirected write goes to slot 0's MIX (caught by the
+  xmod[0].mix == 0 CHECKs, which ARE red). Red state rests on the
+  other 11 + 16 CHECKs.
+
+### Commands + output
+- Build: `make build/tests/test_seq_items build/tests/test_ui_menu`
+  -> rc=0, both recompiled under the baked-in flag set (Makefile:2-3,
+  full WARNFLAGS + -Werror, no flag changes), zero warnings. (First
+  attempt failed under -Werror=conversion: fexactf against xmod[0].mix,
+  an int field — fixed with plain integer comparison.)
+- Run: `./build/tests/test_seq_items` ->
+      FAIL tests/test_seq_items.c:552: MOD_ITEMS_N == 6                (count)
+      FAIL tests/test_seq_items.c:557: ...strcmp(MOD_ITEMS[i].name, M6N[i])   (x6 — SLOT/SOURCE/TARGET/DEST/DEPTH/LEVEL vs the 15-item table)
+      FAIL tests/test_seq_items.c:559: MOD_ITEMS[i].si == 0            (i=5: si 1)
+      FAIL tests/test_seq_items.c:561: MOD_ITEMS[1].id == IT_XMOD_SRC  (is IT_XMOD_TGT)
+      FAIL tests/test_seq_items.c:562: MOD_ITEMS[2].id == IT_XMOD_TGT  (is IT_XMOD_DEST)
+      FAIL tests/test_seq_items.c:563: MOD_ITEMS[3].id == IT_XMOD_DEST (is IT_XMOD_AMT)
+      FAIL tests/test_seq_items.c:564: MOD_ITEMS[4].id == IT_XMOD_AMT  (is IT_XMOD_MIX)
+      FAIL tests/test_seq_items.c:565: MOD_ITEMS[5].id == IT_XMOD_MIX  (is IT_XMOD_SRC)
+      FAIL tests/test_seq_items.c:578: slot_id != -1                   (no 0..15 NAV_STEPSEL spec exists)
+      FAIL tests/test_seq_items.c:579: MOD_ITEMS[0].id == slot_id
+      FAIL tests/test_seq_items.c:580: slot_id != -1 && item_spec(slot_id)->tgt == ITT_UI
+      572/588 passed
+      exit=1
+- Run: `./build/tests/test_ui_menu` ->
+      FAIL tests/test_ui_menu.c:819: it.id == IT_XMOD_AMT              (leg 1: flat 4 is LEVEL)
+      FAIL tests/test_ui_menu.c:821: fexactf(u.draft.xmod[6].amount, 1.0f)   (slot 6 never written)
+      FAIL tests/test_ui_menu.c:822: u.draft.xmod[0].mix == 0          (the edit landed on slot 0's LEVEL)
+      FAIL tests/test_ui_menu.c:843: it.id == IT_XMOD_AMT              (leg 2)
+      FAIL tests/test_ui_menu.c:845: fexactf(u.draft.xmod[15].amount, 1.0f)  (NAV_LEFT inert: no 0->15 roll)
+      FAIL tests/test_ui_menu.c:846: u.draft.xmod[0].mix == 0
+      FAIL tests/test_ui_menu.c:867: it.id == IT_XMOD_AMT              (leg 3)
+      FAIL tests/test_ui_menu.c:869: fexactf(u.draft.xmod[15].amount, 1.0f)  (15 NAV_RIGHTs inert)
+      FAIL tests/test_ui_menu.c:870: u.draft.xmod[0].mix == 0
+      FAIL tests/test_ui_menu.c:873: fexactf(u.draft.xmod[0].amount, 1.0f)   (after 15->0 NAV: inert, edit again hit LEVEL)
+      FAIL tests/test_ui_menu.c:874: fexactf(u.draft.xmod[15].amount, 1.0f)
+      226/237 passed
+      exit=1
+- No existing CHECK moved: 567 old seq_items + 224 old ui_menu CHECKs
+  still pass (572/588 = 567+5, 226/237 = 224+2, the +5/+2 being the
+  documented green-today guards). Red is EXCLUSIVELY the new pins.
+- No source files touched: P4/P5 red does not require it (MOD_ITEMS_N
+  15 at src/ui/seq_items.c:79/MOD_ITEMS :93-103; no MOD row has nav !=
+  NAV_NONE in ITEM_SPECS :248-257; ui.c ACT_NAV NAV_NONE inert :562-563).
+
+### State
+- P4 + P5 RED proven. Not committed (per workflow instruction).
+- Not run in this ask (scheduled as later M3 workflow steps per
+  PLAN_MOD_MATRIX_16.md §2.1): the M3 IMPLEMENT (SLOT row + 6-item
+  model, ui.c slot state, ui_draw SLOT display), then the forced-
+  rebuild suite gate and ASan on the UI tests.
+- Implement-time notes for the M3 implement agent: (a) the OLD MOD
+  pins in tests/test_seq_items.c (:129-149 item table, :210-218
+  MOD_SECTIONS, :446-458 the PLAN_OSC_NAMING P1 block, :434-435
+  page_get) still encode the 15-item contract and must be rewritten
+  WITH the implementation or the suite cannot go green; (b) the P4
+  scan keys on nav == NAV_STEPSEL && 0..15 && wrap — the SLOT spec
+  must carry those bounds and tgt ITT_UI, and MOD_ITEMS[0].id must BE
+  that spec's id (any id enum name works); (c) P5 observes only
+  through DEPTH writes, so the slot-selection mechanism (field name,
+  NAV_STEPSEL extension) is unconstrained — but content_item must
+  resolve the xmod rows' si at use time (PR-D) and val_edit's dim gate
+  must follow the RESOLVED slot's dest.
+
+### IMPLEMENT (green)
+- Scope: src/ui/seq_items.h, src/ui/seq_items.c, src/ui/ui.h,
+  src/ui/ui.c, src/ui/ui_draw.c (the charter's file list), plus the
+  old-pin rewrites in tests/test_seq_items.c and
+  tests/test_ui_menu.c noted in (a) above. Edit tool only; no DSP, no
+  schema, no Makefile/flag change. NOT committed (per workflow
+  instruction).
+- seq_items.h: new id IT_MOD_SLOT (MOD-page SLOT row, ITT_UI);
+  MOD_ITEMS_N 15 -> 6; MOD_SECTIONS_N 3 -> 1; new fmt ITF_SLOT (UI
+  state selector, wraps, "SLOT %d" v+1 display — the ITF_STEPSEL
+  prefix "STEP %d" stays the SEQ STEP row's).
+- seq_items.c: MOD_ITEMS = SLOT · SOURCE · TARGET · DEST · DEPTH ·
+  LEVEL, every si 0 (PR-D: the slot rides the ui state at use time);
+  TARGET was OSC (renamed, owner order 2026-11-09); MOD_SECTIONS = one
+  { "MOD", 0, 6 } label row (draw_sections draws items per section, so
+  the single section must cover all 6 rows); ITEM_SPECS gains
+  [IT_MOD_SLOT] = { ITF_SLOT, 0, 15, wrap 1, ITT_UI, PK_NONE,
+  NAV_STEPSEL } — the ONE NAV_STEPSEL 0..15 entry (the SEQ STEPSEL
+  stays 0..7, pinned test_seq_items.c:398-402 -> P4's uniqueness scan
+  holds). File-top page descriptions updated (they still said
+  "MOD 1..MOD 3 ... = 9").
+- ui.h: ui_t gains int mod_slot (PR-C, alongside seq_sel; zero-init =
+  SLOT 1; UI state only — never committed, not persisted).
+- ui.c:
+  - content_item binds ITT_XMOD rows' si to ui->mod_slot at use time
+    (spec-driven tgt check, PR-D — same pattern as the SEQ
+    PITCH/VEL si binding); param_get/param_set need NO change: the
+    PK_XMOD_* routes take the resolved si, so SRC/TGT/DEST/DEPTH/LEVEL
+    read/write draft.xmod[mod_slot]. The ITF_DEST re-clamp carries the
+    resolved si too (amt = it; amt.id = IT_XMOD_AMT).
+  - item_get/item_set: the ITT_UI holder is keyed on the SPEC's fmt
+    (no id comparisons, R12a): ITF_SLOT -> ui->mod_slot, ITF_STEPSEL ->
+    seq_sel[chain_of]. New const-aware statics ui_sel_get/ui_sel_ref
+    (-Wcast-qual forbids the const-cast form).
+  - ACT_NAV NAV_STEPSEL branch factored into sel_roll (spec bounds +
+    spec-keyed holder); NEW: NAV_NONE rows on TAB_MOD fall back to
+    sel_roll(item_spec(IT_MOD_SLOT)) — P5 leg 3 presses NAV_RIGHT on
+    the DEPTH row (cursor flat 4) and demands the 15 -> 0 roll-over,
+    so on the MOD page LEFT/RIGHT roll the SLOT selection from ANY
+    row; the SLOT row itself stays fully spec-driven (its NAV_STEPSEL
+    spec supplies the bounds). SEQ page row-scoped NAV pins
+    (test_seq_nav_rows) and the MASTER page inertness are untouched:
+    the fallback keys on !is_osc_tab && tab == TAB_MOD.
+  - edit_item: ITF_SLOT joins the R11 wrap-formula group (a wrapping
+    selector; item_set routes it to mod_slot; the tgt != ITT_UI gate
+    skips the mailbox commit, exactly like the STEP row).
+- ui_draw.c: item_value gains case ITF_SLOT -> "SLOT %d" (v+1,
+  1-based like ITF_STEPSEL/ITF_TGT). draw_sections needed no change:
+  the SLOT row renders through the generic path (label/value, cursor
+  highlight); the digit marker's NAV_DIGITS gate simply never fires on
+  it (existing marker/focus behavior, R13). ui_menu.c and
+  valrepeat.c untouched (no item-model references / out of scope).
+- Test rewrites (the log's note (a)):
+  - test_seq_items.c: the 15-item MOD table pin -> the 6-item model
+    (names/ids/si==0, spot check MOD_ITEMS[1] == IT_XMOD_SRC);
+    MOD_SECTIONS pin -> 1 section "MOD" 0/6 (gcc had compile-red the
+    old pin: MOD_SECTIONS[2] above the now-length-1 array bounds under
+    -Werror=array-bounds); the PLAN_OSC_NAMING P1 block re-pins the
+    new names (re-pin precedent, like its P2 does for MASTER).
+    page_get(3,0) needed no edit (macro-keyed). The P4 pin block is
+    untouched and passes as written.
+  - test_ui_menu.c: test_item_value_enum_rows' MOD flat indices move
+    to the 6-row model (DEST 2 -> 3, SOURCE 0 -> 1, TGT 1 -> 2; si
+    still 0 via the resolved mod_slot) and gain ONE green-today guard
+    (repo precedent, M2/M3 log): content_item(0) -> IT_MOD_SLOT,
+    item_value -> "SLOT 1" (R4 display). P5's test_mod_slot_row is
+    untouched and passes as written.
+- Value-key note (no scope to change valrepeat.c): val_edit's inert
+  gate is still `id == IT_SEQ_STEPSEL`, so X/Y on the SLOT row goes
+  through edit_item -> wraps mod_slot 0..15 (bounded, no mailbox
+  commit since tgt == ITT_UI, no retrig off the OSC tabs) with the
+  standard edit pulse/hold — selector-row behavior, not STEP-row
+  inertness. No pin covers it; logged as observed behavior.
+
+### Commands + output (green)
+- Build: `make build/tests/test_seq_items build/tests/test_ui_menu`
+  -> rc=0, both recompiled under the baked flag set (Makefile:2-3,
+  -std=c23 -O2 + full WARNFLAGS with -Werror; no flag changes), zero
+  warnings.
+- Run: `./build/tests/test_seq_items` -> 541/541 passed, exit=0
+  (P4 GREEN; the total moved from 588 because the rewritten old pins
+  loop over 6 rows instead of 15 — fewer CHECK executions, zero
+  failures).
+- Run: `./build/tests/test_ui_menu` -> 239/239 passed, exit=0
+  (P5 GREEN; 237 -> 239 = the two new SLOT-display guard CHECKs).
+- Full gate, exactly as asked: `make clean && make all` -> rc=0,
+  single-TU desktop build, zero warnings (any warning aborts under
+  -Werror); `make test` -> rc=0, all 26 binaries green,
+  TOTAL: 11243/11243 passed, 0 FAIL lines (11254 -> 11243 = the same
+  dynamic CHECK-count effect as above).
+- Tree: `git diff HEAD --numstat` (final, after this append) ->
+  LOG_MOD16.md 218/0 (the red ask's +114 plus this M3 IMPLEMENT
+  record), src/ui/seq_items.c 20/19, src/ui/seq_items.h 19/7,
+  src/ui/ui.c 51/13, src/ui/ui.h 5/0, src/ui/ui_draw.c 5/0,
+  tests/test_seq_items.c 75/37, tests/test_ui_menu.c 106/3 — exactly
+  the charter's file set; nothing staged, no untracked additions by
+  this ask.
+
+### State
+- P4 + P5 GREEN proven; full forced-rebuild suite green under the
+  baked -std=c23 -Werror WARNFLAGS. Not committed (per workflow
+  instruction).
+- Not run in this ask (scheduled as the next M3 workflow step per
+  PLAN_MOD_MATRIX_16.md §2.3): ASan on the UI tests; commit.
+
+## M3 — COMMIT (2026-11-09)
+
+### Commit
+- Message: "Select mod-matrix slots 1..16 on the MOD page with a SLOT
+  row" (single line, imperative, unsigned).
+- Staged exactly (8 files): src/ui/seq_items.h, src/ui/seq_items.c,
+  src/ui/ui.h, src/ui/ui.c, src/ui/ui_draw.c,
+  tests/test_seq_items.c, tests/test_ui_menu.c, LOG_MOD16.md.
+- Left unstaged/untracked: all PLAN_*.md, .zcode/, everything else.
+- Gates: not re-run in this commit ask (no code change made here);
+  the M3 gates stand as recorded above (P4 541/541, P5 239/239,
+  `make clean && make all` rc=0, `make test` 11243/11243, exit 0).
+- ASan on the UI tests: NOT run in any recorded M3 ask, not run here —
+  remains open per PLAN_MOD_MATRIX_16.md §2.3.

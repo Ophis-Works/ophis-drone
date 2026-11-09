@@ -141,7 +141,9 @@ static void freq_digit_sync(ui_t *ui)
 /* content item count / item for the current tab+sub-tab: the page
  * model in seq_items.c is the single source (A1) — the flat item list
  * is the concatenation of the page's spans; the SEQ page binds the
- * PITCH/VEL si to the selected rectangle at use time. */
+ * PITCH/VEL si to the selected rectangle at use time, and the MOD page
+ * binds the five matrix rows to the SLOT row's slot at use time
+ * (PLAN_MOD_MATRIX_16.md PR-D). */
 int content_count(const ui_t *ui)
 {
     const page_t *pg = page_get((int)ui->tab, is_osc_tab(ui)
@@ -160,6 +162,8 @@ item_t content_item(const ui_t *ui, int i)
             item_t it = pg->spans[k].items[i];
             if (it.id == IT_STEP_PITCH || it.id == IT_STEP_VEL)
                 it.si = ui->seq_sel[chain_of(ui)];
+            else if (item_spec(it.id)->tgt == ITT_XMOD)
+                it.si = ui->mod_slot;  /* R4/PR-D: the SLOT row's slot */
             return it;
         }
         i -= pg->spans[k].n;
@@ -293,11 +297,38 @@ void param_set(synth_params_t *d, param_kind_t kind, int ci, int si,
     }
 }
 
+/* the ui_t holder of an ITT_UI row's value (PR-C, PLAN_MOD_MATRIX_16.md)
+ * — keyed on the SPEC's fmt, never an id (R12a): ITF_SLOT is the MOD
+ * page's SLOT row (one selection for the whole matrix), ITF_STEPSEL the
+ * SEQ page's STEP row (one rectangle per chain). */
+static const int *ui_sel_get(const ui_t *ui, const item_spec_t *sp)
+{
+    return sp->fmt == ITF_SLOT ? &ui->mod_slot
+                               : &ui->seq_sel[chain_of(ui)];
+}
+
+static int *ui_sel_ref(ui_t *ui, const item_spec_t *sp)
+{
+    return sp->fmt == ITF_SLOT ? &ui->mod_slot
+                               : &ui->seq_sel[chain_of(ui)];
+}
+
+/* one NAV_STEPSEL roll: the selection wraps across the SPEC's min..max
+ * (R11) — the SEQ STEP row's rectangle 0..7, the MOD SLOT row's slot
+ * 0..15 (R4). Bounds and holder both come from the spec. */
+static void sel_roll(ui_t *ui, const item_spec_t *sp, int dir)
+{
+    int sn = sp->max - sp->min + 1;
+    int *sel = ui_sel_ref(ui, sp);
+    int s = *sel - sp->min;
+    *sel = sp->min + (((s + dir) % sn) + sn) % sn;
+}
+
 double item_get(const ui_t *ui, item_t it)
 {
     const item_spec_t *sp = item_spec(it.id);
     if (sp->tgt == ITT_UI)
-        return (double)ui->seq_sel[chain_of(ui)];   /* IT_SEQ_STEPSEL */
+        return (double)*ui_sel_get(ui, sp);           /* selection state */
     return param_get(&ui->draft, sp->kind, chain_of(ui), it.si);
 }
 
@@ -305,7 +336,7 @@ static void item_set(ui_t *ui, item_t it, double v)
 {
     const item_spec_t *sp = item_spec(it.id);
     if (sp->tgt == ITT_UI) {
-        ui->seq_sel[chain_of(ui)] = (int)v;         /* IT_SEQ_STEPSEL */
+        *ui_sel_ref(ui, sp) = (int)v;                 /* selection state */
         return;
     }
     param_set(&ui->draft, sp->kind, chain_of(ui), it.si, v);
@@ -392,6 +423,11 @@ void edit_item(ui_t *ui, item_t it, int dir)
     case ITF_SEQMODE:
     case ITF_SEQONCE:
     case ITF_STEPSEL:
+    case ITF_SLOT:                         /* the SLOT row: a wrapping
+                                            * selector like the STEP row;
+                                            * item_set routes it to
+                                            * ui_t.mod_slot (ITT_UI: no
+                                            * mailbox commit) */
     case ITF_INT:
     case ITF_XDIV:
     default:                               /* R11: uniform roll-over —
@@ -538,16 +574,12 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
             item_t it = content_item(ui, *cur);
             const item_spec_t *sp = item_spec(it.id);
             switch (sp ? sp->nav : NAV_NONE) {
-            case NAV_STEPSEL: {        /* STEP row: move the rectangle,
-                                        * wrapping across the spec's
-                                        * min..max (0..7) */
-                int sn = sp->max - sp->min + 1;   /* not the outer n:
-                                                     page item count */
-                int s = ui->seq_sel[chain_of(ui)] - sp->min;
-                ui->seq_sel[chain_of(ui)] =
-                    sp->min + (((s + dir) % sn) + sn) % sn;
+            case NAV_STEPSEL:          /* STEP row: move the rectangle;
+                                        * SLOT row: move the matrix slot
+                                        * (R4) — both wrap across the
+                                        * spec's min..max (0..7 / 0..15) */
+                sel_roll(ui, sp, dir);
                 break;
-            }
             case NAV_DIGITS:           /* digit box: move the digit
                                         * cursor — LEFT walks toward the
                                         * 10000s digit, RIGHT toward the
@@ -560,7 +592,13 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
                     ui->freq_digit = clampi(ui->freq_digit + dir, 0, 6);
                 break;
             case NAV_NONE:             /* no nav spec (and the NULL-spec
-            default:                   * guard): inert (as today) */
+            default:                   * guard): inert — except the MOD
+                                       * page (R4): LEFT/RIGHT roll the
+                                       * SLOT selection from ANY row (P5
+                                       * leg 3; bounds from the SLOT
+                                       * spec, PR-C) */
+                if (!is_osc_tab(ui) && ui->tab == TAB_MOD)
+                    sel_roll(ui, item_spec(IT_MOD_SLOT), dir);
                 break;
             }
         }

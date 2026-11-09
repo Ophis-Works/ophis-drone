@@ -14,8 +14,11 @@
  *   SEQ           : SEQ_ITEMS, 7 rows, single column — cursor, item and
  *                   drawn row are 1:1 (BPM is NOT here: the GLOBAL
  *                   tempo lives on the MASTER tab).
- *   MOD           : MOD 1..MOD 3, each SRC · DEST · AMT = 9 (no "SL1 "
- *                   prefixes — the section labels carry the context).
+ *   MOD           : SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL = 6
+ *                   (PLAN_MOD_MATRIX_16.md R4: one SLOT selector row
+ *                   picks the matrix slot 1..16 the five rows below
+ *                   edit — the slot rides the ui state at use time,
+ *                   exactly like SEQ PITCH/VEL).
  *   MASTER        : MASTER · SAFETY · BPM + the old FX tab's DELAY and
  *                   REVERB items = 11.
  * Same underlying params/ids as before the reorg — pure UI reorg, NO
@@ -33,6 +36,8 @@ enum {
   IT_SUB_DIV, IT_SUB_WAVE, IT_SUB_DUTY, IT_SUB_LEVEL,
   IT_FILT_MODE, IT_FILT_CUT, IT_FILT_RES, IT_FILT_ENV, IT_FILT_POLES,
   IT_XMOD_SRC, IT_XMOD_DEST, IT_XMOD_AMT, IT_XMOD_MIX, IT_XMOD_TGT,
+  IT_MOD_SLOT,                   /* MOD page SLOT row (PR-C): ITT_UI —
+                                    * the selected matrix slot 0..15 */
   IT_SEQ_ON, IT_BPM, IT_SEQ_DIV, IT_SEQ_MODE, IT_SEQ_ONCE,
   IT_SEQ_STEPSEL,
   IT_STEP_PITCH, IT_STEP_VEL, IT_MASTER, IT_MIXVOL,
@@ -73,12 +78,16 @@ extern const section_t ENVFLT_SECTIONS[ENVFLT_SECTIONS_N];
 #define SEQ_ITEMS_N 7
 extern const item_t SEQ_ITEMS[SEQ_ITEMS_N];
 
-/* ---- MOD tab: MOD 1..MOD 3, each SRC · TGT · DEST · AMT · MIX
- * = 15 items (TGT: the slot's routing target, PLAN_MOD_ROUTING.md M1;
- * MIX: the slot's own ADD knob, owner order 2026-11-06) ------------- */
-#define MOD_ITEMS_N 15
+/* ---- MOD tab: SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL = 6
+ * items (PLAN_MOD_MATRIX_16.md R4, owner order 2026-11-09): the SLOT
+ * row picks the matrix slot (1..16 shown, ui_t-owned ITT_UI, PR-C) the
+ * five rows below edit — every si is 0 in the TABLE, resolved to the
+ * selected slot at use time by ui.c (PR-D, exactly like SEQ
+ * PITCH/VEL); TARGET = the slot's routing target (PLAN_MOD_ROUTING.md
+ * M1), LEVEL = the slot's own ADD knob ------------------------------- */
+#define MOD_ITEMS_N 6
 extern const item_t MOD_ITEMS[MOD_ITEMS_N];
-#define MOD_SECTIONS_N 3
+#define MOD_SECTIONS_N 1
 extern const section_t MOD_SECTIONS[MOD_SECTIONS_N];
 
 /* ---- MASTER tab: MASTER · SAFETY · BPM + MIX · DELAY + REVERB
@@ -140,6 +149,9 @@ typedef enum {
   ITF_SEQONCE,   /* seq once selector, wraps; SEQONCE_NAMES */
   ITF_STEPSEL,   /* SEQ rectangle selection: UI state (si-target ITT_UI,
                     no commit), wraps */
+  ITF_SLOT,      /* MOD matrix slot selection: UI state (si-target
+                    ITT_UI, no commit), wraps; "SLOT %d" display (v+1) —
+                    PLAN_MOD_MATRIX_16.md R4 */
   ITF_INT,       /* plain integer min..max; "%d" (BPM) */
   ITF_XDIV,      /* clock divider integer; "x%d" */
   ITF_CENTS,     /* delay time in centiseconds (0.01 s steps); "%.2f s" */

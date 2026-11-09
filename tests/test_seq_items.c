@@ -126,27 +126,26 @@ int main(void)
         CHECK(FILT_ITEMS[i].si == 0);
     }
 
-    /* ---- MOD tab: MOD 1..MOD 3, each SOURCE · OSC · DEST · DEPTH ·
-     * LEVEL = 15 (no "SL1 " prefixes — the section labels carry the
-     * context; OSC = the slot's routing target, PLAN_MOD_ROUTING.md M1
-     * + PLAN_OSC_NAMING.md R1; LEVEL = the slot's own ADD knob, owner
-     * order 2026-11-06) ---- */
-    CHECK(MOD_ITEMS_N == 15);
-    static const char *const XN15[15] =
-      { "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL",
-        "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL",
-        "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL" };
-    static const int XI15[15] =
-      { IT_XMOD_SRC, IT_XMOD_TGT, IT_XMOD_DEST, IT_XMOD_AMT, IT_XMOD_MIX,
-        IT_XMOD_SRC, IT_XMOD_TGT, IT_XMOD_DEST, IT_XMOD_AMT, IT_XMOD_MIX,
-        IT_XMOD_SRC, IT_XMOD_TGT, IT_XMOD_DEST, IT_XMOD_AMT, IT_XMOD_MIX };
+    /* ---- MOD tab: SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL = 6
+     * (PLAN_MOD_MATRIX_16.md R4, owner order 2026-11-09 — the SLOT row
+     * selects the matrix slot 1..16 the five rows below edit; TARGET =
+     * the slot's routing target, PLAN_MOD_ROUTING.md M1 +
+     * PLAN_OSC_NAMING.md R1; LEVEL = the slot's own ADD knob, owner
+     * order 2026-11-06; every si is 0 — resolved at use time, PR-D) --
+     */
+    CHECK(MOD_ITEMS_N == 6);
+    static const char *const XN6[6] =
+      { "SLOT", "SOURCE", "TARGET", "DEST", "DEPTH", "LEVEL" };
+    static const int XI6[6] =
+      { IT_MOD_SLOT, IT_XMOD_SRC, IT_XMOD_TGT, IT_XMOD_DEST,
+        IT_XMOD_AMT, IT_XMOD_MIX };
     for (int i = 0; i < MOD_ITEMS_N; i++) {
         CHECK(MOD_ITEMS[i].name != NULL &&
-              strcmp(MOD_ITEMS[i].name, XN15[i]) == 0);
-        CHECK(MOD_ITEMS[i].id == XI15[i]);
-        CHECK(MOD_ITEMS[i].si == i / 5);          /* slot 0..2 */
+              strcmp(MOD_ITEMS[i].name, XN6[i]) == 0);
+        CHECK(MOD_ITEMS[i].id == XI6[i]);
+        CHECK(MOD_ITEMS[i].si == 0);   /* the slot rides the ui state */
     }
-    CHECK(MOD_ITEMS[0].id == IT_XMOD_SRC);        /* demanded spot check */
+    CHECK(MOD_ITEMS[1].id == IT_XMOD_SRC);        /* demanded spot check */
 
     /* ---- MASTER tab: MASTER (3) + MIX (3) + DELAY (4) + REVERB (4)
      * = 14 (MIX A/B/C: the per-chain master send, PLAN_MOD_ROUTING.md
@@ -207,15 +206,11 @@ int main(void)
     CHECK(ENVFLT_SECTIONS[1].first + ENVFLT_SECTIONS[1].count ==
           ADSR_ITEMS_N + FILT_ITEMS_N);
 
-    CHECK(MOD_SECTIONS_N == 3);
-    static const char *const MSL[3] = { "MOD 1", "MOD 2", "MOD 3" };
-    for (int s = 0; s < MOD_SECTIONS_N; s++) {
-        CHECK(MOD_SECTIONS[s].label != NULL &&
-              strcmp(MOD_SECTIONS[s].label, MSL[s]) == 0);
-        CHECK(MOD_SECTIONS[s].first == s * 5);
-        CHECK(MOD_SECTIONS[s].count == 5);
-    }
-    CHECK(MOD_SECTIONS[2].first + MOD_SECTIONS[2].count == MOD_ITEMS_N);
+    CHECK(MOD_SECTIONS_N == 1);
+    CHECK(MOD_SECTIONS[0].label != NULL &&
+          strcmp(MOD_SECTIONS[0].label, "MOD") == 0);
+    CHECK(MOD_SECTIONS[0].first == 0 && MOD_SECTIONS[0].count == 6);
+    CHECK(MOD_SECTIONS[0].first + MOD_SECTIONS[0].count == MOD_ITEMS_N);
 
     CHECK(MASTER_SECTIONS_N == 4);
     static const char *const TSL[4] = { "MASTER", "MIX", "DELAY", "REVERB" };
@@ -443,18 +438,17 @@ int main(void)
      * implementation; strict TDD, watched failing first).
      * ================================================================== */
 
-    /* ---- P1 (PLAN_OSC_NAMING.md §1.0a/R1): the MOD-page row labels
-     * are SOURCE · OSC · DEST · DEPTH · LEVEL per slot (si == i/5);
-     * the preset keys stay raw — labels are UI-only. Red until
-     * seq_items.c renames them. ---- */
-    static const char *const XNL15[15] =
-      { "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL",
-        "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL",
-        "SOURCE", "OSC", "DEST", "DEPTH", "LEVEL" };
+    /* ---- P1 (PLAN_OSC_NAMING.md §1.0a/R1, amended by
+     * PLAN_MOD_MATRIX_16.md R4): the MOD-page row labels stay UI-only
+     * words — SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL (TARGET
+     * was OSC before the 6-row SLOT model); the preset keys stay raw.
+     * ---- */
+    static const char *const XNL6[6] =
+      { "SLOT", "SOURCE", "TARGET", "DEST", "DEPTH", "LEVEL" };
     for (int i = 0; i < MOD_ITEMS_N; i++) {
         CHECK(MOD_ITEMS[i].name != NULL &&
-              strcmp(MOD_ITEMS[i].name, XNL15[i]) == 0);
-        CHECK(MOD_ITEMS[i].si == i / 5);          /* slot 0..2 */
+              strcmp(MOD_ITEMS[i].name, XNL6[i]) == 0);
+        CHECK(MOD_ITEMS[i].si == 0);   /* the slot rides the ui state */
     }
 
     /* ---- P2 (PLAN_OSC_NAMING.md §1.0a/R4): the MASTER MIX rows read
@@ -535,6 +529,50 @@ int main(void)
         /* CUT/TONE floor 20.00 Hz (2000 centi-Hz): rolling below ->
          * 20000.00 */
         CHECK(hz_digit_step(2000, 1, -1, 2000, 2000000) == 2000000);
+    }
+
+    /* ==================================================================
+     * PIN — P4 (PLAN_MOD_MATRIX_16.md §1.3, M3; written FIRST, watched
+     * failing before the implementation): the MOD page is SIX items —
+     * SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL in that order
+     * (owner order 2026-11-09, R4). The five rows below SLOT edit the
+     * slot the SLOT row selects (PR-D: the slot rides the ui state at
+     * use time, exactly like SEQ PITCH/VEL — si is 0 in the table).
+     * The SLOT spec rolls 0..15 (R4/PR-C: NAV_STEPSEL bounds, ui_t-
+     * owned -> tgt ITT_UI; the display shows SLOT n = value + 1, like
+     * ITF_TGT). Red today: MOD_ITEMS is 15 per-slot items
+     * (src/ui/seq_items.c MOD_ITEMS).
+     * ================================================================== */
+    CHECK(MOD_ITEMS_N == 6);
+    {
+        static const char *const M6N[6] =
+          { "SLOT", "SOURCE", "TARGET", "DEST", "DEPTH", "LEVEL" };
+        for (int i = 0; i < 6; i++) {
+            CHECK(MOD_ITEMS[i].name != NULL &&
+                  strcmp(MOD_ITEMS[i].name, M6N[i]) == 0);
+            CHECK(MOD_ITEMS[i].si == 0);   /* slot resolved at use time */
+        }
+        CHECK(MOD_ITEMS[1].id == IT_XMOD_SRC);
+        CHECK(MOD_ITEMS[2].id == IT_XMOD_TGT);
+        CHECK(MOD_ITEMS[3].id == IT_XMOD_DEST);
+        CHECK(MOD_ITEMS[4].id == IT_XMOD_AMT);
+        CHECK(MOD_ITEMS[5].id == IT_XMOD_MIX);
+        /* the SLOT spec: the ONE NAV_STEPSEL entry bounded 0..15 that
+         * wraps (the SEQ STEPSEL stays 0..7); the SLOT row drives it.
+         * No new id is named here — the scan keys on the ask's contract
+         * (nav + bounds) so this pin compiles before the id exists. */
+        int slot_id = -1;
+        for (int i = 0; i < ITEM_SPECS_N; i++)
+            if (ITEM_SPECS[i].nav == NAV_STEPSEL &&
+                ITEM_SPECS[i].min == 0 && ITEM_SPECS[i].max == 15 &&
+                ITEM_SPECS[i].wrap == 1) {
+                CHECK(slot_id == -1);      /* exactly one such entry */
+                slot_id = ITEM_SPECS[i].id;
+            }
+        CHECK(slot_id != -1);              /* the SLOT spec exists */
+        CHECK(MOD_ITEMS[0].id == slot_id); /* the SLOT row drives it */
+        CHECK(slot_id != -1 &&
+              item_spec(slot_id)->tgt == ITT_UI);   /* ui_t-owned (PR-C) */
     }
 
     HARNESS_REPORT();

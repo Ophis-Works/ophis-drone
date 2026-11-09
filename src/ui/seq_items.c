@@ -12,8 +12,9 @@
  *                   MASTER tab); the MODE and ONCE selectors are table
  *                   rows and MUST stay visible (regression-tested by
  *                   tests/test_seq_items.c).
- *   MOD            : MOD 1..MOD 3, each SRC · DEST · AMT = 9 (no "SL1 "
- *                   prefixes — the section labels carry the context).
+ *   MOD            : SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL = 6
+ *                   (PLAN_MOD_MATRIX_16.md R4 — SLOT selects the matrix
+ *                   slot the five rows below edit).
  *   MASTER         : MASTER · SAFETY · BPM + DELAY (TIME L · FEEDBACK ·
  *                   TONE · MIX) + REVERB (SIZE · DAMP · MIX · WIDTH)
  *                   = 11 (the former FX tab merged in, owner order).
@@ -83,29 +84,25 @@ const item_t SEQ_ITEMS[SEQ_ITEMS_N] = {
   { "VEL",    IT_STEP_VEL,    0 },
 };
 
-/* ---- MOD tab: MOD 1..MOD 3, each SOURCE · OSC · DEST · DEPTH · LEVEL */
+/* ---- MOD tab: SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL (R4) --- */
 
-/* cross-mod slots 1..3 (si IS the xmod slot) — labels are UI-only words
- * (PLAN_OSC_NAMING.md R1/R5): SOURCE = the mod source, OSC = the routing
- * target (values "OSC 1/2/3", never raw 0/1/2), DEST, DEPTH = the amount,
- * LEVEL = the slot's own ADD knob; the MOD 1..3 section labels carry the
- * context. Preset keys stay raw ("src"/"tgt"/"dest"/"amount"/"mix"). */
+/* the 16-slot matrix (PLAN_MOD_MATRIX_16.md R4, owner order
+ * 2026-11-09): ONE SLOT selector row (ITT_UI — ui.c binds the five
+ * rows below to the selected slot at use time, PR-D; every si is 0
+ * here). Labels are UI-only words (PLAN_OSC_NAMING.md R1/R5): SOURCE =
+ * the mod source, TARGET = the routing target (values "OSC 1/2/3",
+ * never raw 0/1/2), DEST, DEPTH = the amount, LEVEL = the slot's own
+ * ADD knob. Preset keys stay raw
+ * ("src"/"tgt"/"dest"/"amount"/"mix"). */
 const item_t MOD_ITEMS[MOD_ITEMS_N] = {
-  { "SOURCE", IT_XMOD_SRC,  0 }, { "OSC",   IT_XMOD_TGT,  0 },
-  { "DEST",   IT_XMOD_DEST, 0 }, { "DEPTH", IT_XMOD_AMT,  0 },
+  { "SLOT",   IT_MOD_SLOT,  0 },
+  { "SOURCE", IT_XMOD_SRC,  0 }, { "TARGET", IT_XMOD_TGT,  0 },
+  { "DEST",   IT_XMOD_DEST, 0 }, { "DEPTH",  IT_XMOD_AMT,  0 },
   { "LEVEL",  IT_XMOD_MIX,  0 },
-  { "SOURCE", IT_XMOD_SRC,  1 }, { "OSC",   IT_XMOD_TGT,  1 },
-  { "DEST",   IT_XMOD_DEST, 1 }, { "DEPTH", IT_XMOD_AMT,  1 },
-  { "LEVEL",  IT_XMOD_MIX,  1 },
-  { "SOURCE", IT_XMOD_SRC,  2 }, { "OSC",   IT_XMOD_TGT,  2 },
-  { "DEST",   IT_XMOD_DEST, 2 }, { "DEPTH", IT_XMOD_AMT,  2 },
-  { "LEVEL",  IT_XMOD_MIX,  2 },
 };
 
 const section_t MOD_SECTIONS[MOD_SECTIONS_N] = {
-  { "MOD 1", 0, 5 },
-  { "MOD 2", 5, 5 },
-  { "MOD 3", 10, 5 },
+  { "MOD", 0, 6 },
 };
 
 /* ---- MASTER tab: MASTER · SAFETY · BPM + MIX + DELAY + REVERB ----- */
@@ -255,6 +252,10 @@ const item_spec_t ITEM_SPECS[ITEM_SPECS_N] = {
   /* the routing target shows the OSCILLATOR NAME ("OSC 1/2/3", R2):
    * ITF_TGT in ui_draw.c, not the raw 0/1/2 */
   [IT_XMOD_TGT]   = { IT_XMOD_TGT,   ITF_TGT,     0,    2, 1, ITT_XMOD , PK_XMOD_TGT },
+  /* the MOD page SLOT row (PLAN_MOD_MATRIX_16.md R4/PR-C): UI state,
+   * NAV_STEPSEL roll-over across the 16 slots 0..15 — the ONE
+   * NAV_STEPSEL entry with those bounds (the SEQ STEPSEL stays 0..7) */
+  [IT_MOD_SLOT]   = { IT_MOD_SLOT,   ITF_SLOT,    0,   15, 1, ITT_UI , PK_NONE , NAV_STEPSEL },
   [IT_MIXVOL]     = { IT_MIXVOL,     ITF_PCT,     0,  100, 0, ITT_MIXVOL , PK_CHAIN_MIXVOL },
   /* SEQ page */
   [IT_SEQ_ON]     = { IT_SEQ_ON,     ITF_ONOFF,   0,    1, 1, ITT_SEQ , PK_SEQ_ON },
