@@ -651,6 +651,4 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
     } else if (ui->in_menu == MENU_QUIT) {
         draw_text(r, 280, 232, "QUITTING", C_WHITE);
     }
-
-    SDL_RenderPresent(r);
 }

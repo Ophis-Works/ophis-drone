@@ -194,7 +194,29 @@ int main(void)
         SDL_Quit();
         return 1;
     }
+#if defined(TARGET_R36S)
+    /* RG28XX portrait panel (PLAN_RG28XX_BUILD M3): the SDL output is
+     * 480x640, so the 640x480 UI renders into an offscreen texture and
+     * is presented rotated. OPHIS_ROT=90 flips the direction (default
+     * 270 = CCW quarter turn). R36S panels are native landscape: NULL
+     * scene = direct rendering, unchanged. */
+    SDL_Texture *scene = SDL_CreateTexture(ren, SDL_PIXELFORMAT_RGBA8888,
+                                           SDL_TEXTUREACCESS_TARGET, 640, 480);
+    int rot = 270;
+    {
+        const char *rv = getenv("OPHIS_ROT");
+        if (rv && strcmp(rv, "90") == 0)
+            rot = 90;
+    }
+    if (!scene) {
+        fprintf(stderr, "scene texture failed: %s\n", SDL_GetError());
+        SDL_RenderSetLogicalSize(ren, 640, 480);
+    } else {
+        fprintf(stderr, "rotation: %d\n", rot);
+    }
+#else
     SDL_RenderSetLogicalSize(ren, 640, 480);
+#endif
 
 #if defined(TARGET_R36S)
     /* Rotation diagnostics (PLAN_RG28XX_BUILD M3): the RG28XX panel is
@@ -276,8 +298,21 @@ int main(void)
             atomic_store(&quit, 1);
         if (autoquit && SDL_GetTicks() - t0 >= autoquit)
             atomic_store(&quit, 1);
-        if (dirty)
+        if (dirty) {
+#if defined(TARGET_R36S)
+            if (scene)
+                SDL_SetRenderTarget(ren, scene);
+#endif
             ui_draw(&ui, ren, &st);          /* event-driven redraw */
+#if defined(TARGET_R36S)
+            if (scene) {
+                SDL_SetRenderTarget(ren, NULL);
+                SDL_RenderCopyEx(ren, scene, NULL, NULL, (double)rot,
+                                 NULL, SDL_FLIP_NONE);
+                SDL_RenderPresent(ren);
+            }
+#endif
+        }
         SDL_Delay(5);
     }
 
@@ -290,6 +325,8 @@ int main(void)
 #if defined(TARGET_R36S)
     if (g_ctrl)
         SDL_GameControllerClose(g_ctrl);
+    if (scene)
+        SDL_DestroyTexture(scene);
 #endif
     SDL_DestroyRenderer(ren);
     SDL_DestroyWindow(win);

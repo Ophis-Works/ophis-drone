@@ -49,6 +49,22 @@
   on-device run pending — the stderr lines decide the rotation fix and
   hat-vs-button D-pad.
 
+## 2026-11-09 — Milestone 3b (app-side rotation)
+- On-device test 3: input works (self-mapping ok); diagnostics: display
+  mode 480x640 driver=mali, renderer output 480x640 -> SDL sees the
+  native portrait panel. SDL_ROTATION env in the launcher had no effect
+  (this EmuELEC-family SDL2 has no rotation patch).
+- Fix, app-side: render the 640x480 UI into an offscreen TARGET texture,
+  then SDL_RenderCopyEx rotated onto the 480x640 output (exact 4:3 fit).
+  OPHIS_ROT=90 env selects the other direction; default 270. Direct
+  rendering fallback if the texture cannot be created. R36S path
+  unchanged (scene == NULL there).
+- ui_draw no longer calls SDL_RenderPresent (draw/present split — the
+  present moves to main.c after the rotated blit); desktop behaviour
+  identical (present after each redraw).
+- Verification: make handheld gate PASS (GLIBC_2.17), tests 11253/11253,
+  desktop build clean; direction confirmed on-device pending.
+
 ## Open items
 - On-device retest on the RG28XX (audio + full button matrix for the
   keymap check: A=RUN, B=TRIGGER, X/Y value +/-, L/R pages, Start=MENU,
