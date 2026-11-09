@@ -29,6 +29,26 @@
   `make handheld` gate: GATE PASS, max GLIBC_2.17; desktop build clean.
 - RG28XX zip rebuilt from the final binary.
 
+## 2026-11-09 — Milestone 3 (input self-mapping + rotation diagnostics)
+- On-device test 2: app runs and stays up (the single ALSA line in the
+  log is the FLOAT attempt warning — the S16 fallback succeeded), but the
+  screen content is rotated 90 deg CW and no button works.
+- Cause, input: EmuELEC SDL2 has no gamecontroller mapping for the H700
+  pad (no "opened controller" line in the log) and the R36S PortMaster db
+  paths do not exist there.
+- Cause, screen: the RG28XX panel is natively portrait (DTS rotation=270);
+  the firmware's SDL2/KMS presents our landscape content rotated. What
+  exactly SDL presents (output size) must be measured before choosing the
+  fix.
+- main.c handheld block: joystick GUID self-mapping fallback (runtime
+  SDL_JoystickGetGUIDString + built-in mainline-kernel H700 mapping:
+  a:b1,b:b0,x:b3,y:b2, shoulders b4/b5, back/start/guide b8/b9/b10,
+  D-pad as hat h0.x) + joystick probe line (name/guid/buttons/hats/axes)
+  + display-mode and renderer-output-size diagnostics to stderr.
+- Verification: make handheld gate PASS (GLIBC_2.17), tests 11253/11253;
+  on-device run pending — the stderr lines decide the rotation fix and
+  hat-vs-button D-pad.
+
 ## Open items
 - On-device retest on the RG28XX (audio + full button matrix for the
   keymap check: A=RUN, B=TRIGGER, X/Y value +/-, L/R pages, Start=MENU,

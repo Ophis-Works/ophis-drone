@@ -139,6 +139,44 @@ int main(void)
                         SDL_GetError());
         }
     }
+    /* Fallback (PLAN_RG28XX_BUILD M3): firmware SDL2 with no mapping for
+     * the pad — register one from the runtime GUID and retry. Raw indices
+     * match the mainline H700 gpio-keys (BTN_SOUTH..BTN_START contiguous
+     * with BTN_C/BTN_Z skipped by SDL): south=0 east=1 north=2 west=3,
+     * L1=4 R1=5 L2=6 R2=7 select=8 start=9 menu=10; D-pad as hat. */
+    if (!g_ctrl) {
+        for (int i = 0; i < SDL_NumJoysticks(); i++) {
+            SDL_Joystick *js = SDL_JoystickOpen(i);
+            if (!js)
+                continue;
+            char guid[64];
+            SDL_JoystickGetGUIDString(SDL_JoystickGetGUID(js),
+                                      guid, (int)sizeof guid);
+            fprintf(stderr,
+                    "joystick %d: %s guid=%s buttons=%d hats=%d axes=%d\n",
+                    i, SDL_JoystickName(js), guid,
+                    SDL_JoystickNumButtons(js), SDL_JoystickNumHats(js),
+                    SDL_JoystickNumAxes(js));
+            char map[512];
+            snprintf(map, sizeof map,
+                     "%s,H700 Pad,a:b1,b:b0,x:b3,y:b2,"
+                     "back:b8,start:b9,guide:b10,"
+                     "leftshoulder:b4,rightshoulder:b5,"
+                     "lefttrigger:b6,righttrigger:b7,"
+                     "dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,"
+                     "platform:Linux", guid);
+            SDL_GameControllerAddMapping(map);
+            if (SDL_IsGameController(i)) {
+                g_ctrl = SDL_GameControllerOpen(i);
+                fprintf(stderr, "fallback controller %d: %s (%s)\n", i,
+                        SDL_GameControllerNameForIndex(i),
+                        g_ctrl ? "ok" : SDL_GetError());
+            }
+            SDL_JoystickClose(js);
+            if (g_ctrl)
+                break;
+        }
+    }
 #endif
     SDL_Window *win = SDL_CreateWindow("OPHIS-DRONE",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -157,6 +195,21 @@ int main(void)
         return 1;
     }
     SDL_RenderSetLogicalSize(ren, 640, 480);
+
+#if defined(TARGET_R36S)
+    /* Rotation diagnostics (PLAN_RG28XX_BUILD M3): the RG28XX panel is
+     * natively portrait — record what SDL actually presents before any
+     * rotation decision. */
+    {
+        SDL_DisplayMode dm;
+        int ow = 0, oh = 0;
+        if (SDL_GetDesktopDisplayMode(0, &dm) == 0)
+            fprintf(stderr, "display mode: %dx%d driver=%s\n",
+                    dm.w, dm.h, SDL_GetCurrentVideoDriver());
+        if (SDL_GetRendererOutputSize(ren, &ow, &oh) == 0)
+            fprintf(stderr, "renderer output: %dx%d\n", ow, oh);
+    }
+#endif
 
     mailbox_init(&mb);
     static ui_t ui;                          /* big object, not on the stack */
