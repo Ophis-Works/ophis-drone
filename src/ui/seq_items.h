@@ -276,7 +276,7 @@ const page_t *page_get(int tab, int sub);
 
 /* S1: the display form (UPPERCASE, '_' -> '.') of a RAW preset enum
  * string — the transform lives HERE, never in the preset layer */
-const char *ui_enum_display(const char *raw, char *buf, int cap);   /* NULL for non-OSC sub on
+const char *ui_enum_display(const char *raw, char *buf, size_t cap);   /* NULL for non-OSC sub on
                                                MOD/MASTER (sub ignored) */
 
 /* MOD-page displays (PLAN_OSC_NAMING.md R2/R3, pure, SDL-free):
@@ -285,7 +285,7 @@ const char *ui_enum_display(const char *raw, char *buf, int cap);   /* NULL for 
  * A appended in M2); ui_dest_display — the UPPERCASE, '_' -> ' ' form
  * of a RAW dest string ("flt_cut" -> "FLT CUT"). Both write buf (cap
  * bytes) and return it; truncation is fine for labels. */
-const char *ui_xsrc_display(int v, char *buf, int cap);
-const char *ui_dest_display(const char *raw, char *buf, int cap);
+const char *ui_xsrc_display(int v, char *buf, size_t cap);
+const char *ui_dest_display(const char *raw, char *buf, size_t cap);
 
 #endif /* OPHIS_SEQ_ITEMS_H */

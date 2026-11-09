@@ -53,32 +53,28 @@ static const section_t *page_sections(const ui_t *ui, int *nsec)
 
 /* --- value formatting ------------------------------------------------ */
 
-static void fmt_sec(char *b, int blen, double t)
+static void fmt_sec(char *b, size_t blen, double t)
 {
-    /* every caller passes sizeof-buf: blen > 0, (size_t)blen is
-     * value-preserving */
-    if (t <= 0.0)     snprintf(b, (size_t)blen, "0.000 s");
-    else if (t < 1.0) snprintf(b, (size_t)blen, "%.3f s", t);
-    else              snprintf(b, (size_t)blen, "%.2f s", t);
+    if (t <= 0.0)     snprintf(b, blen, "0.000 s");
+    else if (t < 1.0) snprintf(b, blen, "%.3f s", t);
+    else              snprintf(b, blen, "%.2f s", t);
 }
 
-void item_value(const ui_t *ui, item_t it, char *b, int blen)
+void item_value(const ui_t *ui, item_t it, char *b, size_t blen)
 {
     const item_spec_t *sp = item_spec(it.id);
-    /* every caller passes sizeof-buf: blen > 0, (size_t)blen is
-     * value-preserving */
     if (sp == NULL) {                         /* unknown id (unreachable
                                                  via content_item) */
-        snprintf(b, (size_t)blen, "?");
+        snprintf(b, blen, "?");
         return;
     }
     if (item_dim(ui, it)) {                   /* dimmed value display */
-        snprintf(b, (size_t)blen, "----");
+        snprintf(b, blen, "----");
         return;
     }
     double v = item_get(ui, it);
     switch (sp->fmt) {
-    case ITF_DIV:     snprintf(b, (size_t)blen, "/%d", (int)v); break;
+    case ITF_DIV:     snprintf(b, blen, "/%d", (int)v); break;
     case ITF_HZ:      /* centi-Hz odometer boxes (PLAN_FREQ_DECIMALS.md
                        * R1/R5): "%05d.%02d Hz" — integer part + period +
                        * 2 decimals; a preset fraction is SHOWN, not
@@ -86,11 +82,11 @@ void item_value(const ui_t *ui, item_t it, char *b, int blen)
     case ITF_TONE: {
                       int centi = (int)lround(v * 100.0);
                       int ip = centi / 100, dec = centi - ip * 100;
-                      snprintf(b, (size_t)blen, "%05d.%02d Hz", ip, dec);
+                      snprintf(b, blen, "%05d.%02d Hz", ip, dec);
                       break;
     }
     case ITF_SEC:     fmt_sec(b, blen, v); break;
-    case ITF_CENTS:   snprintf(b, (size_t)blen, "%.2f s", v); break;
+    case ITF_CENTS:   snprintf(b, blen, "%.2f s", v); break;
     case ITF_WAVE:    ui_enum_display(schema_wave_name((int)v), b, blen);
     break;
     case ITF_DEST:    /* R0f: '_' -> ' ' ("flt_cut" -> "FLT CUT") —
@@ -99,7 +95,7 @@ void item_value(const ui_t *ui, item_t it, char *b, int blen)
     break;
     case ITF_TGT:     /* R2: the routing target shows the OSCILLATOR
                        * NAME, never the raw 0/1/2 */
-                      snprintf(b, (size_t)blen, "OSC %d", (int)v + 1);
+                      snprintf(b, blen, "OSC %d", (int)v + 1);
     break;
     case ITF_XSRC:    /* R3: the frozen OSC-name table, not the raw
                        * A/B/C-letter preset strings */
@@ -110,18 +106,18 @@ void item_value(const ui_t *ui, item_t it, char *b, int blen)
     case ITF_POLES:   ui_enum_display(schema_poles_name((int)v), b, blen);
     break;
     case ITF_AMT:
-        snprintf(b, (size_t)blen, amt_dest_of(ui, it) == MOD_PITCH
+        snprintf(b, blen, amt_dest_of(ui, it) == MOD_PITCH
                                   ? "%+.0f Hz" : "%+.0f %%", v);
         break;
-    case ITF_ONOFF:   snprintf(b, (size_t)blen, "%s", (int)v ? "ON" : "OFF"); break;
-    case ITF_SEQMODE: snprintf(b, (size_t)blen, "%s", SEQMODE_NAMES[(int)v]); break;
-    case ITF_SEQONCE: snprintf(b, (size_t)blen, "%s", SEQONCE_NAMES[(int)v]); break;
-    case ITF_STEPSEL: snprintf(b, (size_t)blen, "STEP %d", (int)v + 1); break;
-    case ITF_INT:     snprintf(b, (size_t)blen, "%d", (int)v); break;
-    case ITF_XDIV:    snprintf(b, (size_t)blen, "x%d", (int)v); break;
+    case ITF_ONOFF:   snprintf(b, blen, "%s", (int)v ? "ON" : "OFF"); break;
+    case ITF_SEQMODE: snprintf(b, blen, "%s", SEQMODE_NAMES[(int)v]); break;
+    case ITF_SEQONCE: snprintf(b, blen, "%s", SEQONCE_NAMES[(int)v]); break;
+    case ITF_STEPSEL: snprintf(b, blen, "STEP %d", (int)v + 1); break;
+    case ITF_INT:     snprintf(b, blen, "%d", (int)v); break;
+    case ITF_XDIV:    snprintf(b, blen, "x%d", (int)v); break;
     case ITF_DUTY:
-    case ITF_PCT:     snprintf(b, (size_t)blen, "%d %%", (int)v); break;
-    case ITF_SPCT:    snprintf(b, (size_t)blen, "%+d %%", (int)v); break;
+    case ITF_PCT:     snprintf(b, blen, "%d %%", (int)v); break;
+    case ITF_SPCT:    snprintf(b, blen, "%+d %%", (int)v); break;
     }
 }
 
@@ -154,8 +150,8 @@ static SDL_Texture *font_atlas_build(SDL_Renderer *r)
             unsigned char bits = gl[dy];
             /* row-major over the atlas width; glyph g occupies columns
              * g*OPHIS_FONT_W..+9 of row dy */
-            Uint32 *row = px + (size_t)dy * ATLAS_GLYPHS * OPHIS_FONT_W
-                               + (size_t)g * OPHIS_FONT_W;
+            Uint32 *row = px + dy * ATLAS_GLYPHS * OPHIS_FONT_W
+                               + g * OPHIS_FONT_W;
             for (int dx = 0; dx < OPHIS_FONT_W; dx++)
                 row[dx] = (bits & (1u << dx)) ? 0xFFFFFFFFu : 0x00000000u;
         }
@@ -246,8 +242,9 @@ static void row_cursor(SDL_Renderer *r, int y)
  * screen, in this target's binding words; labels via keymap_label() —
  * THE one label place, PLAN_KEYMAP_REBIND §2/§4). keymap_label() is
  * caller-buffer form (remediation F5): one small local buffer per label
- * so the two snprintfs never alias. */
-static void hint_binding(char *b1, int n1, char *b2, int n2)
+ * so the two snprintfs never alias. Buffer sizes are size_t — the
+ * contract is the type, not a comment. */
+static void hint_binding(char *b1, size_t n1, char *b2, size_t n2)
 {
     char l_tab_b[16], l_tab_n[16], l_sel_u[16], l_sel_d[16];
     char l_dec[16], l_inc[16], l_run[16], l_trig[16], l_menu[16];
@@ -261,11 +258,11 @@ static void hint_binding(char *b1, int n1, char *b2, int n2)
     const char *trig  = keymap_label(KB_TRIGGER, l_trig, sizeof l_trig);
     const char *menu  = keymap_label(KB_MENU, l_menu, sizeof l_menu);
 
-    snprintf(b1, (size_t)n1, "%s/%s:TABS  %s/%s:SEL  %s/%s:EDIT",
+    snprintf(b1, n1, "%s/%s:TABS  %s/%s:SEL  %s/%s:EDIT",
              tab_b ? tab_b : "?", tab_n ? tab_n : "?",
              sel_u ? sel_u : "?", sel_d ? sel_d : "?",
              dec ? dec : "?", inc ? inc : "?");
-    snprintf(b2, (size_t)n2, "%s:RUN  %s:TRIG  %s:MENU",
+    snprintf(b2, n2, "%s:RUN  %s:TRIG  %s:MENU",
              run ? run : "?", trig ? trig : "?", menu ? menu : "?");
 }
 

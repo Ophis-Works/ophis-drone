@@ -136,9 +136,9 @@ const section_t MASTER_SECTIONS[MASTER_SECTIONS_N] = {
 /* ---- S1 (PLAN_OPTIMIZATION.md O6): the display transform for the RAW
  * preset enum strings — UPPERCASE, '_' -> '.' — a UI concern, ONCE
  * here. buf may hold up to cap bytes; truncation is fine for labels. -- */
-const char *ui_enum_display(const char *raw, char *buf, int cap)
+const char *ui_enum_display(const char *raw, char *buf, size_t cap)
 {
-    int i = 0;
+    size_t i = 0;
     for (; raw && raw[i] != '\0' && i < cap - 1; i++)
         buf[i] = (raw[i] == '_') ? '.'
                : (raw[i] >= 'a' && raw[i] <= 'z')
@@ -152,7 +152,7 @@ const char *ui_enum_display(const char *raw, char *buf, int cap)
  * A/B/C-letter forms ("A.OSC") are gone: ids 1..3 = chain B = OSC 2,
  * 4..6 = C = OSC 3, 7..9 = A = OSC 1 (A ids APPENDED, M2 — never
  * renumbered). Pure, SDL-free, testable. -- */
-const char *ui_xsrc_display(int v, char *buf, int cap)
+const char *ui_xsrc_display(int v, char *buf, size_t cap)
 {
     static const char *const XSRC_NAMES[10] = {
         "OFF",
@@ -161,7 +161,7 @@ const char *ui_xsrc_display(int v, char *buf, int cap)
         "OSC 1", "OSC 1 SUB 1", "OSC 1 SUB 2",
     };
     const char *s = (v >= 0 && v <= 9) ? XSRC_NAMES[v] : "";
-    snprintf(buf, (size_t)cap, "%s", s);
+    snprintf(buf, cap, "%s", s);
     return buf;
 }
 
@@ -170,9 +170,9 @@ const char *ui_xsrc_display(int v, char *buf, int cap)
  * "flt_res" -> "FLT RES"). Same contract as ui_enum_display but with a
  * space separator; buf may hold up to cap bytes, truncation is fine
  * for labels. -- */
-const char *ui_dest_display(const char *raw, char *buf, int cap)
+const char *ui_dest_display(const char *raw, char *buf, size_t cap)
 {
-    int i = 0;
+    size_t i = 0;
     for (; raw && raw[i] != '\0' && i < cap - 1; i++)
         buf[i] = (raw[i] == '_') ? ' '
                : (raw[i] >= 'a' && raw[i] <= 'z')

@@ -56,7 +56,7 @@ void   param_set(synth_params_t *d, param_kind_t kind, int ci, int si,
 
 /* the item's value string for display (PLAN_WAVE_DISPLAY.md P1: hoisted
  * out of ui_draw.c's static scope so the enum-row pins can call it) */
-void item_value(const ui_t *ui, item_t it, char *b, int blen);
+void item_value(const ui_t *ui, item_t it, char *b, size_t blen);
 
 /* --- spec-table access (ui.c): the item's param slot ------------------ */
 

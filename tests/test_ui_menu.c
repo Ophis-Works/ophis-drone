@@ -58,8 +58,11 @@ static void purge_dir(const char *dir)
     while ((e = readdir(d)) != NULL) {
         if (strcmp(e->d_name, ".") == 0 ||
             strcmp(e->d_name, "..") == 0) continue;
-        if (snprintf(p, sizeof p, "%s/%s", dir, e->d_name) < (int)sizeof p)
-            unlink(p);
+        int nw = snprintf(p, sizeof p, "%s/%s", dir, e->d_name);
+        if (nw < 0 || (size_t)nw >= sizeof p)
+            continue;              /* failed or truncated: nothing to
+                                    * unlink by that name */
+        unlink(p);
     }
     closedir(d);
     rmdir(dir);
@@ -337,7 +340,7 @@ static void test_load_uncreatable_falls_back(void)
  * sloppy rewrite. item_value is hoisted out of ui_draw.c's static scope
  * as part of the fix (declared in ui_internal.h); this TU mirrors that
  * declaration locally, like param_get/param_set above. ---- */
-extern void item_value(const ui_t *ui, item_t it, char *b, int blen);
+extern void item_value(const ui_t *ui, item_t it, char *b, size_t blen);
 extern item_t content_item(const ui_t *ui, int i);   /* flat item i (ui.c) */
 /* PLAN_HZ_EDIT.md P4/P6 edit-surface mirrors (ui_internal.h decls, same
  * pattern as item_value/content_item above) */
@@ -369,37 +372,37 @@ static void test_item_value_enum_rows(void)
     /* P1: the four snprintf-aliasing cases — EMPTY/garbage today (red) */
     it = content_item(&u, 1);              /* MAIN_ITEMS[1] = WAVE */
     CHECK(it.id == IT_OSC_WAVE);
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "SAW") == 0);
 
     u.tab = TAB_MOD;
     it = content_item(&u, 2);              /* MOD_ITEMS[2] = DEST slot 0 */
     CHECK(it.id == IT_XMOD_DEST && it.si == 0);
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "RING") == 0);
 
     u.tab = TAB_OSC1;
     u.sub[0] = SUB_ENVFLT;
     it = content_item(&u, 4);              /* FILT_ITEMS[0] = MODE */
     CHECK(it.id == IT_FILT_MODE);
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "HP") == 0);
 
     it = content_item(&u, 8);              /* FILT_ITEMS[4] = POLES */
     CHECK(it.id == IT_FILT_POLES);
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "24DB") == 0);
 
     /* P2: the previously-working direct cases stay correct */
     u.tab = TAB_MOD;
     it = content_item(&u, 0);              /* SOURCE slot 0 */
     CHECK(it.id == IT_XMOD_SRC && it.si == 0);
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "OSC 2") == 0);        /* src 1 = chain B = OSC 2 */
 
     it = content_item(&u, 1);              /* OSC (TGT) slot 0 */
     CHECK(it.id == IT_XMOD_TGT && it.si == 0);
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "OSC 3") == 0);        /* tgt 2 -> "OSC %d" (v + 1) */
 }
 
@@ -420,33 +423,33 @@ static void test_item_value_freq_odometer(void)
     CHECK(it.id == IT_OSC_FREQ);
 
     u.draft.chain[0].freq_hz = 220.0f;
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "00220.00 Hz") == 0);
 
     u.draft.chain[0].freq_hz = 20000.0f;   /* the ceiling */
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "20000.00 Hz") == 0);
 
     u.draft.chain[0].freq_hz = 0.01f;      /* the 0.01 Hz edit floor */
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "00000.01 Hz") == 0);
 
     u.draft.chain[0].freq_hz = 55.5f;      /* fraction SHOWN, not rounded */
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "00055.50 Hz") == 0);
 
     u.sub[0] = SUB_ENVFLT;                 /* FILTER CUT: same box (R1) */
     it = content_item(&u, 5);              /* ADSR(4) + FILT_ITEMS[1] */
     CHECK(it.id == IT_FILT_CUT);
     u.draft.chain[0].fc = 1500.0f;
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "01500.00 Hz") == 0);
 
     u.tab = TAB_MASTER;                    /* DELAY TONE: same box (R1) */
     it = content_item(&u, 8);              /* MASTER_ITEMS[8] = TONE */
     CHECK(it.id == IT_DLY_TONE);
     u.draft.delay.tone = 8500;
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "08500.00 Hz") == 0);
 }
 
@@ -474,7 +477,7 @@ static void test_freq_fractional_rounding(void)
     u.freq_digit = 4;                      /* the 1s digit (first
                                             * non-decimal digit, R3) */
     char b[32];
-    item_value(&u, it, b, (int)sizeof b);
+    item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "00055.50 Hz") == 0);  /* fraction displayed */
     CHECK(fexact(item_get(&u, it), 55.5));  /* value keeps the fraction */
 
@@ -591,7 +594,7 @@ static void test_seq_nav_rows(void)
         u.draft.seq[0].steps[3].pitch_hz = 220.0f;
         it = content_item(&u, 5);
         CHECK(it.id == IT_STEP_PITCH && it.si == 3);
-        item_value(&u, it, b, (int)sizeof b);
+        item_value(&u, it, b, sizeof b);
         CHECK(strcmp(b, "00220.00 Hz") == 0);
     }
 
@@ -797,14 +800,14 @@ int main(void)
     /* Preset staging: exactly the dir preset_dir() resolves (absolute,
      * beside the test binary) — the test no longer depends on the CWD.
      * preset_save creates the dir if missing. */
-    if (preset_dir(stage, (int)sizeof stage) != 0) {
+    if (preset_dir(stage, sizeof stage) != 0) {
         printf("preset_dir failed\n");
         return 1;
     }
     {
         char err[128];
         synth_params_t d = OPHIS_DEFAULTS;
-        if (preset_save(stage, "menutest", &d, err, (int)sizeof err) != 0) {
+        if (preset_save(stage, "menutest", &d, err, sizeof err) != 0) {
             printf("preset_save failed: %s\n", err);
             return 1;
         }
@@ -863,15 +866,15 @@ int main(void)
      * UPPERCASE/'.' forms exactly ---- */
     {
         char b[32];
-        (void)ui_enum_display("b_sub1", b, (int)sizeof b);
+        (void)ui_enum_display("b_sub1", b, sizeof b);
         CHECK(strcmp(b, "B.SUB1") == 0);
-        (void)ui_enum_display("a_osc", b, (int)sizeof b);
+        (void)ui_enum_display("a_osc", b, sizeof b);
         CHECK(strcmp(b, "A.OSC") == 0);
-        (void)ui_enum_display("saw", b, (int)sizeof b);
+        (void)ui_enum_display("saw", b, sizeof b);
         CHECK(strcmp(b, "SAW") == 0);
-        (void)ui_enum_display("pingpong", b, (int)sizeof b);
+        (void)ui_enum_display("pingpong", b, sizeof b);
         CHECK(strcmp(b, "PINGPONG") == 0);
-        (void)ui_enum_display("12db", b, (int)sizeof b);
+        (void)ui_enum_display("12db", b, sizeof b);
         CHECK(strcmp(b, "12DB") == 0);
         /* schema layer is RAW now (strict separation) */
         CHECK(strcmp(schema_wave_name(WAVE_SAW), "saw") == 0);
