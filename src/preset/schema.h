@@ -1,25 +1,28 @@
-/* src/preset/schema.h — preset format schema layer (PLAN §9 version 1)
+/* src/preset/schema.h — preset format schema layer (PLAN §9 format,
+ * schema version 2, owner order 2026-11-09 PLAN_MOD_MATRIX_16.md R2/R3)
  * over the vendored sheredom/json.h parser/writer (third_party/json.h,
  * Unlicense). Pure: no file IO. Replaces the Phase 1-6 hand-rolled
  * preset/json.{c,h} (PLAN_CODE_REVIEW_FIXES.md Phase 7): the parser walks
  * the json.h DOM and enforces the contract explicitly — strict
- * app/version, required keys, exact array lengths (3 chains / 2 subs /
- * 8 steps / 3 xmod), enum strings, integer percents 0..100, bpm 1..500,
- * duty 5..95, delay/reverb/safety objects REQUIRED, unknown keys
- * leniently skipped, over-long keys (> 15 chars) rejected, duplicate
- * keys REJECTED at every object level. */
+ * app/version (version 2 ONLY, version 1 rejects), required keys, array
+ * lengths (3 chains / 2 subs / 8 steps / "xmod" 0..16 ACTIVE entries —
+ * entry i is slot i, slots absent from the array are OFF), enum strings,
+ * integer percents 0..100, bpm 1..500, duty 5..95, delay/reverb/safety
+ * objects REQUIRED, unknown keys leniently skipped, over-long keys
+ * (> 15 chars) rejected, duplicate keys REJECTED at every object level. */
 #ifndef OPHIS_SCHEMA_H
 #define OPHIS_SCHEMA_H
 
 #include "../dsp/types.h"
 
-/* Writer: synth_params_t -> buf (PLAN §9 format, version 1; `run`
- * excluded). Serializes through json.h's minified writer into the caller's
- * fixed buffer. Returns bytes written (excluding NUL), or -1 if buf_len is
- * too small (8 KiB must be provably enough). */
+/* Writer: synth_params_t -> buf (PLAN §9 format, schema version 2,
+ * canonical: ACTIVE xmod slots only, ascending slot order; `run`
+ * excluded). Serializes through json.h's minified writer into the
+ * caller's fixed buffer. Returns bytes written (excluding NUL), or -1 if
+ * buf_len is too small (8 KiB must be provably enough). */
 int schema_write_params(char *buf, int buf_len, const synth_params_t *p);
 
-/* Parser: PLAN §9 version 1 (see header comment for the enforced
+/* Parser: schema version 2 (see header comment for the enforced
  * contract). On success copies into *p; on error (returns -1) *p is
  * untouched (IMPLEMENTATION.md §7). err (may be NULL) gets a field-path
  * message, e.g. "seq.steps[2].vel", when err_len>0. */

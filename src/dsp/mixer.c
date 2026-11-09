@@ -78,7 +78,7 @@ void matrix_render(mixer_state_t *m, const mixer_params_t *p,
     int ring_mode[3][3];                   /* 0 = ring (multiply), 1 = mix
                                               (crossfade) */
     int ring_n[3] = { 0, 0, 0 };
-    for (int slot = 0; slot < 3; slot++) {
+    for (int slot = 0; slot < MOD_SLOTS; slot++) {
         const xmod_params_t *x = &sp->xmod[slot];
         int t = clampi(x->tgt, 0, 2);
         /* the slot's own ADD function (owner order 2026-11-06): the

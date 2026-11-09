@@ -77,6 +77,10 @@ typedef struct {
                              (compat default) */
 } xmod_params_t;
 
+/* mod matrix slot count (owner order 2026-11-09, PLAN_MOD_MATRIX_16.md
+ * R1): 16 slots; every loop/table bound to the old 3 uses MOD_SLOTS */
+#define MOD_SLOTS 16
+
 typedef struct { float pitch_hz; int vel; } seq_step_t;
 /* vel: percent 0..100; vel 0 = silent step (there is no active flag) */
 
@@ -116,7 +120,7 @@ static inline double clampd(double v, double lo, double hi)
 typedef struct {
   chain_params_t chain[3];
   seq_params_t   seq[3];
-  xmod_params_t  xmod[3];
+  xmod_params_t  xmod[MOD_SLOTS];
   delay_params_t delay;        /* master-path delay (PLAN §5 amended) */
   reverb_params_t reverb;      /* master-path reverb (PLAN §5 amended) */
   int            bpm;         /* GLOBAL tempo 1..500 (AMENDED, owner

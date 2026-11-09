@@ -1,9 +1,12 @@
 /* tools/migrate_presets.c — ONE-OFF dev-time migration (M4b,
- * PLAN_MOD_ROUTING.md): rewrites preset files to the current format by
- * parse -> write round-trip. Absent optionals get their defaults
- * (xmod tgt 0, chain mixvol 100); chfm / dest "mix" would already be
- * rejected by the current parser, so any file still carrying them
- * FAILS LOUDLY instead of being silently migrated.
+ * PLAN_MOD_ROUTING.md; version-2 gate, PLAN_MOD_MATRIX_16.md R6):
+ * rewrites preset files to the current format by parse -> write
+ * round-trip. The input must parse as schema version 2 — the parser's
+ * version gate (schema_parse.c) rejects version 1 files LOUDLY, this
+ * tool is not a v1 converter. Absent optionals get their defaults
+ * (xmod tgt 0 / mix 0, chain mixvol 100); chfm / dest "mix" are also
+ * rejected by the parser, so any file still carrying them FAILS LOUDLY
+ * instead of being silently migrated.
  * Usage: migrate_presets file.json [more.json ...]  (rewrites in place)
  * Not shipped — a development tool. */
 #include <stdio.h>
@@ -37,7 +40,7 @@ int main(int argc, char **argv)
         }
         f = fopen(argv[i], "wb");
         if (!f) { perror(argv[i]); return 1; }
-        fwrite(out, 1, w, f);
+        fwrite(out, 1, (size_t)w, f);
         fclose(f);
         printf("%s: migrated (%d bytes, params verified)\n", argv[i], w);
     }

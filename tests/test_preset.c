@@ -64,7 +64,12 @@ static void fill_params(synth_params_t *p)
             p->seq[q].steps[s].vel = (s * 5 + q) % 101;
         }
     }
-    p->xmod[1].src = 2; p->xmod[1].dest = 3; p->xmod[1].amount = 66.0f;
+    /* xmod: TWO ACTIVE slots at 0..1 — prefix-canonical for schema v2
+     * (M2, R2/R3: the writer emits active slots only in ascending slot
+     * order, so nonzero slots must sit at a 0..k prefix for the save/
+     * load round-trip to land back in place) */
+    p->xmod[0].src = 2; p->xmod[0].dest = 3; p->xmod[0].amount = 66.0f;
+    p->xmod[1].src = 5; p->xmod[1].dest = 7; p->xmod[1].amount = -20.0f;
     p->delay.time_l = 0.42f; p->delay.time_r = 0.77f;
     p->delay.feedback = 55;  p->delay.tone = 6000;  p->delay.mix = 25;
     p->reverb.size = 70; p->reverb.damp = 40; p->reverb.mix = 35;

@@ -26,6 +26,16 @@ static mixer_params_t mkp(const synth_params_t *sp)
     return p;
 }
 
+/* runtime-bound xmod slot accessor (P3, PLAN_MOD_MATRIX_16.md §1.3):
+ * noinline keeps gcc from proving slot 8 out of bounds against today's
+ * xmod[3] — the M2 type-widen (xmod[3] -> xmod[16]) must leave this pin
+ * a RUNTIME red, not a compile red */
+static __attribute__((noinline)) xmod_params_t *h_xmod(synth_params_t *sp,
+                                                       int s)
+{
+    return &sp->xmod[s];
+}
+
 int main(void)
 {
     /* ---- sum correctness: out == tanh(1.5 * (A+B+C)) exactly ---- */
@@ -249,6 +259,33 @@ int main(void)
         double post[3];
         matrix_render(&m, &mp, hot, post);
         CHECK(fexact((double)m.xm[0].detune_hz, 3.0 * (double)0.1f));
+    }
+
+    /* ---- P3 (PLAN_MOD_MATRIX_16.md §1.3): the matrix has 16 slots —
+     * slot index 8 (the 9th slot) with dest MOD_FRES modulates chain B
+     * through matrix_render; slots with no params never fire. RED
+     * today: no 9th slot exists (synth_params_t.xmod[3], types.h:119).
+     * The slot is written and read through the runtime-bound h_xmod so
+     * this stays a RUNTIME red, not a compile red. ---- */
+    memset(&m, 0, sizeof m);
+    m.src[0] = 0.5;                            /* B.osc: id 1 -> src[0] */
+    sp0 = mksp();
+    mp = mkp(&sp0);
+    {
+        const int nslots = (int)(sizeof sp0.xmod / sizeof sp0.xmod[0]);
+        CHECK(nslots == 16);                   /* the 9th slot exists */
+        if (nslots > 8) {
+            xmod_params_t *x8 = h_xmod(&sp0, 8);
+            x8->src = 1;                       /* B.osc */
+            x8->dest = MOD_FRES;
+            x8->amount = 100.0f;
+            x8->tgt = 1;                       /* chain B */
+        }
+        double post[3];
+        matrix_render(&m, &mp, hot, post);
+        CHECK(fabs(m.xm[1].res_mod - 0.5) < 1e-6);   /* 100/100 × 0.5 */
+        CHECK(fabs(m.xm[0].res_mod) < 1e-9);         /* A: no slot fires */
+        CHECK(fabs(m.xm[2].res_mod) < 1e-9);         /* C: no slot fires */
     }
 
     /* ---- cross-mod B→A detune measurable end-to-end: 200 → 202 Hz ---- */

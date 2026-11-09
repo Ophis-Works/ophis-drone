@@ -15,6 +15,11 @@ static const subosc_params_t SUB_OFF = {
     .div = 1, .wave = WAVE_SINE, .duty = 50, .level = 0
 };
 
+/* all 16 matrix slots default OFF (MOD_SLOTS, owner order 2026-11-09) */
+static const xmod_params_t XMOD_OFF = {
+    .src = 0, .dest = MOD_OFF, .amount = 0.0f, .mix = 0, .tgt = 0
+};
+
 const synth_params_t OPHIS_DEFAULTS = {
     .chain = {
         { .freq_hz = 55.0f, .wave = WAVE_SAW, .duty = 50,
@@ -47,7 +52,10 @@ const synth_params_t OPHIS_DEFAULTS = {
                      { 55.0f, 100 }, { 55.0f, 100 }, { 55.0f, 100 },
                      { 55.0f, 100 }, { 55.0f, 100 } } }
     },
-    .xmod = { { 0, 0, 0.0f }, { 0, 0, 0.0f }, { 0, 0, 0.0f } },
+    .xmod = { XMOD_OFF, XMOD_OFF, XMOD_OFF, XMOD_OFF,
+              XMOD_OFF, XMOD_OFF, XMOD_OFF, XMOD_OFF,
+              XMOD_OFF, XMOD_OFF, XMOD_OFF, XMOD_OFF,
+              XMOD_OFF, XMOD_OFF, XMOD_OFF, XMOD_OFF },
     .delay = { .time_l = 0.0f, .time_r = 0.0f,
                .feedback = 0, .tone = 20000, .mix = 0 },
     .reverb = { .size = 0, .damp = 0, .mix = 0, .width = 0 },

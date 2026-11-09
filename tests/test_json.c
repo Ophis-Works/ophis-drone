@@ -111,13 +111,33 @@ static int replace_once(char *buf, const char *from, const char *to)
     return 0;
 }
 
+/* runtime-bound xmod slot accessor (P2, PLAN_MOD_MATRIX_16.md §1.3):
+ * noinline keeps gcc from proving slot 5..15 out of bounds against
+ * today's xmod[3] — the M2 type-widen (xmod[3] -> xmod[16]) must leave
+ * these pins RUNTIME reds, not compile reds (§10 precedent) */
+static __attribute__((noinline)) xmod_params_t *h_xmod(synth_params_t *p,
+                                                       int s)
+{
+    return &p->xmod[s];
+}
+
+/* schema v2 (M2, PLAN_MOD_MATRIX_16.md R2): build_doc emits version 2 —
+ * the "xmod" array holds 0..16 ACTIVE slots, version 1 is REJECTED.
+ * build_doc_v2 is the plain 3/2/8-shape alias kept for the P2 pins. */
+static int build_doc(char *buf, int n_chains, int n_subs, int n_steps,
+                     int n_xmod);
+static int build_doc_v2(char *buf, int n_xmod)
+{
+    return build_doc(buf, 3, 2, 8, n_xmod);
+}
+
 /* build a valid full document with configurable array lengths, for the
- * wrong-array-length rejection tests */
+ * wrong-array-length rejection tests (xmod valid range 0..16) */
 static int build_doc(char *buf, int n_chains, int n_subs, int n_steps,
                      int n_xmod)
 {
     int n = snprintf(buf, 16384,
-        "{\"app\":\"ophis-drone\",\"version\":1,\"master\":70,\"bpm\":60,"
+        "{\"app\":\"ophis-drone\",\"version\":2,\"master\":70,\"bpm\":60,"
         "\"chain\":[");
     for (int c = 0; c < n_chains; c++) {
         n += snprintf(buf + n, (size_t)(16384 - n),
@@ -245,7 +265,7 @@ int main(void)
         for (int i = 0; i < 6; i++) {
             char doc[16384];
             int n = snprintf(doc, sizeof doc,
-                "{\"app\":\"ophis-drone\",\"version\":1,\"master\":0,"
+                "{\"app\":\"ophis-drone\",\"version\":2,\"master\":0,"
                 "\"chain\":[{\"freq_hz\":55.0,\"wave\":\"%s\",\"level\":0,"
                 "\"vel\":0,\"sub\":[{\"div\":1,\"wave\":\"sine\","
                 "\"duty\":50,\"level\":0},"
@@ -260,7 +280,7 @@ int main(void)
             /* rebuild with the target wave for chain A */
             {
                 int k = snprintf(doc, sizeof doc,
-                "{\"app\":\"ophis-drone\",\"version\":1,\"master\":0,"
+                "{\"app\":\"ophis-drone\",\"version\":2,\"master\":0,"
                 "\"bpm\":60,"
                     "\"chain\":[");
                 for (int c = 0; c < 3; c++) {
@@ -405,9 +425,10 @@ int main(void)
         CHECK(q.bpm == 500);
         q = keep;   /* restore the no-half-write baseline */
 
-        /* wrong version */
+        /* wrong version: schema 1 is REJECTED (M2, R2 — the old
+         * fixed-length-3 contract is gone) */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
-        CHECK(replace_once(buf, "\"version\":1", "\"version\":2") == 0);
+        CHECK(replace_once(buf, "\"version\":2", "\"version\":1") == 0);
         CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                                 err, sizeof err) == -1);
         CHECK(params_equal(&q, &keep));
@@ -439,13 +460,23 @@ int main(void)
         CHECK(build_doc(buf, 3, 2, 9, 3) == 0);
         CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                                 err, sizeof err) == -1);
+        /* xmod length: v2 accepts 0..16 entries — 2 is legal now, 17
+         * rejects (M2, R2) */
         CHECK(build_doc(buf, 3, 2, 8, 2) == 0);
+        memset(&q, 0xEE, sizeof q);
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
+                                err, sizeof err) == 0);
+        CHECK(h_xmod(&q, 0)->dest == MOD_OFF &&
+              h_xmod(&q, 1)->dest == MOD_OFF &&
+              h_xmod(&q, 2)->dest == MOD_OFF);
+        q = keep;   /* restore the no-half-write baseline */
+        CHECK(build_doc(buf, 3, 2, 8, 17) == 0);
         CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                                 err, sizeof err) == -1);
         CHECK(params_equal(&q, &keep));
 
         /* filter expansion (PLAN §9): res/env/poles are REQUIRED parts of
-         * version 1 — a file without them is missing required fields */
+         * version 2 — a file without them is missing required fields */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
         CHECK(replace_once(buf, "\"res\":10,", "") == 0);
         CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
@@ -1217,6 +1248,60 @@ int main(void)
           "\"amount\":0.0}") == 0);
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                               err, sizeof err) == -1);
+
+    /* 11. P2 (PLAN_MOD_MATRIX_16.md §1.3, M2): schema v2 — the "xmod"
+     * array holds ONLY the active slots, 0..16 entries; slots missing
+     * from the array are OFF (dest off); version key must be 2 (version
+     * 1 REJECTED — the fixed-length-3 contract is gone); "xmod" stays
+     * REQUIRED (empty array = matrix fully off). RED pre-M2 (parser
+     * demanded version 1 and exactly 3 entries; see the M2 PIN log
+     * section), GREEN post-M2. Runtime-bound h_xmod access kept from the
+     * pin — now plain in-bounds slot reads on xmod[16]. */
+    {
+        synth_params_t v2;
+
+        /* 5 active entries parse; array index == slot index (entry 0 is
+         * made ACTIVE to prove the positional mapping); slots 5..15 are
+         * OFF (dest off — vacuous until the M2 widen makes them exist) */
+        CHECK(build_doc_v2(buf, 5) == 0);
+        CHECK(replace_once(buf,
+              "{\"src\":\"off\",\"dest\":\"off\",\"amount\":0.0}",
+              "{\"src\":\"b_osc\",\"dest\":\"pitch\",\"amount\":50.0}")
+              == 0);
+        memset(&v2, 0xEE, sizeof v2);
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &v2,
+                                  err, sizeof err) == 0);
+        CHECK(h_xmod(&v2, 0)->src == 1 &&
+              h_xmod(&v2, 0)->dest == MOD_PITCH);
+        CHECK(fexactf(h_xmod(&v2, 0)->amount, 50.0f));
+        CHECK(h_xmod(&v2, 4)->src == 0);       /* the 5th entry, still off */
+        for (int s = 5; s < 16; s++)
+            CHECK(h_xmod(&v2, s)->dest == MOD_OFF);
+        CHECK((int)(sizeof v2.xmod / sizeof v2.xmod[0]) == 16);
+
+        /* 17 entries REJECT — the reject names the ARRAY (its length),
+         * not the version */
+        CHECK(build_doc_v2(buf, 17) == 0);
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &v2,
+                                  err, sizeof err) == -1);
+        CHECK(strstr(err, "xmod") != NULL);
+
+        /* version 1 REJECTS — the old contract is gone */
+        CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
+        CHECK(replace_once(buf, "\"version\":2", "\"version\":1") == 0);
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &v2,
+                                  err, sizeof err) == -1);
+        CHECK(strstr(err, "version") != NULL);
+
+        /* empty xmod array parses — matrix fully off (all 16 slots
+         * dest off) */
+        CHECK(build_doc_v2(buf, 0) == 0);
+        memset(&v2, 0xEE, sizeof v2);
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &v2,
+                                  err, sizeof err) == 0);
+        for (int s = 0; s < 16; s++)
+            CHECK(h_xmod(&v2, s)->dest == MOD_OFF);
+    }
 
     HARNESS_REPORT();
 }

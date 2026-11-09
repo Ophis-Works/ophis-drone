@@ -12,13 +12,16 @@
 
 /* Fixed arena for the DOM build (pools sized with headroom over the exact
  * field counts; any overflow makes the writer return -1 — the same
- * "does not fit" contract as the old writer's 8 KiB guarantee). */
+ * "does not fit" contract as the old writer's 8 KiB guarantee). Maxima
+ * verified for the v2 worst case (16 active xmod entries): vals 290,
+ * key+value strings 290, numbers 165, object elements 240, objects 60,
+ * array elements 55, arrays 9. */
 #define W_VAL_N 448
-#define W_STR_N 256
-#define W_NUM_N 160
-#define W_EL_N  224
-#define W_OBJ_N 56
-#define W_AEL_N 48
+#define W_STR_N 304
+#define W_NUM_N 176
+#define W_EL_N  256
+#define W_OBJ_N 72
+#define W_AEL_N 64
 #define W_ARR_N 12
 
 typedef struct {
@@ -153,14 +156,24 @@ static int wael(warena *w, json_value_t *av, json_value_t *vv)
 #define AEL(w, arr, val) \
     do { if (wael((w), (arr), (val))) return -1; } while (0)
 
+/* A slot equal to the canonical OFF state (src 0, dest off, amount +0,
+ * mix 0, tgt 0) is INACTIVE — omitted from the v2 array (R2/R3). memcmp,
+ * not float ==, so -0.0 amount slots stay distinct (and round-trip). */
+static int xmod_is_off(const xmod_params_t *x)
+{
+    static const xmod_params_t OFF;
+    return memcmp(x, &OFF, sizeof *x) == 0;
+}
+
 /* Build the full DOM in the same member order the Phase 1-6 writer used
- * (shipped presets must round-trip byte-comparable). */
+ * (shipped presets round-trip byte-comparable after the one-time v2
+ * migration). */
 static int build_dom(warena *w, const synth_params_t *p)
 {
     json_value_t *root = wobj_new(w);
     if (!root) return -1;
     ADD(w, root, "app", wstr(w, "ophis-drone"));
-    ADD(w, root, "version", wnumd(w, 1));
+    ADD(w, root, "version", wnumd(w, 2));
     ADD(w, root, "master", wnumd(w, p->master));
     /* top-level "bpm" next to "master": the GLOBAL tempo (AMENDED,
      * owner order, PLAN §6/§9) */
@@ -227,10 +240,14 @@ static int build_dom(warena *w, const synth_params_t *p)
         }
     }
 
+    /* schema v2 (owner order 2026-11-09, R3): ACTIVE slots only, in
+     * ascending slot order, same 5 keys per entry — the parser fills
+     * absent slots with exactly the OFF state xmod_is_off tests */
     json_value_t *xmods = warr_new(w);
     ADD(w, root, "xmod", xmods);
-    for (int x = 0; x < 3; x++) {
+    for (int x = 0; x < MOD_SLOTS; x++) {
         const xmod_params_t *xp = &p->xmod[x];
+        if (xmod_is_off(xp)) continue;
         json_value_t *xv = wobj_new(w);
         AEL(w, xmods, xv);
         ADD(w, xv, "src", wstr(w, enum_name(src_tab, 10, xp->src)));

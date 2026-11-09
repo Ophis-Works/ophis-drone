@@ -1,16 +1,20 @@
-/* src/preset/schema.c — preset format schema layer (PLAN §9 version 1)
+/* src/preset/schema.c — preset format schema layer (PLAN §9 format,
+ * schema version 2, owner order 2026-11-09 PLAN_MOD_MATRIX_16.md R2)
  * over the vendored sheredom/json.h (third_party/json.h, Unlicense).
  * Replaces the Phase 1-6 hand-rolled preset/json.{c,h}
  * (PLAN_CODE_REVIEW_FIXES.md Phase 7): json.h knows nothing about our
- * schema, so the contract is explicit code here — strict app/version,
- * required keys, exact array lengths (3 chains / 2 subs / 8 steps /
- * 3 xmod), enum strings, integer percents 0..100, bpm 1..500, duty 5..95,
- * delay/reverb/safety objects REQUIRED, unknown keys leniently skipped,
- * over-long keys (> 15 chars) REJECTED (Phase 6 P5 absorbed), duplicate
- * keys REJECTED at every object level (json.h preserves member order, so
- * the walker flags a second occurrence). Parses into a local, commits
- * into *p only on success (IMPLEMENTATION.md §7). Error messages are
- * field paths, e.g. "seq.steps[2].vel".
+ * schema, so the contract is explicit code here — strict app/version
+ * (version 2 ONLY; version 1 files REJECT), required keys, array
+ * lengths 3 chains / 2 subs / 8 steps / "xmod" 0..16 ACTIVE entries in
+ * ascending slot order (entry i maps to slot i; slots absent from the
+ * array are OFF: dest off, amount 0, mix 0), enum strings, integer
+ * percents 0..100, bpm 1..500, duty 5..95, delay/reverb/safety objects
+ * REQUIRED, unknown keys leniently skipped, over-long keys (> 15 chars)
+ * REJECTED (Phase 6 P5 absorbed), duplicate keys REJECTED at every
+ * object level (json.h preserves member order, so the walker flags a
+ * second occurrence). Parses into a local, commits into *p only on
+ * success (IMPLEMENTATION.md §7). Error messages are field paths,
+ * e.g. "seq.steps[2].vel".
  * Writer: the synth_params_t DOM is built into a fixed arena and
  * serialized with json.h's minified writer (compact {"key":value,...},
  * byte-identical to the Phase 1-6 hand-rolled writer, so shipped presets
@@ -276,13 +280,18 @@ static int walk_object(const json_value_t *val, ps_t *j, const char *path,
     return 0;
 }
 
-/* Walk an array of exactly `exact` elements (element paths "<path>[i]") */
+/* Walk an array of lo..hi elements (element paths "<path>[i]"); a
+ * length outside the range rejects by naming the array path itself
+ * ("xmod"), never a member path */
 static int walk_array(const json_value_t *val, ps_t *j, const char *path,
-                      int exact, arr_fn fn, void *arg)
+                      int lo, int hi, arr_fn fn, void *arg)
 {
     if (!val || val->type != json_type_array) { perr(j, path); return -1; }
     const json_array_t *a = val->payload;
-    if ((int)a->length != exact) { perr(j, path); return -1; }
+    if ((int)a->length < lo || (int)a->length > hi) {
+        perr(j, path);
+        return -1;
+    }
     int i = 0;
     for (const json_array_element_t *e = a->start; e; e = e->next, i++) {
         char cpath[128];
@@ -476,22 +485,28 @@ static int root_custom(ps_t *j, const char *path, const char *key,
     if (!strcmp(key, "version")) {
         int ver;
         if (val_int(v, &ver, j, path)) return -1;
-        if (ver != 1) { perr(j, path); return -1; }
+        /* schema 2 ONLY (owner order 2026-11-09, R2): version 1 — the
+         * old fixed-length-3 contract — is REJECTED, not migrated */
+        if (ver != 2) { perr(j, path); return -1; }
         a->seen |= SB(RB_VERSION);
         return 0;
     }
     if (!strcmp(key, "chain")) {
-        if (walk_array(v, j, path, 3, chain_elem, NULL)) return -1;
+        if (walk_array(v, j, path, 3, 3, chain_elem, NULL)) return -1;
         a->seen |= SB(RB_CHAIN);
         return 0;
     }
     if (!strcmp(key, "seq")) {
-        if (walk_array(v, j, path, 3, seq_elem, NULL)) return -1;
+        if (walk_array(v, j, path, 3, 3, seq_elem, NULL)) return -1;
         a->seen |= SB(RB_SEQ);
         return 0;
     }
     if (!strcmp(key, "xmod")) {
-        if (walk_array(v, j, path, 3, xmod_elem, NULL)) return -1;
+        /* v2 (R2): 0..MOD_SLOTS ACTIVE entries; entry i lands in slot i
+         * (positional — xmod_elem's warg idx); absent slots stay at the
+         * memset-zero OFF state of the parse-into local */
+        if (walk_array(v, j, path, 0, MOD_SLOTS, xmod_elem, NULL))
+            return -1;
         a->seen |= SB(RB_XMOD);
         return 0;
     }
@@ -584,7 +599,7 @@ static int chain_custom(ps_t *j, const char *path, const char *key,
 {
     warg_t *a = arg;
     if (!strcmp(key, "sub")) {
-        if (walk_array(v, j, path, 2, sub_elem, a)) return -1;
+        if (walk_array(v, j, path, 2, 2, sub_elem, a)) return -1;
         a->seen |= SB(CB_SUB);
         return 0;
     }
@@ -632,7 +647,7 @@ static int seq_custom(ps_t *j, const char *path, const char *key,
 {
     warg_t *a = arg;
     if (!strcmp(key, "steps")) {
-        if (walk_array(v, j, path, 8, step_elem, a)) return -1;
+        if (walk_array(v, j, path, 8, 8, step_elem, a)) return -1;
         a->seen |= SB(QB_STEPS);
         return 0;
     }
