@@ -4,12 +4,17 @@
 #include <alsa/asoundlib.h>
 
 #include "alsa_pcm.h"
+#include "f32tos16.h"
 
 struct alsa_pcm {
     snd_pcm_t *pcm;
     int        rate;
     int        period_frames;
     long       xruns;      /* cumulative recovered xrun count */
+    int        use_s16;    /* device lacks the format plug: write converts
+                            float→S16 (H700/EmuELEC firmware, PLAN_RG28XX
+                            M2); 0 = native FLOAT, no conversion */
+    int16_t   *scratch;    /* PERIOD frames * 2 ch, allocated at open */
 };
 
 alsa_pcm_t *alsa_open(const char *dev, int rate, int period_frames)
@@ -36,17 +41,38 @@ alsa_pcm_t *alsa_open(const char *dev, int rate, int period_frames)
                                 SND_PCM_ACCESS_RW_INTERLEAVED,
                                 2, (unsigned int)rate, 1, latency_us);
     if (rc < 0) {
-        snd_pcm_close(a->pcm);
-        free(a);
-        return NULL;
+        /* Fallback: firmwares whose "default" maps straight to the codec
+         * (no plug) only take S16_LE — convert in the write path. */
+        rc = snd_pcm_set_params(a->pcm, SND_PCM_FORMAT_S16_LE,
+                                SND_PCM_ACCESS_RW_INTERLEAVED,
+                                2, (unsigned int)rate, 1, latency_us);
+        if (rc < 0) {
+            snd_pcm_close(a->pcm);
+            free(a);
+            return NULL;
+        }
+        a->use_s16 = 1;
+        a->scratch = malloc((size_t)period_frames * 2u * sizeof *a->scratch);
+        if (!a->scratch) {
+            snd_pcm_close(a->pcm);
+            free(a);
+            return NULL;
+        }
     }
     return a;
 }
 
 int alsa_write(alsa_pcm_t *a, const float *stereo_interleaved, int frames)
 {
+    /* S16 fallback: callers write at most period_frames per block
+     * (main.c writes exactly PERIOD), so the open-sized scratch fits. */
+    const void *buf = stereo_interleaved;
+    if (a->use_s16) {
+        f32_to_s16(stereo_interleaved, a->scratch, frames);
+        buf = a->scratch;
+    }
     snd_pcm_sframes_t w =
-        snd_pcm_writei(a->pcm, stereo_interleaved, (snd_pcm_uframes_t)frames);
+        snd_pcm_writei(a->pcm, buf, (snd_pcm_uframes_t)frames);
     if (w < 0) {
         /* XRUN (or suspended stream): recover, DROP the block, count it. */
         if (snd_pcm_recover(a->pcm, (int)w, 1) < 0)
@@ -68,5 +94,6 @@ void alsa_close(alsa_pcm_t *a)
         return;
     snd_pcm_drain(a->pcm);
     snd_pcm_close(a->pcm);
+    free(a->scratch);
     free(a);
 }

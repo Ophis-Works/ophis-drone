@@ -10,7 +10,8 @@ DSP_SRC = src/dsp/osc.c src/dsp/prng.c src/dsp/subosc.c src/dsp/adsr.c \
           src/dsp/filter.c src/dsp/chain.c src/dsp/mixer.c src/dsp/fx.c
 SEQ_SRC = $(wildcard src/seq/*.c)
 PRESET_SRC = $(wildcard src/preset/*.c)
-AUDIO_SRC = src/audio/alsa_pcm.c src/audio/mailbox.c src/audio/engine.c
+AUDIO_SRC = src/audio/alsa_pcm.c src/audio/mailbox.c src/audio/engine.c \
+            src/audio/f32tos16.c
 # font8x8.c: a real TU (AMENDED, owner order) — the embedded 8x8 face
 # plus the 10x10 per-pixel scaled cache (font_glyph10), PLAN §8.6
 # seq_items.c: the pure SEQ page item table (AMENDED, owner order,
@@ -25,7 +26,7 @@ TESTS   = test_sanity test_osc test_adsr test_filter test_chain \
           test_keymap_events test_keymap_events_r36s \
           test_theme \
           test_range test_seq_items test_font test_ui_menu \
-          test_autoquit
+          test_autoquit test_f32tos16
 
 .PHONY: all handheld test clean
 .DELETE_ON_ERROR:
@@ -203,6 +204,12 @@ build/tests/test_keymap_events_r36s: tests/test_keymap_events.c \
 	$(CC) $(CFLAGS) -Isrc -DTARGET_R36S $(shell pkg-config --cflags sdl2) \
 	    tests/test_keymap_events.c src/ui/keymap.c -o $@ \
 	    $(shell pkg-config --libs sdl2)
+
+# test_f32tos16: the float→S16 conversion helper (PLAN_RG28XX_BUILD M2)
+# for the ALSA S16_LE fallback — SDL/ALSA-free pure-math module.
+build/tests/test_f32tos16: tests/test_f32tos16.c tests/harness.h \
+                           src/audio/f32tos16.h src/audio/f32tos16.c | build/tests
+	$(CC) $(CFLAGS) -Isrc tests/test_f32tos16.c src/audio/f32tos16.c -o $@ -lm
 
 # test_theme: WCAG AA contrast on the exported palette constants — SDL-free;
 # definitions live in ui/theme.c (not yet implemented: red state).
