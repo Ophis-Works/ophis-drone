@@ -129,8 +129,8 @@ matrix (SRC = B.SUB1 etc.), which is unaffected by its LEVEL.</p>
 <h4>OSC tab — SEQ sub-tab (per chain, step page)</h4>
 <p>Single column, one parameter per row (cursor order = visual order):
 <strong>SEQ ON</strong> (ON/OFF — a UI parameter, never a button),
-<strong>DIV</strong> (clock divider, integer 1–16, default 1; step period =
-60/BPM/4&nbsp;&times;&nbsp;div seconds), <strong>MODE</strong>,
+<strong>DIV</strong> (clock divider, integer 1–16, shown <code>/1</code>..<code>/16</code>,
+default 1; step period = 60/BPM/4&nbsp;&times;&nbsp;div seconds), <strong>MODE</strong>,
 <strong>ONCE</strong>. Then — after two blank lines under a gray
 <strong>“Steps”</strong> label — the row of eight step rectangles
 (LEFT/RIGHT — desktop arrows / R36S d-pad — selects/moves the rectangle
@@ -169,7 +169,9 @@ C.SUB1 · C.SUB2 · A.OSC · A.SUB1 · A.SUB2 — any chain's raw osc/sub
 output; self-routing is legal), <strong>TARGET</strong> (A · B · C —
 which chain the slot's modulation and ADD feed; default A),
 <strong>DEST</strong>
-(OFF · PITCH · PHASE · AMP · FILTER · RING · FM), <strong>DEPTH</strong>
+(OFF · PITCH · PHASE · AMP · FLT CUT · FLT RES · FLT ENV · RING · FM ·
+ADSR A · ADSR D · ADSR S · ADSR R; A/D/R scale their stage time
+±100&nbsp;%, S shifts ±100 points), <strong>DEPTH</strong>
 (same ranges/rules as sub AMT; the knob reads +50&nbsp;Hz under PITCH,
 100&nbsp;% under RING, +4&nbsp;IDX under FM) and <strong>LEVEL</strong>
 (the slot's ADD knob — the source's audio blended into the TARGET,

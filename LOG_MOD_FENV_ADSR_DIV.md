@@ -76,3 +76,27 @@ enum; schema stays version 2.
   (max == 12 pins), test_ui_menu 257/260 ("FLT ENV"/"ADSR A"/"/4").
 - GREEN: test_json 641/641, test_seq_items 541/541, test_ui_menu
   260/260; full `make test` TOTAL 11432/11432 passed.
+
+## 2026-11-10 — MS3 (docs + full verification)
+
+### What changed
+- `MANUAL.md`: MOD DEST ladder gained FLT ENV · ADSR A · ADSR D ·
+  ADSR S · ADSR R (A/D/R = stage-time ratio ±100 %, S = ±100 points);
+  SEQ DIV wording now states the on-screen `/1`..`/16` display (the
+  step-period formula 60/BPM/4 × div kept — it is the period math, not
+  the display).
+- `docs/manual.html`: MOD-tab DEST list mirrored the same ladder (it
+  had also drifted pre-MS2 — still said "FILTER" without FLT RES —
+  brought in line); SEQ DIV row notes the `/1`..`/16` display.
+- No code changes.
+
+### Why
+PLAN_MOD_FENV_ADSR_DIV.md MS3: document the five new destinations and
+the unified "/n" divider display; full clean verification before the
+final commit.
+
+### Test results
+- `make clean && make`: OK.
+- `make test`: TOTAL 11432/11432 passed.
+- `make handheld rg28xx`: both builds OK, GATE PASS on both (GLIBC_2.17 max)
+  (readelf: no new required glibc symbols).

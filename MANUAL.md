@@ -40,7 +40,8 @@ ENV (envelope -> cutoff sweep amount), poles 12/24 dB.
 
 8 steps. `SEQ ON` runs it; **PITCH/VEL** edit the selected step's pitch
 and velocity (VEL 0 = silent step). The **STEP** row selects the step
-(`←`/`→` or `X`/`Z`); DIV slows it (step = 60/BPM/4 × div); MODE =
+(`←`/`→` or `X`/`Z`); DIV slows it (shown `/1`..`/16`; step =
+60/BPM/4 × div); MODE =
 fwd/pingpong/oddeven/random/markov; ONCE = one pass then silence.
 
 ![SEQ page](docs/screenshots/seq.png)
@@ -49,8 +50,9 @@ fwd/pingpong/oddeven/random/markov; ONCE = one pass then silence.
 
 16 slots. The **SLOT** row selects the slot (`←`/`→` or `X`/`Z`,
 rolls over); the five rows below edit it: **SOURCE** (any osc or sub,
-any chain) → **TARGET** (the chain it acts on) → **DEST** (PITCH
-vibrato · PHASE · AMP · FLT CUT · FLT RES · RING · FM) → **DEPTH**,
+any chain) → **TARGET** (the chain it acts on) → **DEST** (PITCH vibrato · PHASE · AMP · FLT CUT · FLT RES · FLT ENV ·
+RING · FM · ADSR A · ADSR D · ADSR S · ADSR R; A/D/R scale their stage
+time ±100 %, S shifts ±100 points) → **DEPTH**,
 plus **LEVEL** — the source's raw audio blended into that chain
 (works with DEST off). Self-routing is legal; sources read one
 sample late.
