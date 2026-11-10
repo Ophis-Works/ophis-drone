@@ -30,7 +30,7 @@ TESTS   = test_sanity test_osc test_adsr test_filter test_chain \
           test_autoquit test_f32tos16 \
           test_keymap_rg28xx test_keymap_events_rg28xx
 
-.PHONY: all handheld rg28xx test clean
+.PHONY: all handheld rg28xx test bench clean
 .DELETE_ON_ERROR:
 
 all: build/desktop/ophis-drone
@@ -182,6 +182,16 @@ test: $(TESTS:%=build/tests/%)
 	done; \
 	echo "TOTAL: $$pass/$$total passed"; \
 	exit $$failed
+
+# Render benchmark (PLAN_POLYBLEP.md MS1): desktop-only, engine + DSP —
+# no SDL/ALSA; times 2000 engine_render_block calls, prints µs/block.
+build/tests/bench_render: tools/bench_render.c $(DSP_SRC) $(SEQ_SRC) \
+                          $(PRESET_SRC) src/audio/engine.c | build/tests
+	$(CC) $(CFLAGS) -Isrc tools/bench_render.c $(DSP_SRC) $(SEQ_SRC) \
+	    $(PRESET_SRC) src/audio/engine.c -o $@ -lm
+
+bench: build/tests/bench_render
+	@./build/tests/bench_render
 
 # Per-test shortcut: 'make test_preset' builds and runs one test binary.
 .PHONY: $(TESTS)

@@ -126,30 +126,33 @@ int main(void)
     CHECK(h_rms(buf + 40000, 10000) < 1e-6);
 
     /* ---- filter expansion (PLAN §5): ENV AMT drives cutoff end-to-end.
-     * Saw 200 Hz, LP fc=500; measure the 10 kHz harmonic (50th). ---- */
+     * Saw 200 Hz, LP fc=500; measure the 1 kHz harmonic (5th). Was the
+     * 50th (10 kHz) pre-PolyBLEP (PLAN_POLYBLEP MS1): band-limiting
+     * pushed that measurement to the numerical floor, so the harmonic
+     * bin moved into the surviving band — same property, same factors. */
     {
         p = mkchain();
         p.wave = WAVE_SAW;
         p.fc   = 500.0f;
         chain_run(&c, &p, &xm0, 1.0f, NC);
-        double g10k_base = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
+        double g1k_base = h_goertzel_mag(buf + 5000, NC - 5000, 1000.0, SR);
 
         /* envamt +100: env=1 in sustain -> fc = 500×(1+1) = 1000 Hz,
-         * 10 kHz content rises (stop slope 12 dB/oct ≈ +6 dB here) */
+         * 1 kHz content rises (12 dB/oct LP at its cutoff) */
         p = mkchain();
         p.wave = WAVE_SAW;
         p.fc = 500.0f; p.envamt = 100;
         chain_run(&c, &p, &xm0, 1.0f, NC);
-        double g10k_up = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
-        CHECK(g10k_up > g10k_base * 1.4);
+        double g1k_up = h_goertzel_mag(buf + 5000, NC - 5000, 1000.0, SR);
+        CHECK(g1k_up > g1k_base * 1.4);
 
-        /* envamt -50: fc = 250 Hz, 10 kHz content falls */
+        /* envamt -50: fc = 250 Hz, 1 kHz content falls */
         p = mkchain();
         p.wave = WAVE_SAW;
         p.fc = 500.0f; p.envamt = -50;
         chain_run(&c, &p, &xm0, 1.0f, NC);
-        double g10k_down = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
-        CHECK(g10k_down < g10k_base / 1.4);
+        double g1k_down = h_goertzel_mag(buf + 5000, NC - 5000, 1000.0, SR);
+        CHECK(g1k_down < g1k_base / 1.4);
     }
 
     /* ---- res passes through: LP with fc at the tone frequency — higher

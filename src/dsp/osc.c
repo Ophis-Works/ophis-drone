@@ -42,6 +42,49 @@ static double pink_sample(osc_t *o)
     return out;
 }
 
+/* PolyBLEP unit-step residual (PLAN_POLYBLEP.md). Verified against the
+ * Si-symmetric ideal band-limited step: the sample just BEFORE a rising
+ * unit step at fractional distance s (0..1) gains +0.5*(1-s)^2, the
+ * sample just AFTER loses 0.5*s^2 — the step value diff of 1 is spread
+ * over the pair (max adjacent jump 1.5 for a +-2 step, owner ruling
+ * 2026-11-10 bound < 2.0). For a step of amplitude A at edge e
+ * (d = p - e wrapped to (-0.5, 0.5], |d| < dt): pre-side x += A*0.5*u^2,
+ * post-side x -= A*0.5*s^2, u = 1 - s. Step directions: SAW wrap =
+ * FALLING -2 (A=-2); SQUARE wrap p~0 = RISING +2 (A=+2); SQUARE duty
+ * crossing = FALLING -2 (A=-2). */
+static double polyblep_correct(double x, const osc_t *o, double freq_hz,
+                               double sr)
+{
+    double dt = freq_hz / sr;
+    if (dt >= 0.5)                   /* window wider than the domain: */
+        return x;                    /* naive output is noise there   */
+    double edges[2] = { 0.0, -1.0 }; /* -1 = absent (never in window) */
+    double amps[2]  = { -2.0, 0.0 }; /* SAW: one falling edge at wrap */
+    int ne = 1;
+    if (o->wave == WAVE_SQUARE) {
+        int d = o->duty;
+        if (d < 5)  d = 5;
+        if (d > 95) d = 95;
+        edges[1] = (double)d / 100.0;
+        amps[0]  = 2.0;              /* wrap: RISING +2 */
+        amps[1]  = -2.0;             /* duty crossing: FALLING -2 */
+        ne = 2;
+    }
+    for (int i = 0; i < ne; i++) {
+        double d = o->phase - edges[i];
+        d -= round(d);               /* wrap to (-0.5, 0.5] */
+        double ad = fabs(d);
+        if (ad < dt) {
+            double s = ad / dt, u = 1.0 - s;
+            if (d < 0.0)
+                x += amps[i] * 0.5 * u * u;   /* pre-side  */
+            else
+                x -= amps[i] * 0.5 * s * s;   /* post-side */
+        }
+    }
+    return x;
+}
+
 double osc_next(osc_t *o, double freq_hz, double sr)
 {
     double x;
@@ -91,5 +134,8 @@ double osc_next(osc_t *o, double freq_hz, double sr)
         x = 0.0;
         break;
     }
+
+    if (o->wave == WAVE_SAW || o->wave == WAVE_SQUARE)
+        x = polyblep_correct(x, o, freq_hz, sr);
     return x;
 }
