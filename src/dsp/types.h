@@ -7,7 +7,9 @@ typedef enum { WAVE_SINE, WAVE_TRIANGLE, WAVE_SAW, WAVE_SQUARE,
                WAVE_WHITE, WAVE_PINK } wave_t;
 
 typedef enum { MOD_OFF, MOD_PITCH, MOD_PHASE, MOD_AMP, MOD_FILTER,
-               MOD_RING, MOD_FM, MOD_FRES } mod_dest_t;
+               MOD_RING, MOD_FM, MOD_FRES,
+               MOD_FENV, MOD_ADSR_A, MOD_ADSR_D, MOD_ADSR_S,
+               MOD_ADSR_R } mod_dest_t;
 /* MOD_PHASE (PM, approved plan change eacb368+fix): the modulator adds to
  * the carrier phase; amount -100..+100 percent maps linearly to ±180°
  * (±pi rad) of phase deviation. Used by sub dest and xmod dest alike.
@@ -20,7 +22,13 @@ typedef enum { MOD_OFF, MOD_PITCH, MOD_PHASE, MOD_AMP, MOD_FILTER,
  * never renumbered): the source sweeps the target's RESONANCE percent;
  * amount ±100. The per-slot mixing ADD function is the xmod mix knob
  * (xmod_params_t.mix), not a dest — the stage-3 MOD_MIX dest is GONE
- * from the format (PLAN_MOD_ROUTING.md M4b/D4, "new format only"). */
+ * from the format (PLAN_MOD_ROUTING.md M4b/D4, "new format only").
+ * MOD_FENV + MOD_ADSR_A/D/S/R (owner order 2026-11-10,
+ * PLAN_MOD_FENV_ADSR_DIV.md MS1, appended after MOD_FRES — ids 0..7
+ * never renumbered): FLT_ENV sweeps the target's ENV AMT additively
+ * (envamt + 100×env_mod points, clamped ±100); ADSR A/D/R scale the
+ * stage durations by the ratio (1 + adsr_mod[i], clamped 0..60 s),
+ * ADSR S adds points (s + 100×adsr_mod[2], clamped 0..100). */
 
 typedef enum { FILT_LP, FILT_HP, FILT_BP, FILT_BR } filt_mode_t;
 

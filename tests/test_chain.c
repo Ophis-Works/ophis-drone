@@ -65,7 +65,7 @@ int main(void)
 {
     chain_state_t c;
     chain_params_t p;
-    xmod_in_t xm0 = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+    xmod_in_t xm0 = { 0 };
 
     /* ---- velocity 0 → silence ---- */
     p = mkchain();
@@ -198,7 +198,7 @@ int main(void)
         p = mkchain();
         p.wave = WAVE_SAW;
         p.fc = 15000.0f; p.envamt = 100;
-        xmod_in_t xm_hi = { 0.0f, 0.0f, 0.2f, 0.0f, 0.0f };   /* fc -> 36000 -> clamp */
+        xmod_in_t xm_hi = { .filter_mod = 0.2f };   /* fc -> 36000 -> clamp */
         chain_run(&c, &p, &xm_hi, 1.0f, NC);
         double rms_clamped = rms_steady(NC);
         CHECK(fabs(rms_clamped / rms_18k - 1.0) < 0.10);
@@ -277,6 +277,182 @@ int main(void)
         CHECK(carr[1] > 0.35 * carr[0] && carr[1] < 0.62 * carr[0]);
         CHECK(carr[1] > carr[2]);
         CHECK(side_up[1] > side_up[2]);
+    }
+
+    /* ---- PLAN_MOD_FENV_ADSR_DIV.md MS1: envelope-stage timing helpers.
+     * first_above: first index where |buf| rises above frac × the late
+     * (sustain) peak — attack timing. last_above: last index above
+     * frac × the global peak — decay/release timing. ---- */
+    {
+        /* FLT_ENV consumption: envamt 0 + env_mod 0.5 (i.e. +50 points)
+         * must shift fc EXACTLY like envamt 50 without mod — same
+         * formula, same coefficient path. */
+        double g_ref, g_mod;
+        p = mkchain();
+        p.wave = WAVE_SAW;
+        p.fc = 500.0f; p.envamt = 50;
+        chain_run(&c, &p, &xm0, 1.0f, NC);
+        g_ref = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
+        p = mkchain();
+        p.wave = WAVE_SAW;
+        p.fc = 500.0f; p.envamt = 0;
+        xmod_in_t xm_env;
+        memset(&xm_env, 0, sizeof xm_env);
+        xm_env.env_mod = 0.5;                  /* +50 envamt points */
+        chain_run(&c, &p, &xm_env, 1.0f, NC);
+        g_mod = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
+        CHECK(fabs(g_mod / g_ref - 1.0) < 1e-9);     /* exact identity */
+
+        /* clamp at +100: envamt 100 + env_mod 1.0 == envamt 100 alone */
+        p = mkchain();
+        p.wave = WAVE_SAW;
+        p.fc = 500.0f; p.envamt = 100;
+        chain_run(&c, &p, &xm0, 1.0f, NC);
+        g_ref = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
+        p = mkchain();
+        p.wave = WAVE_SAW;
+        p.fc = 500.0f; p.envamt = 100;
+        memset(&xm_env, 0, sizeof xm_env);
+        xm_env.env_mod = 1.0;
+        chain_run(&c, &p, &xm_env, 1.0f, NC);
+        g_mod = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
+        CHECK(fabs(g_mod / g_ref - 1.0) < 1e-9);
+
+        /* clamp at -100: envamt -100 + env_mod -1.0 == envamt -100 alone */
+        p = mkchain();
+        p.wave = WAVE_SAW;
+        p.fc = 500.0f; p.envamt = -100;
+        chain_run(&c, &p, &xm0, 1.0f, NC);
+        g_ref = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
+        p = mkchain();
+        p.wave = WAVE_SAW;
+        p.fc = 500.0f; p.envamt = -100;
+        memset(&xm_env, 0, sizeof xm_env);
+        xm_env.env_mod = -1.0;
+        chain_run(&c, &p, &xm_env, 1.0f, NC);
+        g_mod = h_goertzel_mag(buf + 5000, NC - 5000, 10000.0, SR);
+        CHECK(fabs(g_mod / g_ref - 1.0) < 1e-9);
+    }
+
+    /* ---- ADSR consumption (owner decision: A/D/R ratio, S additive
+     * points). adsr_mod[i]: 0=A 1=D 2=S 3=R. ---- */
+    {
+        /* first index where |buf| rises above frac × the sustain peak */
+        double peak;
+        int t_base, t_mod;
+        xmod_in_t xm_a;
+
+        /* a_mod +1.0: attack 0.1 s -> 0.2 s (~2x the samples) */
+        p = mkchain();
+        p.wave = WAVE_SINE;
+        p.adsr.a = 0.1f;
+        chain_run(&c, &p, &xm0, 1.0f, NC);
+        peak = 0.0;
+        for (int i = NC - 2000; i < NC; i++)
+            if (fabs(buf[i]) > peak) peak = fabs(buf[i]);
+        t_base = -1;
+        for (int i = 0; i < NC && t_base < 0; i++)
+            if (fabs(buf[i]) >= 0.9 * peak) t_base = i;
+        memset(&xm_a, 0, sizeof xm_a);
+        xm_a.adsr_mod[0] = 1.0;                /* ratio ×2 */
+        chain_run(&c, &p, &xm_a, 1.0f, NC);
+        t_mod = -1;
+        for (int i = 0; i < NC && t_mod < 0; i++)
+            if (fabs(buf[i]) >= 0.9 * peak) t_mod = i;
+        CHECK(t_base > 3000);                        /* ~0.9 × 4410 */
+        CHECK(t_mod > 17 * t_base / 10 && t_mod < 23 * t_base / 10);
+
+        /* a_mod -1.0: ratio 0 -> clamped 0 s -> 1-sample attack */
+        memset(&xm_a, 0, sizeof xm_a);
+        xm_a.adsr_mod[0] = -1.0;
+        chain_run(&c, &p, &xm_a, 1.0f, NC);
+        t_mod = -1;
+        for (int i = 0; i < NC && t_mod < 0; i++)
+            if (fabs(buf[i]) >= 0.9 * peak) t_mod = i;
+        CHECK(t_mod >= 0 && t_mod < 100);
+
+        /* d_mod +1.0: decay 0.1 s -> 0.2 s (linear to sustain 0) */
+        p = mkchain();
+        p.wave = WAVE_SINE;
+        p.adsr.a = 0.001f; p.adsr.d = 0.1f; p.adsr.s = 0;
+        chain_run(&c, &p, &xm0, 1.0f, NC);
+        peak = 0.0;
+        for (int i = 0; i < NC; i++)
+            if (fabs(buf[i]) > peak) peak = fabs(buf[i]);
+        t_base = -1;
+        for (int i = NC - 1; i >= 0 && t_base < 0; i--)
+            if (fabs(buf[i]) >= 0.1 * peak) t_base = i;
+        xmod_in_t xm_d;
+        memset(&xm_d, 0, sizeof xm_d);
+        xm_d.adsr_mod[1] = 1.0;
+        chain_run(&c, &p, &xm_d, 1.0f, NC);
+        t_mod = -1;
+        for (int i = NC - 1; i >= 0 && t_mod < 0; i--)
+            if (fabs(buf[i]) >= 0.1 * peak) t_mod = i;
+        CHECK(t_base > 3500);                        /* ~0.9 × 4410 */
+        CHECK(t_mod > 15 * t_base / 10 && t_mod < 25 * t_base / 10);
+
+        /* s_mod +1.0 on s=50: +100 points -> clamp 100 -> sustain rms
+         * equals the s=100 baseline exactly */
+        double rms_s100;
+        p = mkchain();
+        p.wave = WAVE_SINE;
+        p.adsr.s = 100;
+        chain_run(&c, &p, &xm0, 1.0f, NC);
+        rms_s100 = rms_steady(NC);
+        p = mkchain();
+        p.wave = WAVE_SINE;
+        p.adsr.s = 50;
+        xmod_in_t xm_s;
+        memset(&xm_s, 0, sizeof xm_s);
+        xm_s.adsr_mod[2] = 1.0;
+        chain_run(&c, &p, &xm_s, 1.0f, NC);
+        CHECK(fabs(rms_steady(NC) / rms_s100 - 1.0) < 1e-9);
+        /* s_mod -1.0 on s=50: -100 points -> clamp 0 -> silence */
+        memset(&xm_s, 0, sizeof xm_s);
+        xm_s.adsr_mod[2] = -1.0;
+        chain_run(&c, &p, &xm_s, 1.0f, NC);
+        CHECK(rms_steady(NC) < 1e-6);
+
+        /* r_mod +1.0: release 0.1 s -> 0.2 s after the gate's falling
+         * edge at 20000 */
+        p = mkchain();
+        p.wave = WAVE_SINE;
+        p.adsr.a = 0.001f; p.adsr.d = 0.001f;
+        p.adsr.s = 100; p.adsr.r = 0.1f;
+        chain_init(&c, 7);
+        for (int i = 0; i < NC; i++) {
+            chain_event_t ev = { 0, 0.0f };
+            int gate = (i < 20000);
+            if (i == 0) { ev.retrigger = 1; ev.vel = 1.0f; }
+            buf[i] = chain_render(&c, &p, &xm0, &ev, SR, gate);
+        }
+        peak = 0.0;
+        for (int i = 0; i < 20000; i++)
+            if (fabs(buf[i]) > peak) peak = fabs(buf[i]);
+        t_base = -1;
+        for (int i = NC - 1; i >= 0 && t_base < 0; i--)
+            if (fabs(buf[i]) >= 0.1 * peak) t_base = i;
+        xmod_in_t xm_r;
+        memset(&xm_r, 0, sizeof xm_r);
+        xm_r.adsr_mod[3] = 1.0;
+        chain_init(&c, 7);
+        for (int i = 0; i < NC; i++) {
+            chain_event_t ev = { 0, 0.0f };
+            int gate = (i < 20000);
+            if (i == 0) { ev.retrigger = 1; ev.vel = 1.0f; }
+            buf[i] = chain_render(&c, &p, &xm_r, &ev, SR, gate);
+        }
+        t_mod = -1;
+        for (int i = NC - 1; i >= 0 && t_mod < 0; i--)
+            if (fabs(buf[i]) >= 0.1 * peak) t_mod = i;
+        CHECK(t_base > 20000 + 3500);                /* ~20000+0.9×4410 */
+        /* compare release LENGTHS (the 20000-sample gate offset would
+         * skew a raw index ratio) */
+        {
+            int rl_base = t_base - 20000, rl_mod = t_mod - 20000;
+            CHECK(rl_mod > 15 * rl_base / 10 && rl_mod < 25 * rl_base / 10);
+        }
     }
 
     /* sub RING/FM dest pins (owner order 2026-11-06) are GONE with the

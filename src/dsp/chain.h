@@ -23,6 +23,16 @@ typedef struct {
                      amount/100 × m (-1..1); the chain adds res_mod × 100
                      percent to the RES knob (clamped 0..100). 0 = the
                      static-res coefficient caches apply unchanged. */
+  double env_mod;    /* FLT_ENV dest (owner order 2026-11-10,
+                     PLAN_MOD_FENV_ADSR_DIV.md MS1): normalized ENV AMT
+                     input amount/100 × m (-1..1); the chain adds
+                     env_mod × 100 percent points to the ENV AMT knob
+                     (clamped ±100). */
+  double adsr_mod[4]; /* ADSR A/D/S/R dests (same order): A/D/R entries
+                     are ratio inputs — the stage seconds scale by
+                     (1 + adsr_mod[i]), clamped 0..60 s; the S entry is
+                     additive points (s + 100×adsr_mod[2], clamped
+                     0..100). All zero = the plain params apply. */
 } xmod_in_t;
 
 typedef struct { int retrigger; float vel; } chain_event_t;

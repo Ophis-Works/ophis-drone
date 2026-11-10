@@ -91,15 +91,36 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
      * into release by passing gate=0 to adsr_next */
     int env_gate = (c->last_gate && !gate) ? 0 : gate;
     c->last_gate = gate;
-    float env = adsr_next(&c->env, &p->adsr, sr, env_gate);
+    /* ADSR mod dests (owner order 2026-11-10, PLAN_MOD_FENV_ADSR_DIV.md
+     * MS1): effective params per sample — A/D/R scale seconds by the
+     * ratio (1 + adsr_mod[i]), clamped 0..60 s; S adds points, clamped
+     * 0..100 (int percent, 1-point granularity, matching the knob). All
+     * fields zero reproduces the plain params exactly (bit-identical
+     * regression path). */
+    adsr_params_t adsr_eff;
+    adsr_eff.a = (float)clampd((double)p->adsr.a * (1.0 + xm->adsr_mod[0]),
+                               0.0, 60.0);
+    adsr_eff.d = (float)clampd((double)p->adsr.d * (1.0 + xm->adsr_mod[1]),
+                               0.0, 60.0);
+    adsr_eff.s = (int)clampd((double)p->adsr.s + xm->adsr_mod[2] * 100.0,
+                             0.0, 100.0);
+    adsr_eff.r = (float)clampd((double)p->adsr.r * (1.0 + xm->adsr_mod[3]),
+                               0.0, 60.0);
+    float env = adsr_next(&c->env, &adsr_eff, sr, env_gate);
     double gain = (double)env * (double)c->vel;
 
     /* 5. filter (coefficients updated only when fc/mode/res/poles actually
      * change). fc: xmod filter mod then ENV AMT (chain ADSR drives
      * cutoff, PLAN §5 step 5), clamped 30 Hz–18 kHz. Q: res percent ->
-     * pos = res/2 in 0..50, Q = 0.5 × 40^(pos/50) (log 0.5..20). */
+     * pos = res/2 in 0..50, Q = 0.5 × 40^(pos/50) (log 0.5..20).
+     * FLT_ENV (owner order 2026-11-10, PLAN_MOD_FENV_ADSR_DIV.md MS1):
+     * the slot adds points to the ENV AMT knob — envamt_eff = envamt +
+     * 100×env_mod, clamped ±100 (like RES); env_mod == 0 keeps the
+     * existing fc value exactly. */
+    double envamt_eff = clampd((double)p->envamt + xm->env_mod * 100.0,
+                               -100.0, 100.0);
     double fc = (double)p->fc * (1.0 + filter_mod)
-              * (1.0 + (double)p->envamt / 100.0 * (double)env);
+              * (1.0 + envamt_eff / 100.0 * (double)env);
     fc = clampd(fc, 30.0, 18000.0);
     int poles = (p->poles == 24) ? 24 : 12;
     /* FLT_RES (owner order 2026-11-07, PLAN_OSC_NAMING.md R0c): the slot

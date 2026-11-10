@@ -51,6 +51,21 @@ static void mod_apply(xmod_in_t *acc, mod_dest_t dest, float amount,
          * cutoff channel's sibling; chain.c clamps res + 100×res_mod. */
         acc->res_mod += (double)amount / 100.0 * s;
         break;
+    case MOD_FENV:
+        /* FLT_ENV (owner order 2026-11-10, PLAN_MOD_FENV_ADSR_DIV.md
+         * MS1): the source sweeps the target's ENV AMT percent —
+         * chain.c clamps envamt + 100×env_mod. */
+        acc->env_mod += (double)amount / 100.0 * s;
+        break;
+    case MOD_ADSR_A:
+    case MOD_ADSR_D:
+    case MOD_ADSR_S:
+    case MOD_ADSR_R:
+        /* ADSR A/D/S/R (owner order 2026-11-10, same plan): normalized
+         * input per channel, A/D/S/R index order; chain.c applies ratio
+         * (A/D/R) or additive points (S). */
+        acc->adsr_mod[dest - MOD_ADSR_A] += (double)amount / 100.0 * s;
+        break;
     case MOD_FM:
         /* operator FM (owner order 2026-11-06): DX-style index
          * amount/25 cycles × the source (shares the phase channel

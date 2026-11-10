@@ -288,6 +288,59 @@ int main(void)
         CHECK(fabs(m.xm[2].res_mod) < 1e-9);         /* C: no slot fires */
     }
 
+    /* ---- PLAN_MOD_FENV_ADSR_DIV.md MS1: the FLT_ENV pin — dest
+     * MOD_FENV accumulates env_mod = amount/100 × src into xm->env_mod;
+     * the filter cutoff channel (filter_mod) stays untouched. ---- */
+    memset(&m, 0, sizeof m);
+    m.src[0] = 0.5;                                /* B.osc: id 1 -> src[0] */
+    sp0 = mksp();
+    mp = mkp(&sp0);
+    sp0.xmod[0].tgt = 0;
+    sp0.xmod[0].src = 1; sp0.xmod[0].dest = MOD_FENV; sp0.xmod[0].amount = 50.0f;
+    (void)mixer_render(&m, &mp, hot, SR);
+    CHECK(fabs(m.xm[0].env_mod - 0.25) < 1e-6);    /* 50/100 × 0.5 */
+    CHECK(fabs(m.xm[0].filter_mod) < 1e-9);        /* FLT_CUT untouched */
+    sp0.xmod[0].amount = -50.0f;
+    (void)mixer_render(&m, &mp, hot, SR);
+    CHECK(fabs(m.xm[0].env_mod + 0.25) < 1e-6);    /* both signs */
+
+    /* ---- PLAN_MOD_FENV_ADSR_DIV.md MS1: the ADSR pins — dests
+     * MOD_ADSR_A/D/S/R accumulate adsr_mod[0..3] = amount/100 × src
+     * (A,D,S,R index order); each leaves the other channels zero. ---- */
+    for (int d = 0; d < 4; d++) {
+        memset(&m, 0, sizeof m);
+        m.src[0] = 0.5;
+        sp0 = mksp();
+        mp = mkp(&sp0);
+        sp0.xmod[0].tgt = 0;
+        sp0.xmod[0].src = 1;
+        sp0.xmod[0].dest = (mod_dest_t)(MOD_ADSR_A + d);
+        sp0.xmod[0].amount = 100.0f;
+        (void)mixer_render(&m, &mp, hot, SR);
+        CHECK(fabs(m.xm[0].adsr_mod[d] - 0.5) < 1e-6);   /* 100/100 × 0.5 */
+        sp0.xmod[0].amount = -100.0f;
+        (void)mixer_render(&m, &mp, hot, SR);
+        CHECK(fabs(m.xm[0].adsr_mod[d] + 0.5) < 1e-6);   /* both signs */
+        for (int k = 0; k < 4; k++)
+            if (k != d) CHECK(fabs(m.xm[0].adsr_mod[k]) < 1e-9);
+        CHECK(fabs(m.xm[0].env_mod) < 1e-9);       /* FLT_ENV untouched */
+    }
+
+    /* regression: OFF/PITCH slots leave the new channels zero */
+    memset(&m, 0, sizeof m);
+    m.src[0] = 0.5;
+    sp0 = mksp();
+    mp = mkp(&sp0);
+    sp0.xmod[0].tgt = 0;
+    sp0.xmod[0].src = 1; sp0.xmod[0].dest = MOD_OFF; sp0.xmod[0].amount = 100.0f;
+    (void)mixer_render(&m, &mp, hot, SR);
+    CHECK(fabs(m.xm[0].env_mod) < 1e-9);
+    for (int k = 0; k < 4; k++) CHECK(fabs(m.xm[0].adsr_mod[k]) < 1e-9);
+    sp0.xmod[0].dest = MOD_PITCH; sp0.xmod[0].amount = 4.0f;
+    (void)mixer_render(&m, &mp, hot, SR);
+    CHECK(fabs(m.xm[0].env_mod) < 1e-9);
+    for (int k = 0; k < 4; k++) CHECK(fabs(m.xm[0].adsr_mod[k]) < 1e-9);
+
     /* ---- cross-mod B→A detune measurable end-to-end: 200 → 202 Hz ---- */
     chain_params_t cp;
     memset(&cp, 0, sizeof cp);
