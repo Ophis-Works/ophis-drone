@@ -52,8 +52,10 @@ static void *audio_thread_fn(void *arg)
     ui_status_t st;
 
     while (!atomic_load_explicit(&quit, memory_order_relaxed)) {
-        mailbox_read(&mb, &snap);                       /* e.p per block */
-        eng.p = snap;
+        /* M-1: bounded read — 0 = retries exhausted (*out untouched):
+         * keep the previous block's params instead of spinning. */
+        if (mailbox_read(&mb, &snap))
+            eng.p = snap;
         int trig = atomic_exchange(&mb.trigger_req, 0); /* fetch-exchange */
         int pan  = atomic_exchange(&mb.panic_req, 0);
         int rmask = atomic_exchange(&mb.retrig_req, 0);

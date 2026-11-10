@@ -111,7 +111,7 @@ int main(void)
         mailbox_write(&mb, &p);
 
         /* block 1: panic — guard zeroes run for this block */
-        mailbox_read(&mb, &e.p);
+        CHECK(mailbox_read(&mb, &e.p) == 1);
         engine_render_block(&e, win, PERIOD, 0, 1, 0);
         st.run = e.p.run;
         CHECK(st.run == 0);
@@ -119,7 +119,7 @@ int main(void)
         /* block 2: UI committed draft.run = 0 on PANIC -> still silent */
         p.run = 0;
         mailbox_write(&mb, &p);
-        mailbox_read(&mb, &e.p);
+        CHECK(mailbox_read(&mb, &e.p) == 1);
         engine_render_block(&e, win, PERIOD, 0, 0, 0);
         st.run = e.p.run;
         CHECK(st.run == 0);
@@ -128,7 +128,7 @@ int main(void)
          * reflects the mailbox, it does not force run off */
         p.run = 1;
         mailbox_write(&mb, &p);
-        mailbox_read(&mb, &e.p);
+        CHECK(mailbox_read(&mb, &e.p) == 1);
         engine_render_block(&e, win, PERIOD, 0, 0, 0);
         st.run = e.p.run;
         CHECK(st.run == 1);

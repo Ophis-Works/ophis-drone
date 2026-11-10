@@ -19,6 +19,8 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "../src/audio/mailbox.h"
 
@@ -118,7 +120,7 @@ static void test_single_threaded(void)
      * commits once before the audio thread starts and must read it). */
     synth_params_t p;
     memset(&p, 0xAA, sizeof p);
-    mailbox_read(&mb, &p);
+    CHECK(mailbox_read(&mb, &p) == 1);  /* first read: init commit ready */
     synth_params_t zero;
     memset(&zero, 0, sizeof zero);
     CHECK(memcmp(&p, &zero, sizeof p) == 0);
@@ -128,11 +130,11 @@ static void test_single_threaded(void)
     mailbox_write(&mb, &p);
     synth_params_t r;
     fill_params(&r, TAG_MAX);          /* poison */
-    mailbox_read(&mb, &r);
+    CHECK(mailbox_read(&mb, &r) == 1);
     CHECK(params_valid(&r) && r.bpm == 7);
 
     /* read is non-destructive. */
-    mailbox_read(&mb, &r);
+    CHECK(mailbox_read(&mb, &r) == 1);
     CHECK(r.bpm == 7);
 
     /* two writes before one read: the newest complete snapshot wins. */
@@ -140,7 +142,7 @@ static void test_single_threaded(void)
     mailbox_write(&mb, &p);
     fill_params(&p, 2);
     mailbox_write(&mb, &p);
-    mailbox_read(&mb, &r);
+    CHECK(mailbox_read(&mb, &r) == 1);
     CHECK(params_valid(&r) && r.bpm == 2);
 
     /* an odd commit count (1 and 3) before a read must not stall the
@@ -148,7 +150,7 @@ static void test_single_threaded(void)
     for (int tag = 1; tag <= 3; tag++) {
         fill_params(&p, tag);
         mailbox_write(&mb, &p);
-        mailbox_read(&mb, &r);
+        CHECK(mailbox_read(&mb, &r) == 1);
         CHECK(params_valid(&r) && r.bpm == tag);
     }
 
@@ -214,7 +216,8 @@ static void test_params_interleave(void)
     synth_params_t r;
     long reads = 0, tears = 0;
     for (int i = 0; i < N_READS; i++) {
-        mailbox_read(&g_mb, &r);
+        int rc = mailbox_read(&g_mb, &r);
+        CHECK(rc == 0 || rc == 1);
         reads++;
         if (!params_valid(&r))
             tears++;
@@ -224,11 +227,52 @@ static void test_params_interleave(void)
     pthread_join(th, NULL);
 
     /* final read after the writer is finished: must be its last commit */
-    mailbox_read(&g_mb, &r);
+    CHECK(mailbox_read(&g_mb, &r) == 1);
     CHECK(params_valid(&r) && r.bpm == (N_COMMITS - 1) % TAG_MAX + 1);
     printf("params interleave: %ld reads, %ld torn snapshots accepted\n",
            reads, tears);
     CHECK(tears == 0);
+}
+
+/* --- bounded read (M-1) + retrig_req init (L-1) ------------------------- */
+
+static void test_bounded_read(void)
+{
+    mailbox_t mb;
+    mailbox_init(&mb);
+
+    /* L-1: every req flag is atomic_init-ed to 0. */
+    CHECK(atomic_load(&mb.retrig_req) == 0);
+
+    /* M-1: a hammering writer cannot starve the reader — every read
+     * returns within the retry bound (1 = snapshot, 0 = exhausted with
+     * *out untouched). alarm() is the watchdog: an unbounded spin hangs
+     * and the process dies instead of passing. */
+    mailbox_init(&g_mb);
+    atomic_init(&g_params_done, 1);     /* writer loop checks nothing */
+    pthread_t th;
+    CHECK(pthread_create(&th, NULL, params_writer, NULL) == 0);
+
+    alarm(30);
+    synth_params_t r;
+    long got = 0, starved = 0;
+    for (int i = 0; i < 1000; i++) {
+        fill_params(&r, 7);             /* sentinel: 0 must leave it */
+        int rc = mailbox_read(&g_mb, &r);
+        CHECK(rc == 0 || rc == 1);
+        if (rc) {
+            got++;
+            CHECK(params_valid(&r));    /* 1 must carry a whole commit */
+        } else {
+            starved++;
+            CHECK(params_valid(&r) && r.bpm == 7);  /* *out untouched */
+        }
+    }
+    alarm(0);
+    pthread_cancel(th);
+    pthread_join(th, NULL);
+    printf("bounded read: %ld snapshots, %ld exhausted\n", got, starved);
+    CHECK(got > 0);                     /* not permanently starved */
 }
 
 /* --- interleave: H2 stability flag toggles under a publishing writer ---- */
@@ -288,5 +332,6 @@ int main(void)
     test_status_single_threaded();
     test_params_interleave();
     test_status_interleave();
+    test_bounded_read();
     HARNESS_REPORT();
 }

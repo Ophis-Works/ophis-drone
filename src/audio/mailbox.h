@@ -62,9 +62,12 @@ void mailbox_init(mailbox_t *mb);
 void mailbox_write(mailbox_t *mb, const synth_params_t *p);
 
 /* Host thread: copy the published snapshot (u64 seqlock: retries while a
- * publish is in flight or interleaved; always returns a COMPLETE
- * snapshot — every field from one commit — at most one block stale). */
-void mailbox_read(mailbox_t *mb, synth_params_t *out);
+ * publish is in flight or interleaved; bounded to 100 attempts — a
+ * hammering writer cannot starve the audio thread). Returns 1 with a
+ * COMPLETE snapshot in *out (every field from one commit, at most one
+ * block stale); returns 0 on exhaustion with *out untouched — the caller
+ * keeps its previous params. */
+int mailbox_read(mailbox_t *mb, synth_params_t *out);
 
 /* Host thread: publish a status snapshot (store-release). */
 void mailbox_status_publish(mailbox_t *mb, const ui_status_t *s);

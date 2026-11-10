@@ -28,6 +28,7 @@ void mailbox_init(mailbox_t *mb)
     atomic_init(&mb->seq, 0ull);
     atomic_init(&mb->trigger_req, 0);
     atomic_init(&mb->panic_req, 0);
+    atomic_init(&mb->retrig_req, 0);
     atomic_init(&mb->status_index, 0ull);
 }
 
@@ -50,14 +51,20 @@ void mailbox_write(mailbox_t *mb, const synth_params_t *p)
     atomic_store_explicit(&mb->seq, s + 2, memory_order_release);
 }
 
-void mailbox_read(mailbox_t *mb, synth_params_t *out)
+int mailbox_read(mailbox_t *mb, synth_params_t *out)
 {
-    for (;;) {
+    /* M-1: bounded retries — the audio thread must never spin forever.
+     * 1 = complete snapshot in *out, 0 = exhausted (*out untouched,
+     * caller keeps its last params). The copy goes to a scratch first:
+     * an interleaved publish between copy and reload must not leave a
+     * torn snapshot in *out when the retries run out. */
+    synth_params_t tmp;
+    for (int tries = 0; tries < 100; tries++) {
         uint64_t a =
             atomic_load_explicit(&mb->seq, memory_order_acquire);
         if (a & 1)
             continue;             /* publish in flight — retry */
-        *out = mb->buf[(a >> 1) & 1];
+        tmp = mb->buf[(a >> 1) & 1];
         /* the copy must be complete before the reload below — see the
          * fence note atop this file: the reload must run at least one
          * fence latency after the last copy load, so a slot overwrite
@@ -65,10 +72,13 @@ void mailbox_read(mailbox_t *mb, synth_params_t *out)
         atomic_thread_fence(memory_order_seq_cst);
         uint64_t b =
             atomic_load_explicit(&mb->seq, memory_order_relaxed);
-        if (a == b)
-            return;               /* stable and even: complete snapshot */
+        if (a == b) {
+            *out = tmp;           /* stable and even: complete snapshot */
+            return 1;
+        }
         /* writer published while we copied — retry with the newer half */
     }
+    return 0;
 }
 
 void mailbox_status_publish(mailbox_t *mb, const ui_status_t *s)
