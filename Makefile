@@ -130,18 +130,19 @@ PRESETS      = $(wildcard presets/*.json)
 
 # --- desktop release archive (PLAN_DESKTOP_TARGZ.md) -----------------------
 # make desktop: build the desktop binary, stage a fresh program folder and
-# tar.gz it: ophis-drone-desktop/{ophis-drone, presets/, MANUAL.md, README.md}.
-# Staging is rebuilt from scratch on every run (F13 lesson, same as the
-# handheld zips): no stale presets can survive.
+# tar.gz it: ophis-drone-desktop/{ophis-drone, presets/, MANUAL.md}.
+# README.md stays repo-only (user order 2026-11-10). Staging is rebuilt
+# from scratch on every run (F13 lesson, same as the handheld zips): no
+# stale presets can survive.
 desktop: $(DEPLOY)/ophis-drone-desktop.tar.gz
 
 $(DEPLOY)/ophis-drone-desktop.tar.gz: build/desktop/ophis-drone \
-                                      $(PRESETS) MANUAL.md README.md \
+                                      $(PRESETS) MANUAL.md \
                                       | $(DEPLOY)
 	rm -rf $(DEPLOY)/ophis-drone-desktop
 	mkdir -p $(DEPLOY)/ophis-drone-desktop/presets
 	cp build/desktop/ophis-drone $(DEPLOY)/ophis-drone-desktop/
-	cp MANUAL.md README.md $(DEPLOY)/ophis-drone-desktop/
+	cp MANUAL.md $(DEPLOY)/ophis-drone-desktop/
 	for f in presets/*.json; do \
 	  if [ -e "$$f" ]; then cp "$$f" $(DEPLOY)/ophis-drone-desktop/presets/; fi; \
 	done
