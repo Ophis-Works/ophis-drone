@@ -29,6 +29,10 @@ rolls to the top and vice versa.
   (integer 1..16). Their **LEVEL** mixes them into the oscillator; 0 =
   silent. Subs modulate only via the MOD matrix.
 
+Saw and square are band-limited (edge smoothing at twice the sample
+rate), so they stay clean instead of picking up alias harshness.
+Sine, tri and the noise waves are unchanged.
+
 ## 4. Envelope + filter (ENV+FLT)
 
 ADSR (seconds, log scale) + filter: mode LP/HP/BP/BR, cutoff, resonance,

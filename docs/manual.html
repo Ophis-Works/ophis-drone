@@ -87,7 +87,7 @@ ENV+FLT sub-tab's ADSR section).</p>
 <table>
 <tr><th>Item</th><th>Range / options</th></tr>
 <tr><td>FREQ</td><td>0.1 Hz – 20 kHz, log, 1/12-octave steps (0.1&nbsp;&times;&nbsp;2<sup>pos/12</sup>, pos 0..212); dimmed/inert for noise waves</td></tr>
-<tr><td>WAVE</td><td>sine · tri · saw · square · white · pink (all normalized −1..1)</td></tr>
+<tr><td>WAVE</td><td>sine · tri · saw · square · white · pink (all normalized −1..1); saw and square are band-limited (edge smoothing at twice the sample rate — no alias harshness)</td></tr>
 <tr><td>DUTY</td><td>square pulse width, 5–95&nbsp;% (default 50); dimmed unless wave is square</td></tr>
 <tr><td>LEVEL</td><td>0–100&nbsp;%, 1&nbsp;pp steps</td></tr>
 <tr><td>VEL</td><td>0–100&nbsp;% — retrigger level used by TRIGGER and by direct mode when RUN is ON</td></tr>
@@ -99,7 +99,7 @@ sub-tab), each with:</p>
 <table>
 <tr><th>Item</th><th>Range / options</th></tr>
 <tr><td>DIV</td><td>subharmonic divider 1..16 — the sub plays <em>parent_f&nbsp;/&nbsp;div</em> (Subharmonicon-style integer division; 1 = unison, 2 = one octave down, …)</td></tr>
-<tr><td>WAVE</td><td>sine · tri · saw · square (subs are tonal voices — no noise)</td></tr>
+<tr><td>WAVE</td><td>sine · tri · saw · square (subs are tonal voices — no noise; saw/square band-limited like the main osc)</td></tr>
 <tr><td>DUTY</td><td>square pulse width 5–95&nbsp;%, dimmed unless WAVE = square</td></tr>
 <tr><td>LEVEL</td><td>0–100&nbsp;% — the sub's audio mixed into the chain's OSC sum (0 = inaudible); level never changes what the MOD matrix taps</td></tr>
 </table>

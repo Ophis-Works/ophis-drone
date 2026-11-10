@@ -1,5 +1,27 @@
 # LOG_POLYBLEP.md — PLAN_POLYBLEP.md work log
 
+## 2026-11-10 — MS3 COMPLETE (docs + full verification)
+
+### Docs
+
+- MANUAL.md §3: terse note — saw/square are band-limited (edge
+  smoothing at twice the sample rate), no alias harshness; sine/tri/
+  noise unchanged. Matches MS2 KEEP outcome (2x + half-band FIR).
+- docs/manual.html: mirrors the wave list, updated both WAVE rows
+  (main osc + SUB sections) with the band-limited note.
+
+### Full verification (clean)
+
+- `make clean && make`: desktop build green, -Werror, no warnings.
+- `make test`: **204302/204302 passed** (includes test_osc 56/56).
+- `make handheld rg28xx`: both build green; GATE PASS on both —
+  build/r36s and build/rg28xx, max required **GLIBC_2.17** (<= 2.28).
+  No new glibc symbols, as expected (pure arithmetic only).
+
+### Commit
+
+`Document the band-limited oscillators` (unsigned).
+
 ## 2026-11-10 — MS2 COMPLETE (ruling option (a): probe moved to the 150th
 ## fold; GREEN; keep)
 
