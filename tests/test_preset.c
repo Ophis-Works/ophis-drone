@@ -207,6 +207,62 @@ int main(void)
     CHECK(preset_load(dir, "no_such_preset", &q, err, sizeof err) == -1);
     CHECK(params_equal(&q, &keep));
 
+    /* 4b. oversize preset rejected (M-2, PLAN_REVIEW_2026-11-10.md MS2):
+     * a valid preset padded with trailing spaces past the 64 KiB buffer
+     * must be rejected, not parsed from its leading bytes */
+    {
+        char d3buf[512];
+        snprintf(d3buf, sizeof d3buf, "/tmp/ophis_test_big.XXXXXX");
+        char *d3 = mkdtemp(d3buf);
+        CHECK(d3 != NULL);
+        fill_params(&p);
+        CHECK(preset_save(d3, "big", &p, err, sizeof err) == 0);
+        char fp[600];
+        snprintf(fp, sizeof fp, "%s/big.json", d3);
+        FILE *fz = fopen(fp, "a");
+        CHECK(fz != NULL);
+        for (int i = 0; i < 65536 + 16; i++) fputc(' ', fz);
+        fclose(fz);
+        memset(&q, 0x5A, sizeof q);
+        CHECK(preset_load(d3, "big", &q, err, sizeof err) == -1);
+        CHECK(strstr(err, "preset too large") != NULL);
+        snprintf(fp, sizeof fp, "rm -rf '%s'", d3);
+        if (system(fp) != 0) { /* best-effort cleanup */ }
+    }
+
+    /* 4c. atomic save (M-3, MS2): the temp file is renamed away (no
+     * <name>.json.tmp left behind) and the final file round-trips */
+    {
+        fill_params(&p);
+        CHECK(preset_save(dir, "atomic", &p, err, sizeof err) == 0);
+        char tp[600];
+        snprintf(tp, sizeof tp, "%s/atomic.json.tmp", dir);
+        struct stat st;
+        CHECK(stat(tp, &st) != 0);
+        CHECK(preset_load(dir, "atomic", &q, err, sizeof err) == 0);
+        CHECK(params_equal(&p, &q));
+    }
+
+    /* 4d. presets dir mode 0755 (L-4, MS2): umask(0) so the raw mkdir
+     * mode is visible — group/other write bits must not survive */
+    {
+        char d4buf[512];
+        snprintf(d4buf, sizeof d4buf, "/tmp/ophis_test_mode.XXXXXX");
+        char *d4 = mkdtemp(d4buf);
+        CHECK(d4 != NULL);
+        char sub[600];
+        snprintf(sub, sizeof sub, "%s/mode_probe", d4);
+        mode_t old = umask(0);
+        CHECK(preset_ensure_dir(sub) == 0);
+        umask(old);
+        struct stat st;
+        CHECK(stat(sub, &st) == 0 && S_ISDIR(st.st_mode));
+        CHECK((st.st_mode & 0022) == 0);
+        char cmd[700];
+        snprintf(cmd, sizeof cmd, "rm -rf '%s'", d4);
+        if (system(cmd) != 0) { /* best-effort cleanup */ }
+    }
+
     /* 5. OPHIS_DEFAULTS sanity (IMPLEMENTATION.md §2) */
     const synth_params_t *d = &OPHIS_DEFAULTS;
     CHECK(d->master == 70 && d->run == 0);

@@ -114,10 +114,10 @@ int preset_ensure_dir(const char *dir)
     for (char *q = tmp + 1; *q; q++) {
         if (*q != '/') continue;
         *q = '\0';
-        if (mkdir(tmp, 0777) != 0 && errno != EEXIST) return -1;
+        if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
         *q = '/';
     }
-    if (mkdir(tmp, 0777) != 0 && errno != EEXIST) return -1;
+    if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
     return 0;
 }
 
@@ -138,11 +138,24 @@ int preset_save(const char *dir, const char *name, const synth_params_t *p,
     int n = schema_write_params(buf, sizeof buf, p);
     if (n < 0) return set_err(err, err_len, "params do not fit preset JSON");
 
-    FILE *f = fopen(path, "w");
+    /* M-3: write <path>.tmp, flush+fsync, then rename — a crash mid-save
+     * leaves the old preset intact, never a torn file at the final path */
+    char tmp[1040];
+    int tn = snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    if (tn <= 0 || tn >= (int)sizeof tmp)
+        return set_err(err, err_len, "path too long");
+
+    FILE *f = fopen(tmp, "w");
     if (!f) return set_err(err, err_len, "cannot open preset file");
     size_t wrote = fwrite(buf, 1, (size_t)n, f);
-    if (fclose(f) != 0 || wrote != (size_t)n)
+    int flushed = fflush(f);
+    int synced = fsync(fileno(f));
+    int closed = fclose(f);
+    if (flushed != 0 || synced != 0 || closed != 0 ||
+        wrote != (size_t)n || rename(tmp, path) != 0) {
+        unlink(tmp);
         return set_err(err, err_len, "write failed");
+    }
     return 0;
 }
 
@@ -159,11 +172,16 @@ int preset_load(const char *dir, const char *name, synth_params_t *p,
     FILE *f = fopen(path, "r");
     if (!f) return set_err(err, err_len, "cannot open preset file");
 
-    static char buf[65536];
+    /* L-7: plain local — no shared static state; call depth is shallow */
+    char buf[65536];
     size_t got = fread(buf, 1, sizeof buf, f);
+    /* M-2: buffer filled and one more byte remains -> file is oversize;
+     * reject instead of parsing truncated leading JSON */
+    int oversize = (got == sizeof buf) && (fgetc(f) != EOF);
     int read_err = ferror(f);
     fclose(f);
     if (read_err) return set_err(err, err_len, "read failed");
+    if (oversize) return set_err(err, err_len, "preset too large");
 
     synth_params_t local;   /* parse into a local: *p untouched on error */
     char jerr[128];
