@@ -73,12 +73,15 @@ and REVERB.
 
 ![Menu](docs/screenshots/menu.png)
 
-`Space` (R36S `A`) = RUN/STOP — runs the sequencers, or in direct mode
-retrigs at the chain's VEL. `T` (R36S `B`) = TRIGGER/retrigger.
+`Space` (R36S/RG28XX `A`) = RUN/STOP — runs the sequencers, or in direct
+mode retrigs at the chain's VEL. `T` (R36S/RG28XX `B`) =
+TRIGGER/retrigger — the **only** key that triggers. The edit keys
+(`Z`/`X`, pad `Y`/`X`) change values and nothing else: no retrigger, no
+TRIG flash, while tapped or held.
 
 ## 9. Keys
 
-| Action | Desktop | R36S |
+| Action | Desktop | R36S / RG28XX |
 |---|---|---|
 | Tabs | `Q` / `E` | `L` / `R` shoulder |
 | Sub-tabs | `←`/`→` on the sub-tab row | same |
@@ -86,9 +89,11 @@ retrigs at the chain's VEL. `T` (R36S `B`) = TRIGGER/retrigger.
 | Digit cursor / step select | `←` / `→` | d-pad `LEFT`/`RIGHT` |
 | Edit | `Z` / `X` | `Y` / `X` |
 | RUN / TRIG | `Space` / `T` | `A` / `B` |
-| Menu | `Escape` | `Start` (or `Select`) |
+| Menu | `Escape` | `Start` (RG28XX: top `Menu` key; or `Select`) |
 
 ## 10. Presets on disk
 
 Plain JSON next to the executable (`presets/`). The LOAD picker creates
-the folder if missing. Saving overwrites by name.
+the folder if missing. Saving overwrites by name; the SAVE dialog starts
+with the last successfully saved name already typed (a failed save never
+changes it; a fresh session starts blank).
