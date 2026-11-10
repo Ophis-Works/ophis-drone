@@ -37,7 +37,7 @@ shows the keys in use.
 | Navigate (sub-tabs, seq steps, digits) | Left / Right | d-pad left / right |
 | TRIGGER (retrigger everything) | T | B |
 | RUN (start/stop the transport) | Space | A |
-| MENU | Esc | Start |
+| MENU | Esc | Start (RG28XX: M key) |
 | Confirm | Enter | A |
 
 Esc opens the menu: NEW, SAVE, LOAD, PANIC, EXIT. Presets are plain JSON
