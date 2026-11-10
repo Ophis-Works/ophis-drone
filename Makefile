@@ -1,6 +1,7 @@
 # ophis-drone build (IMPLEMENTATION.md §5)
 WARNFLAGS = -Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wfloat-equal -Wcast-qual -Wcast-align -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wundef -Wpointer-arith -Wwrite-strings -Wredundant-decls -Wold-style-definition -Wmissing-field-initializers -Wswitch-enum -Wformat=2
 CFLAGS  = -std=c23 -O2 $(WARNFLAGS) -D_POSIX_C_SOURCE=200809L \
+          -fstack-protector-strong -D_FORTIFY_SOURCE=2 \
           -isystem third_party
 DEPS    = $(shell pkg-config --cflags --libs sdl2 alsa)
 CC      = gcc
@@ -39,7 +40,7 @@ build/desktop/ophis-drone: $(SRC_APP) src/config.h $(AUDIO_SRC) $(UI_SRC) \
                            | build/desktop
 	$(CC) $(CFLAGS) -Isrc -DTARGET_DESKTOP $(SRC_APP) $(AUDIO_SRC) \
 	    $(UI_SRC) $(DSP_SRC) $(SEQ_SRC) $(PRESET_SRC) $(DEPS) \
-	    -lpthread -lm -o $@
+	    -Wl,-z,relro,-z,now -lpthread -lm -o $@
 
 build/desktop build/r36s build/tests build/r36s/obj/compat \
 build/rg28xx build/rg28xx/obj/compat build/deploy/ports \
@@ -59,6 +60,7 @@ build/deploy/Roms/PORTS:
 # build/deploy/ophis-drone-r36s.zip (build/ is gitignored).
 CROSS       = aarch64-linux-gnu-gcc
 HCFLAGS     = -std=c23 -O2 $(WARNFLAGS) -D_POSIX_C_SOURCE=200809L \
+              -fstack-protector-strong -D_FORTIFY_SOURCE=2 \
               -Isrc -isystem third_party -isystem /usr/include/SDL2
 HANDHELD_SRC = $(SRC_APP) $(AUDIO_SRC) $(UI_SRC) $(DSP_SRC) $(SEQ_SRC) \
                $(PRESET_SRC) src/compat/glibc_symver.c

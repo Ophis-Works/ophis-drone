@@ -148,3 +148,31 @@ unreachable/defensive with no observable contract (TDD deviation
 stated in the plan). Full `make test`:
 `TOTAL: 213517/213517 passed` (includes test_ui_menu 260/260,
 test_seq_items 541/541).
+
+## 2026-11-10 — MS6: build hardening (M-5)
+
+What changed (Makefile only):
+- `CFLAGS`: added `-fstack-protector-strong -D_FORTIFY_SOURCE=2`
+  (desktop + all test builds).
+- `HCFLAGS`: same two flags (R36S and RG28XX cross compiles).
+- Desktop link recipe (`build/desktop/ophis-drone`) only: added
+  `-Wl,-z,relro,-z,now` (full RELRO + immediate binding). Handheld link
+  recipes untouched by design — they use `-no-pie` with custom crt0.
+
+Why: M-5 — no stack protector / FORTIFY; desktop binary unhardened.
+
+Verification (plan MS6 checks):
+1. `make clean && make` — desktop builds clean under `-Werror`.
+   `readelf -d`: `BIND_NOW` (FLAGS) + `FLAGS_1 NOW PIE`;
+   `readelf -l`: `GNU_RELRO` segment present;
+   `nm`: `U __stack_chk_fail@GLIBC_2.4` referenced.
+2. `make test` — `TOTAL: 186300/186300 passed`, all green under the
+   new flags.
+3. `make handheld rg28xx` — both GATE PASS:
+   `GATE PASS: build/r36s/ophis-drone (aarch64, <= GLIBC_2.28)`,
+   max required version GLIBC_2.17 (same for RG28XX). No
+   `-D_FORTIFY_SOURCE=2` rollback needed — `_chk`/stack-protector
+   references stay within the pinned floor.
+
+Test results: build-level milestone, no unit tests (per plan).
+Full `make test`: `TOTAL: 186300/186300 passed`.
