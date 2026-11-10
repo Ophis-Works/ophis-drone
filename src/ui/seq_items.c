@@ -3,7 +3,7 @@
  * Pages (flat item lists + section splits):
  *   OSC (sub-tab) : MAIN (FREQ · WAVE · DUTY · LEVEL · VEL) then
  *                   SUB 1 and SUB 2 (each FMODE · FREQ · WAVE · DUTY ·
- *                   DEST · AMT) = 17 — the ADSR items moved OFF this
+ *                   DEST · AMT) = 13 — the ADSR items moved OFF this
  *                   page; NO dsp/param/model changes, same ids.
  *   ENV+FLT        : ADSR (ATTACK · DECAY · SUSTAIN · RELEASE) then
  *                   FILTER (MODE · CUTOFF · RES · ENV · POLES) = 9.
@@ -27,7 +27,7 @@
 
 #include "seq_items.h"
 
-/* ---- OSC sub-tab, OSC page: MAIN + SUB 1 + SUB 2 = 17 ------------- */
+/* ---- OSC sub-tab, OSC page: MAIN + SUB 1 + SUB 2 = 13 ------------- */
 
 const item_t MAIN_ITEMS[MAIN_ITEMS_N] = {
   { "FREQ",  IT_OSC_FREQ, 0 }, { "WAVE",  IT_OSC_WAVE, 0 },

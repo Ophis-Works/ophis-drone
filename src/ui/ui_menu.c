@@ -76,8 +76,8 @@ static void load_refresh(ui_t *ui)
         ui->load_count++;
     }
     n = 0;
-    if (preset_list(ui->load_dir, names, &n, 32) != 0 && ui->load_err[0]) {
-        /* dir itself unreadable: files list empty too, error already set */
+    if (preset_list(ui->load_dir, names, &n, 32) != 0) {
+        /* files unlistable: show an empty list regardless of dir error */
         n = 0;
     }
     for (int i = 0; i < n && ui->load_count < 64; i++) {

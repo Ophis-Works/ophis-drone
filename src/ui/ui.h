@@ -51,12 +51,12 @@ typedef struct {
    * roll-over) and the five rows below resolve their si to it at use
    * time. UI state only: never committed, not persisted. */
   int             mod_slot;
-  /* digit cursor of the 5-digit odometer boxes (PLAN_HZ_EDIT.md R3,
-   * PR-E): index 0..4 into the value's digits counted from the RIGHT —
-   * 0 = the 1s digit (place 10^0), 4 = the 10000s digit (place 10^4) —
-   * so a zeroed ui starts on the 1s digit. Reset to 0 whenever the
-   * cursor enters a digit-box row (OSC FREQ / FILTER CUT / DELAY TONE);
-   * LEFT walks toward the 10000s digit, RIGHT back toward the 1s. */
+  /* digit cursor of the 7-digit odometer boxes (PLAN_HZ_EDIT.md R3,
+   * PR-E): index 0..6 into the value's digits counted from the LEFT —
+   * 0 = the 10000s digit, 6 = the 0.01s decimal digit — used to index
+   * digit_place's PLACES[] table. Reset to the 1s digit (4) whenever
+   * the cursor enters a digit-box row (OSC FREQ / FILTER CUT / DELAY
+   * TONE); RIGHT walks toward the 1s digit, LEFT toward the 10000s. */
   int             freq_digit;
   /* menu window (overlay on any screen) */
   int             in_menu;             /* 0 closed, else sub-state id */

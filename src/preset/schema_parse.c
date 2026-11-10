@@ -36,12 +36,6 @@
 
 #include "schema_priv.h"
 
-#include <json.h>
-
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 /* ---------------- parser ---------------- */
 
 /* Phase 6 P5 absorbed (PLAN_CODE_REVIEW_FIXES.md): object keys longer

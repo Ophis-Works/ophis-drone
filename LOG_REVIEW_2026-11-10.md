@@ -120,3 +120,31 @@ Test results (TDD):
   "implicit declaration of function 'chain_q_lut'" (test_chain.c:462).
 - GREEN: `test_chain 86/86 passed`.
 - Full `make test`: `TOTAL: 208180/208180 passed`.
+
+## MS5 — 2026-11-10 — UI defensive fixes + doc drift (L-2, L-5, L-6)
+
+Changes:
+- src/ui/ui_menu.c: `load_refresh` files-list fallback is now
+  `if (preset_list(...) != 0) n = 0;` — the `&& ui->load_err[0]` gate
+  is dropped, so `n` resets on ANY preset_list failure (previously n
+  survived a failure whenever the dir-error string was empty).
+- src/ui/ui.c: `content_item` NULL-guards the spec before reading
+  `->tgt` (`item_spec(it.id) != NULL && ...tgt == ITT_XMOD`),
+  mirroring `edit_item`'s unknown-id guard (NULL spec: non-XMOD).
+- src/ui/ui.h: `freq_digit` comment corrected — index 0..6 counted
+  from the LEFT (0 = 10000s digit, 6 = the 0.01s decimal digit),
+  PLACES[]-table semantics, reset to the 1s digit (4); the old text
+  claimed right-to-left 0..4.
+- src/ui/seq_items.c: header + section comments "= 17" → "= 13"
+  (actual OSC page total is 5 + 4 + 4).
+- src/preset/schema_parse.c: removed the duplicated include block
+  (json.h, math.h, stdio.h, stdlib.h, string.h appeared twice).
+
+Why: L-2/L-5 defensive guards on unreachable paths; L-6 comment and
+include drift. No observable behavior change.
+
+Test results: no new tests — plan states these paths are
+unreachable/defensive with no observable contract (TDD deviation
+stated in the plan). Full `make test`:
+`TOTAL: 213517/213517 passed` (includes test_ui_menu 260/260,
+test_seq_items 541/541).

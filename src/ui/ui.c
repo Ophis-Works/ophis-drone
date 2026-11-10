@@ -162,7 +162,8 @@ item_t content_item(const ui_t *ui, int i)
             item_t it = pg->spans[k].items[i];
             if (it.id == IT_STEP_PITCH || it.id == IT_STEP_VEL)
                 it.si = ui->seq_sel[chain_of(ui)];
-            else if (item_spec(it.id)->tgt == ITT_XMOD)
+            else if (item_spec(it.id) != NULL &&
+                     item_spec(it.id)->tgt == ITT_XMOD)
                 it.si = ui->mod_slot;  /* R4/PR-D: the SLOT row's slot */
             return it;
         }
