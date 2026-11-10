@@ -82,8 +82,11 @@ Both handheld builds run a gate (`tools/handheld_gate.sh`) that fails the
 build unless the binary runs against glibc 2.28 or older, so it works on
 ArkOS and EmuELEC firmware as-is.
 
-## License notes
+## License
+
+OPHIS-DRONE is licensed under the
+[GNU Affero General Public License v3.0](LICENSE).
 
 The JSON parser (`third_party/json.h`) is vendored from
 [sheredom/json.h](https://github.com/sheredom/json.h) (Unlicense /
-public domain). Everything else in this repository is project code.
+public domain) and keeps its own license.
