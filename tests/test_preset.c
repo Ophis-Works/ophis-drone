@@ -141,6 +141,38 @@ int main(void)
         if (strcmp(names[i - 1], names[i]) > 0) ordered = 0;
     CHECK(ordered);
 
+    /* 3b. preset_list rejects unsafe *.json names (H-1/L-3,
+     * PLAN_REVIEW_2026-11-10.md MS1): over-long base names would corrupt
+     * the 33-byte row, dotted names are unloadable — only "ok" is listed */
+    {
+        char d2buf[512];
+        snprintf(d2buf, sizeof d2buf, "/tmp/ophis_test_list.XXXXXX");
+        char *d2 = mkdtemp(d2buf);
+        CHECK(d2 != NULL);
+        char fp[600];
+        /* 60-char base name: memcpy of len-5 bytes overflows names[i][33] */
+        snprintf(fp, sizeof fp, "%s/%s.json", d2,
+                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        FILE *fl = fopen(fp, "w");
+        CHECK(fl != NULL);
+        if (fl) fclose(fl);
+        snprintf(fp, sizeof fp, "%s/a.b.json", d2);   /* dotted: unloadable */
+        fl = fopen(fp, "w");
+        CHECK(fl != NULL);
+        if (fl) fclose(fl);
+        snprintf(fp, sizeof fp, "%s/ok.json", d2);
+        fl = fopen(fp, "w");
+        CHECK(fl != NULL);
+        if (fl) fclose(fl);
+        char n2[8][33];
+        int c2 = -1;
+        CHECK(preset_list(d2, n2, &c2, 8) == 0);
+        CHECK(c2 == 1);
+        CHECK(strcmp(n2[0], "ok") == 0);
+        snprintf(fp, sizeof fp, "rm -rf '%s'", d2);
+        if (system(fp) != 0) { /* best-effort cleanup */ }
+    }
+
     /* 4. invalid file rejected with error, params unchanged */
     fill_params(&p);
     char badpath[512];

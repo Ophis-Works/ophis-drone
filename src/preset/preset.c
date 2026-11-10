@@ -88,6 +88,10 @@ int preset_list(const char *dir, char names[][33], int *count, int max)
         if (*count >= max) break;
         memcpy(names[*count], e->d_name, len - 5);
         names[*count][len - 5] = '\0';
+        /* H-1/L-3: reject over-long or dotted base names (name_ok is the
+         * single name contract); skip before counting */
+        if (!name_ok(names[*count]))
+            continue;
         (*count)++;
     }
     closedir(d);
