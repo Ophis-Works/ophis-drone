@@ -69,6 +69,11 @@ typedef struct {
  * constructor but deterministic noise subs need a seed (PLAN §5). */
 void chain_init(chain_state_t *c, uint64_t seed);
 
+/* FLT_RES Q table (M-4): Q = 0.5 × 40^(pos/50) for pos 0..50, computed
+ * lazily on first use (audio thread, no malloc, no lock) — bit-identical
+ * to the per-sample pow expression it replaces. */
+double chain_q_lut(int pos);
+
 /* render one sample (PLAN §5 order: detune -> wave -> AM -> env*vel*level
    -> biquad -> level/100). gate is the chain's gate: on its falling edge
    (edge kept in chain_state_t) the envelope is driven into release by

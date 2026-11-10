@@ -455,6 +455,14 @@ int main(void)
         }
     }
 
+    /* ---- M-4 (PLAN_REVIEW MS4): FLT_RES Q LUT — bit-exact against the
+     * per-sample pow expression it replaces ---- */
+    {
+        for (int pos = 0; pos <= 50; pos++)
+            CHECK(fexact(chain_q_lut(pos),
+                         0.5 * pow(40.0, (double)pos / 50.0)));
+    }
+
     /* sub RING/FM dest pins (owner order 2026-11-06) are GONE with the
      * sub dests (O2/DP2): the matrix covers them — test_mixer pins the
      * RING/MIX application, test_chain's PM pin above exercises the

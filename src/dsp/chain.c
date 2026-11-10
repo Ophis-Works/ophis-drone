@@ -13,11 +13,30 @@
  * Contract: IMPLEMENTATION.md §2. Pure, deterministic. No SDL/ALSA. */
 #include <string.h>
 #include <math.h>
+#include <stdbool.h>
 
 #include "chain.h"
 #include "exact_eq.h"
 
 #define OPHIS_2PI 6.28318530717958647692
+
+/* M-4 (PLAN_REVIEW MS4): FLT_RES Q LUT, pos = res/2 (0..50) -> Q =
+ * 0.5 × 40^(pos/50) — replaces the per-sample pow in the res_mod path.
+ * Lazy fill on first use, audio thread only (single thread calls
+ * chain_render; no malloc, no lock). Values are the same pow results,
+ * so DSP output stays bit-identical (pinned by tests). */
+static double q_lut[51];
+static bool q_lut_ready;
+
+double chain_q_lut(int pos)
+{
+    if (!q_lut_ready) {
+        for (int i = 0; i < 51; i++)
+            q_lut[i] = 0.5 * pow(40.0, (double)i / 50.0);
+        q_lut_ready = true;
+    }
+    return q_lut[pos];
+}
 
 void chain_init(chain_state_t *c, uint64_t seed)
 {
@@ -135,7 +154,7 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
         double res_eff = clampd((double)p->res + xm->res_mod * 100.0,
                                 0.0, 100.0);
         int pos = (int)(res_eff / 2.0);           /* 0..100 -> pos 0..50 */
-        float q = (float)(0.5 * pow(40.0, (double)pos / 50.0));
+        float q = (float)chain_q_lut(pos);
         if (poles == 24) {
             biquad_set_coefs(&c->filt, p->fmode, (float)fc, sr, q);
             biquad_set_coefs(&c->filt2, p->fmode, (float)fc, sr, q);
