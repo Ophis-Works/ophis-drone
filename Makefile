@@ -30,7 +30,7 @@ TESTS   = test_sanity test_osc test_adsr test_filter test_chain \
           test_autoquit test_f32tos16 \
           test_keymap_rg28xx test_keymap_events_rg28xx
 
-.PHONY: all handheld rg28xx test bench clean
+.PHONY: all handheld rg28xx desktop test bench clean
 .DELETE_ON_ERROR:
 
 all: build/desktop/ophis-drone
@@ -127,6 +127,26 @@ $(DEPLOY)/ports/Ophis-Drone.sh: tools/r36s-launcher.sh | $(DEPLOY)/ports
 # only 'make clean' removes staging). rm -rf + fresh copy on every zip
 # build means stale files cannot survive.
 PRESETS      = $(wildcard presets/*.json)
+
+# --- desktop release archive (PLAN_DESKTOP_TARGZ.md) -----------------------
+# make desktop: build the desktop binary, stage a fresh program folder and
+# tar.gz it: ophis-drone-desktop/{ophis-drone, presets/, MANUAL.md, README.md}.
+# Staging is rebuilt from scratch on every run (F13 lesson, same as the
+# handheld zips): no stale presets can survive.
+desktop: $(DEPLOY)/ophis-drone-desktop.tar.gz
+
+$(DEPLOY)/ophis-drone-desktop.tar.gz: build/desktop/ophis-drone \
+                                      $(PRESETS) MANUAL.md README.md \
+                                      | $(DEPLOY)
+	rm -rf $(DEPLOY)/ophis-drone-desktop
+	mkdir -p $(DEPLOY)/ophis-drone-desktop/presets
+	cp build/desktop/ophis-drone $(DEPLOY)/ophis-drone-desktop/
+	cp MANUAL.md README.md $(DEPLOY)/ophis-drone-desktop/
+	for f in presets/*.json; do \
+	  if [ -e "$$f" ]; then cp "$$f" $(DEPLOY)/ophis-drone-desktop/presets/; fi; \
+	done
+	tar -czf $@ -C $(DEPLOY) ophis-drone-desktop
+	@echo "DESKTOP OK: $@"
 
 $(DEPLOY)/ophis-drone-r36s.zip: $(DEPLOY)/ports/ophis-drone/ophis-drone \
                                 $(DEPLOY)/ports/Ophis-Drone.sh \
