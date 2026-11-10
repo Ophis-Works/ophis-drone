@@ -361,7 +361,7 @@ int main(void)
     for (int i = 0; i < 9; i++)
         CHECK(item_spec(WRAP_IDS[i])->wrap == 1);
     /* selector counts (PLAN §8.3/§8.2/§6, amended O2): 6 waves, 4 filt,
-     * 10 xmod srcs, 7 dests, 5 modes, 2 once, 2 on; subs are voices */
+     * 10 xmod srcs, 13 dests, 5 modes, 2 once, 2 on; subs are voices */
     CHECK(item_spec(IT_OSC_WAVE)->min == 0 && item_spec(IT_OSC_WAVE)->max == 5);
     CHECK(item_spec(IT_SUB_WAVE)->min == 0 && item_spec(IT_SUB_WAVE)->max == 5);
     CHECK(item_spec(IT_FILT_MODE)->min == 0 && item_spec(IT_FILT_MODE)->max == 3);
@@ -376,10 +376,12 @@ int main(void)
           item_spec(IT_XMOD_TGT)->max == 2 &&
           item_spec(IT_XMOD_TGT)->wrap == 1 &&
           item_spec(IT_XMOD_TGT)->tgt == ITT_XMOD);
-    /* dest ladder (PLAN_MOD_ROUTING.md M4 + PLAN_OSC_NAMING.md R0e):
-     * dest "mix" is gone, "filter" renamed "flt_cut" and "flt_res"
-     * added — off/pitch/phase/amp/flt_cut/flt_res/ring/fm = 0..7 */
-    CHECK(item_spec(IT_XMOD_DEST)->min == 0 && item_spec(IT_XMOD_DEST)->max == 7);
+    /* dest ladder (PLAN_MOD_ROUTING.md M4 + PLAN_OSC_NAMING.md R0e +
+     * PLAN_MOD_FENV_ADSR_DIV.md MS2): "filter" renamed "flt_cut",
+     * "flt_res" appended, then "flt_env" + "adsr_a/d/s/r" appended —
+     * off/pitch/phase/amp/flt_cut/flt_res/ring/fm/flt_env/adsr_a/
+     * adsr_d/adsr_s/adsr_r = 0..12 (ids 0..7 frozen, new ids appended) */
+    CHECK(item_spec(IT_XMOD_DEST)->min == 0 && item_spec(IT_XMOD_DEST)->max == 12);
     CHECK(item_spec(IT_SEQ_MODE)->min == 0 && item_spec(IT_SEQ_MODE)->max == 4);
     CHECK(item_spec(IT_SEQ_ONCE)->min == 0 && item_spec(IT_SEQ_ONCE)->max == 1);
     CHECK(item_spec(IT_SEQ_ON)->min == 0 && item_spec(IT_SEQ_ON)->max == 1);
@@ -465,12 +467,11 @@ int main(void)
           MASTER_ITEMS[5].si == 2);
     CHECK(strcmp(MASTER_SECTIONS[1].label, "MIX") == 0);  /* title unchanged */
 
-    /* ---- P5 (PLAN_OSC_NAMING.md §1.0/R0e, §1.4): the DEST ladder max
-     * is 7 (off/pitch/phase/amp/flt_cut/flt_res/ring/fm — the ladder
-     * gains flt_res); still a 0-based wrapping selector. Red until
-     * seq_items.c raises the max. ---- */
+    /* ---- MS2 (PLAN_MOD_FENV_ADSR_DIV.md): the DEST ladder max is 12
+     * (flt_env + adsr_a/d/s/r appended after the frozen 0..7); still a
+     * 0-based wrapping selector. Red until seq_items.c raises the max. */
     CHECK(item_spec(IT_XMOD_DEST)->min == 0);
-    CHECK(item_spec(IT_XMOD_DEST)->max == 7);
+    CHECK(item_spec(IT_XMOD_DEST)->max == 12);
     CHECK(item_spec(IT_XMOD_DEST)->wrap == 1);
 
     /* ---- P3 (PLAN_OSC_NAMING.md §1.3, §1.4): the TGT item's fmt is

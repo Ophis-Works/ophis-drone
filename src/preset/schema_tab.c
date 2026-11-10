@@ -14,15 +14,20 @@ const ent_t wave_tab[] = {
     { "sine", WAVE_SINE }, { "tri", WAVE_TRIANGLE }, { "saw", WAVE_SAW },
     { "square", WAVE_SQUARE }, { "white", WAVE_WHITE }, { "pink", WAVE_PINK }
 };
-/* dest ladder 8 entries (owner order 2026-11-07, PLAN_OSC_NAMING.md
+/* dest ladder 13 entries (owner order 2026-11-07, PLAN_OSC_NAMING.md
  * R0e): the old "filter" string is RENAMED "flt_cut" (MOD_FILTER, id 4,
- * unchanged semantics); "flt_res" is the NEW MOD_FRES resonance sweep.
- * New format only — old presets carrying "filter" are rewritten by
+ * unchanged semantics); "flt_res" is the NEW MOD_FRES resonance sweep;
+ * "flt_env" + "adsr_a/d/s/r" are the PLAN_MOD_FENV_ADSR_DIV.md MS1
+ * dests (ids 0..7 frozen, new ids appended — same as MOD_FRES). New
+ * format only — old presets carrying "filter" are rewritten by
  * tools/migrate_presets.c. Table order need not match the enum ids. */
 const ent_t dest_tab[] = {
     { "off", MOD_OFF }, { "pitch", MOD_PITCH }, { "phase", MOD_PHASE },
     { "amp", MOD_AMP }, { "flt_cut", MOD_FILTER },
-    { "flt_res", MOD_FRES }, { "ring", MOD_RING }, { "fm", MOD_FM }
+    { "flt_res", MOD_FRES }, { "ring", MOD_RING }, { "fm", MOD_FM },
+    { "flt_env", MOD_FENV }, { "adsr_a", MOD_ADSR_A },
+    { "adsr_d", MOD_ADSR_D }, { "adsr_s", MOD_ADSR_S },
+    { "adsr_r", MOD_ADSR_R }
 };
 const ent_t filt_tab[] = {
     { "lp", FILT_LP }, { "hp", FILT_HP }, { "bp", FILT_BP }, { "br", FILT_BR }

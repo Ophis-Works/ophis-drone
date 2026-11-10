@@ -251,7 +251,7 @@ static int build_dom(warena *w, const synth_params_t *p)
         json_value_t *xv = wobj_new(w);
         AEL(w, xmods, xv);
         ADD(w, xv, "src", wstr(w, enum_name(src_tab, 10, xp->src)));
-        ADD(w, xv, "dest", wstr(w, enum_name(dest_tab, 8, xp->dest)));
+        ADD(w, xv, "dest", wstr(w, enum_name(dest_tab, 13, xp->dest)));
         ADD(w, xv, "amount", wnumf(w, xp->amount));
         /* the slot's own ADD knob (owner order 2026-11-06) */
         ADD(w, xv, "mix", wnumd(w, xp->mix));

@@ -153,7 +153,7 @@ typedef enum {
                     ITT_UI, no commit), wraps; "SLOT %d" display (v+1) —
                     PLAN_MOD_MATRIX_16.md R4 */
   ITF_INT,       /* plain integer min..max; "%d" (BPM) */
-  ITF_XDIV,      /* clock divider integer; "x%d" */
+  ITF_XDIV,      /* clock divider integer; "/%d" */
   ITF_CENTS,     /* delay time in centiseconds (0.01 s steps); "%.2f s" */
   ITF_TONE       /* delay tone: centi-Hz odometer box min..max
                     (2000..2000000 = 20.00..20000.00 Hz, R4 keeps the

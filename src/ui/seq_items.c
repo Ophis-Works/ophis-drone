@@ -243,8 +243,9 @@ const item_spec_t ITEM_SPECS[ITEM_SPECS_N] = {
   [IT_FILT_POLES] = { IT_FILT_POLES, ITF_POLES,  12,   24, 0, ITT_CHAIN , PK_CHAIN_POLES },
   /* MOD tab */
   [IT_XMOD_SRC]   = { IT_XMOD_SRC,   ITF_XSRC,    0,    9, 1, ITT_XMOD , PK_XMOD_SRC },
-  /* dest ladder gains FLT_RES (PLAN_OSC_NAMING.md R0e): max 6 -> 7 */
-  [IT_XMOD_DEST]  = { IT_XMOD_DEST,  ITF_DEST,    0,    7, 1, ITT_XMOD , PK_XMOD_DEST },
+  /* dest ladder gains FLT_ENV + the ADSR A/D/S/R rows
+   * (PLAN_MOD_FENV_ADSR_DIV.md MS2): max 7 -> 12 */
+  [IT_XMOD_DEST]  = { IT_XMOD_DEST,  ITF_DEST,    0,   12, 1, ITT_XMOD , PK_XMOD_DEST },
   [IT_XMOD_AMT]   = { IT_XMOD_AMT,   ITF_AMT,  -100,  100, 0, ITT_XMOD , PK_XMOD_AMT },
   /* the slot's own ADD knob (owner order 2026-11-06): independent of
    * the dest — a slot can add AND modulate, or either alone */

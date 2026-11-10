@@ -13,6 +13,7 @@
 #include "../src/preset/schema.h"
 #include <string.h>
 #include <stdio.h>
+#include <dirent.h>
 
 /* ---- helpers (test-side) -------------------------------------------- */
 
@@ -1301,6 +1302,104 @@ int main(void)
                                   err, sizeof err) == 0);
         for (int s = 0; s < 16; s++)
             CHECK(h_xmod(&v2, s)->dest == MOD_OFF);
+    }
+
+    /* 12. MS2 (PLAN_MOD_FENV_ADSR_DIV.md): the five NEW dest strings —
+     * "flt_env" + "adsr_a/d/s/r" — are written, parse back and round-trip
+     * byte-comparably; an unknown "adsr_x" rejects naming "xmod[0].dest";
+     * the ±100 amount rule applies to the new dests (101 on flt_env
+     * rejects, -1 on adsr_s rejects); every shipped preset still parses.
+     * Red until schema_tab.c's dest_tab grows past 8 entries. */
+    {
+        synth_params_t w, r;
+        char buf2[16384], buf3[16384];
+        static const int nd[5] = { MOD_FENV, MOD_ADSR_A, MOD_ADSR_D,
+                                   MOD_ADSR_S, MOD_ADSR_R };
+        fill_params(&w);                  /* valid base doc; only the five
+                                             xmod slots change below */
+        for (int i = 0; i < 5; i++) {
+            w.xmod[i].src = 1;                /* b_osc — non-off slot */
+            w.xmod[i].dest = nd[i];
+            w.xmod[i].amount = 50.0f;
+        }
+        int len2 = schema_write_params(buf2, sizeof buf2, &w);
+        CHECK(len2 > 0);
+        CHECK(strstr(buf2, "\"dest\":\"flt_env\"") != NULL &&
+              strstr(buf2, "\"dest\":\"adsr_a\"") != NULL &&
+              strstr(buf2, "\"dest\":\"adsr_d\"") != NULL &&
+              strstr(buf2, "\"dest\":\"adsr_s\"") != NULL &&
+              strstr(buf2, "\"dest\":\"adsr_r\"") != NULL);
+        memset(&r, 0xEE, sizeof r);
+        CHECK(schema_parse_params(buf2, len2, &r, err, sizeof err) == 0);
+        for (int i = 0; i < 5; i++)
+            CHECK(r.xmod[i].dest == nd[i] &&
+                  fexactf(r.xmod[i].amount, 50.0f));
+        /* byte-comparable: writing the parsed-back params is identical */
+        int len3 = schema_write_params(buf3, sizeof buf3, &r);
+        CHECK(len3 == len2 && memcmp(buf2, buf3, (size_t)len2) == 0);
+
+        /* unknown dest string "adsr_x" rejects — the error names the
+         * field path "xmod[0].dest" */
+        q = r;                            /* reject baseline: q untouched */
+        CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
+        CHECK(replace_once(buf, "\"dest\":\"off\"",
+                            "\"dest\":\"adsr_x\"") == 0);
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
+                                  err, sizeof err) == -1);
+        CHECK(strstr(err, "xmod[0].dest") != NULL);
+        CHECK(params_equal(&q, &r));
+
+        /* amount 101 on flt_env rejects (±100, like flt_res) */
+        CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
+        CHECK(replace_once(buf, "\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
+              "\"amount\":0.0}",
+              "\"xmod\":[{\"src\":\"off\",\"dest\":\"flt_env\","
+              "\"amount\":101.0}") == 0);
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
+                                  err, sizeof err) == -1);
+        CHECK(params_equal(&q, &r));
+
+        /* adsr_s rides the ±100 rule (the plan's DESIGN: amounts ±100
+         * for all five new dests — NOT RING's 0..100): -1 parses, -101
+         * rejects */
+        CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
+        CHECK(replace_once(buf, "\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
+              "\"amount\":0.0}",
+              "\"xmod\":[{\"src\":\"off\",\"dest\":\"adsr_s\","
+              "\"amount\":-1.0}") == 0);
+        memset(&q, 0, sizeof q);
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
+                                  err, sizeof err) == 0);
+        CHECK(fexactf(q.xmod[0].amount, -1.0f));
+
+        CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
+        CHECK(replace_once(buf, "\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
+              "\"amount\":0.0}",
+              "\"xmod\":[{\"src\":\"off\",\"dest\":\"adsr_s\","
+              "\"amount\":-101.0}") == 0);
+        q = r;                            /* reject baseline: untouched */
+        CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
+                                  err, sizeof err) == -1);
+        CHECK(params_equal(&q, &r));
+
+        /* every shipped preset still parses */
+        DIR *dp = opendir("presets");
+        CHECK(dp != NULL);
+        struct dirent *e;
+        while ((e = readdir(dp)) != NULL) {
+            size_t nl = strlen(e->d_name);
+            if (nl < 6 || strcmp(e->d_name + nl - 5, ".json")) continue;
+            char ppath[512];
+            snprintf(ppath, sizeof ppath, "presets/%s", e->d_name);
+            FILE *f = fopen(ppath, "rb");
+            CHECK(f != NULL);
+            char pbuf[16384];
+            int n = (int)fread(pbuf, 1, sizeof pbuf, f);
+            fclose(f);
+            memset(&q, 0, sizeof q);
+            CHECK(schema_parse_params(pbuf, n, &q, err, sizeof err) == 0);
+        }
+        closedir(dp);
     }
 
     HARNESS_REPORT();

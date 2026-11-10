@@ -438,7 +438,7 @@ static const key_spec_t XMOD_KEYS[] = {
     [XB_SRC]  = { "src",    KT_ENUM, offsetof(xmod_params_t, src),
                   10, 0, src_tab },
     [XB_DEST] = { "dest",   KT_ENUM, offsetof(xmod_params_t, dest),
-                  8, 0, dest_tab },
+                  13, 0, dest_tab },
     [XB_AMT]  = { "amount", KT_CUSTOM, 0, 0, 0, NULL, xmod_amount },
     [XB_MIX]  = { "mix",    KT_PERCENT, offsetof(xmod_params_t, mix) },
     [XB_TGT]  = { "tgt",    KT_INT, offsetof(xmod_params_t, tgt), 0, 2 },

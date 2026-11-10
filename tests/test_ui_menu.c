@@ -444,6 +444,25 @@ static void test_item_value_enum_rows(void)
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "SLOT 1") == 0);
 
+    /* MS2 (PLAN_MOD_FENV_ADSR_DIV.md): the NEW dest strings ride the same
+     * table-driven display — "flt_env" -> "FLT ENV", "adsr_a" -> "ADSR A"
+     * ('_' -> ' ', uppercased). Red until dest_tab gains the entries. */
+    it = content_item(&u, 3);              /* MOD_ITEMS[3] = DEST again */
+    u.draft.xmod[0].dest = MOD_FENV;
+    item_value(&u, it, b, sizeof b);
+    CHECK(strcmp(b, "FLT ENV") == 0);
+    u.draft.xmod[0].dest = MOD_ADSR_A;
+    item_value(&u, it, b, sizeof b);
+    CHECK(strcmp(b, "ADSR A") == 0);
+
+    /* MS2: SEQ DIV shows "/n" (matches the sub-oscillator DIV display).
+     * Red until ui_draw.c's ITF_XDIV switches "x%d" -> "/%d". */
+    u.tab = TAB_OSC1;                      /* SEQ ids live on OSC tabs */
+    u.draft.seq[0].div = 4;
+    it = (item_t){ NULL, IT_SEQ_DIV, 0 };
+    item_value(&u, it, b, sizeof b);
+    CHECK(strcmp(b, "/4") == 0);
+
     u.tab = TAB_OSC1;
     u.sub[0] = SUB_ENVFLT;
     it = content_item(&u, 4);              /* FILT_ITEMS[0] = MODE */

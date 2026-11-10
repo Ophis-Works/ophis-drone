@@ -119,7 +119,7 @@ void item_value(const ui_t *ui, item_t it, char *b, size_t blen)
                       snprintf(b, blen, "SLOT %d", (int)v + 1);
     break;
     case ITF_INT:     snprintf(b, blen, "%d", (int)v); break;
-    case ITF_XDIV:    snprintf(b, blen, "x%d", (int)v); break;
+    case ITF_XDIV:    snprintf(b, blen, "/%d", (int)v); break;
     case ITF_DUTY:
     case ITF_PCT:     snprintf(b, blen, "%d %%", (int)v); break;
     case ITF_SPCT:    snprintf(b, blen, "%+d %%", (int)v); break;
