@@ -160,6 +160,55 @@ static void test_text_entry_state_tracker(void)
     CHECK(!SDL_IsTextInputActive());
 }
 
+/* PLAN_LAST_SAVED_NAME.md (owner order 2026-11-10): SAVE opens with the
+ * last SUCCESSFULLY saved name prefilled; failed saves record nothing;
+ * the record updates on each success. The record lives in ui_t (one
+ * instance per app session), so the reopens here stay on ONE ui — the
+ * fresh_ui-per-scenario helper would wipe the memory under test. */
+static void save_reopen(void)              /* same-session MENU -> SAVE */
+{
+    ui_handle_action(&ui, ACT_MENU);           /* opens MAIN on any screen */
+    while (ui.menu_cursor != 1)
+        ui_handle_action(&ui, ACT_SEL_UP);
+    ui_handle_action(&ui, ACT_CONFIRM);        /* -> MENU_NAME */
+}
+
+static void test_save_prefills_last_name(void)
+{
+    purge_dir(stage);
+    /* 1. fresh session + failed save (EMPTY NAME): nothing recorded,
+     *    the next SAVE opens blank */
+    open_item(1);
+    CHECK(ui.in_menu == MENU_NAME);
+    ui_handle_action(&ui, ACT_CONFIRM);    /* empty name: stays */
+    CHECK(ui.in_menu == MENU_NAME);
+    ui_handle_action(&ui, ACT_MENU);       /* cancel */
+    save_reopen();
+    CHECK(ui.name_len == 0 && ui.name[0] == '\0');
+    ui_handle_action(&ui, ACT_MENU);       /* cancel */
+
+    /* 2. a successful save records the name; SAVE opens typed */
+    save_reopen();                             /* back into name entry */
+    snprintf(ui.name, sizeof ui.name, "abc");
+    ui.name_len = 3;
+    ui_handle_action(&ui, ACT_CONFIRM);
+    CHECK(ui.in_menu == MENU_OFF);
+    save_reopen();
+    CHECK(ui.name_len == 3);
+    CHECK(strcmp(ui.name, "abc") == 0);
+
+    /* 3. the record follows the newest success */
+    snprintf(ui.name, sizeof ui.name, "dude");
+    ui.name_len = 4;
+    ui_handle_action(&ui, ACT_CONFIRM);
+    CHECK(ui.in_menu == MENU_OFF);
+    save_reopen();
+    CHECK(ui.name_len == 4);
+    CHECK(strcmp(ui.name, "dude") == 0);
+    ui_handle_action(&ui, ACT_MENU);
+    purge_dir(stage);
+}
+
 static void test_load_nav_val_inert(void)
 {
     open_item(2);                          /* LOAD -> folder navigator */
@@ -189,43 +238,38 @@ static void test_load_nav_val_inert(void)
  * presets dir is created by the LOAD open; an UNCREATABLE presets dir
  * falls back to its parent. Closes go through ACT_MENU (Esc) — stable
  * across both targets. */
-/* Owner order 2026-11-05: holding the value keys (X/Y on the pad) must
- * RETRIG (scoped, owner order 2026-11-06: "we are just changing that
- * specific parameter" — the whole-synth TRIGGER stays reserved for the
- * TRIGGER key). Pad buttons never auto-repeat, so the app synthesizes
- * the hold: every value-change event fires the edited CHAIN's retrig
- * bit (press AND repeats), the hold repeats value+retrig (400 ms
- * delay, 120 ms rate) until the button is released. */
-static void test_valkey_hold_retrig(void)
+/* Owner order 2026-11-10 (supersedes the 2026-11-05 retrig order,
+ * which the owner retracted): the value keys NEVER trigger — no retrig,
+ * no TRIG flash, no mailbox writes. The single trigger path in the
+ * whole UI is ACT_TRIGGER (the TRIGGER key): inclusion principle,
+ * pinned here. The synthesized hold (400 ms delay, 120 ms rate) sweeps
+ * VALUES only. */
+static void test_valkey_no_retrig(void)
 {
     fresh_ui();
     CHECK(atomic_load(&mb.retrig_req) == 0);
-    CHECK(atomic_load(&mb.trigger_req) == 0);  /* TRIGGER not involved */
-    ui_handle_action(&ui, ACT_SEL_DOWN);       /* enter content (focus) */
-    ui_handle_action(&ui, ACT_VAL_INC);        /* press + hold */
-    CHECK(atomic_load(&mb.retrig_req) == 1);   /* chain A bit only */
     CHECK(atomic_load(&mb.trigger_req) == 0);
+    ui_handle_action(&ui, ACT_SEL_DOWN);       /* enter content (focus) */
+    synth_params_t before = ui.draft;
+    ui_handle_action(&ui, ACT_VAL_INC);        /* press + hold */
     CHECK(ui.val_held_dir == +1);
-    atomic_store(&mb.retrig_req, 0);
+    CHECK(memcmp(&ui.draft, &before, sizeof before) != 0); /* applied */
+    CHECK(atomic_load(&mb.retrig_req) == 0);   /* NO chain retrig */
+    CHECK(atomic_load(&mb.trigger_req) == 0);  /* whole-synth untouched */
+    CHECK(ui.trig_flash_until == 0);           /* NO TRIG flash */
 
     Uint32 t0 = SDL_GetTicks();
-    ui_tick(&ui, t0 + 100);                    /* before the first repeat */
+    synth_params_t once = ui.draft;
+    ui_tick(&ui, t0 + 400);                    /* first hold repeat */
+    CHECK(memcmp(&ui.draft, &once, sizeof once) != 0);     /* swept */
     CHECK(atomic_load(&mb.retrig_req) == 0);
-    ui_tick(&ui, t0 + 400);                    /* first repeat */
-    CHECK(atomic_load(&mb.retrig_req) == 1);
+    CHECK(atomic_load(&mb.trigger_req) == 0);
+    CHECK(ui.trig_flash_until == 0);
     CHECK(ui.val_next_repeat >= t0 + 400 + 120);
-    atomic_store(&mb.retrig_req, 0);
-    ui_tick(&ui, t0 + 525);                    /* second repeat (>= +520) */
-    CHECK(atomic_load(&mb.retrig_req) == 1);
-    atomic_store(&mb.retrig_req, 0);
-
-    /* a value edit on OSC 2 ORs chain B's bit, not chain A's */
-    ui_handle_action(&ui, ACT_TAB_NEXT);       /* OSC 2 */
-    ui_handle_action(&ui, ACT_SEL_DOWN);
-    ui_handle_action(&ui, ACT_VAL_INC);
-    CHECK(atomic_load(&mb.retrig_req) == 2);
-    atomic_store(&mb.retrig_req, 0);
-    ui_handle_action(&ui, ACT_TAB_BACK);       /* back to OSC 1 */
+    ui_tick(&ui, t0 + 525);                    /* second repeat */
+    CHECK(atomic_load(&mb.retrig_req) == 0);
+    CHECK(atomic_load(&mb.trigger_req) == 0);
+    CHECK(ui.trig_flash_until == 0);
 
     SDL_Event e;                               /* release ends the hold */
     memset(&e, 0, sizeof e);
@@ -274,10 +318,18 @@ static void test_valkey_hold_retrig(void)
 
     fresh_ui();                                /* DEC symmetric */
     ui_handle_action(&ui, ACT_SEL_DOWN);       /* enter content (focus) */
+    before = ui.draft;
     ui_handle_action(&ui, ACT_VAL_DEC);
     CHECK(ui.val_held_dir == -1);
-    CHECK(atomic_load(&mb.retrig_req) == 1);
+    CHECK(memcmp(&ui.draft, &before, sizeof before) != 0);
+    CHECK(atomic_load(&mb.retrig_req) == 0);
     CHECK(atomic_load(&mb.trigger_req) == 0);
+    CHECK(ui.trig_flash_until == 0);
+
+    /* INCLUSION: the one trigger path is the TRIGGER key itself. */
+    ui_handle_action(&ui, ACT_TRIGGER);
+    CHECK(atomic_load(&mb.trigger_req) == 1);
+    CHECK(ui.trig_flash_until != 0);
 }
 
 static void test_load_empty_shows_up(void){
@@ -917,7 +969,8 @@ int main(void)
     test_name_grid_picker_kept();
     test_text_entry_state_tracker();
     test_load_nav_val_inert();
-    test_valkey_hold_retrig();
+    test_valkey_no_retrig();
+    test_save_prefills_last_name();
     /* ---- PLAN_MOD_MATRIX_16.md §1.3: the MOD SLOT row (P5) — red
      * first (before SDL_Quit: the val path reads SDL_GetTicks) ---- */
     test_mod_slot_row();

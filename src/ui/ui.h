@@ -72,6 +72,9 @@ typedef struct {
   char            save_err[64];
   char            name[33];            /* SAVE name entry buffer */
   int             name_len;
+  char            last_saved_name[33]; /* last SUCCESSFUL save (PLAN_LAST_
+                                        * SAVED_NAME): prefills the next
+                                        * SAVE; empty = none this session */
   /* preset I/O dir (resolved once; navigator starts here) */
   char            preset_dir[512];
   /* SAVE name-entry grid picker (R36S path; also usable with a pad) */

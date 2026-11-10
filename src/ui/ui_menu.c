@@ -138,8 +138,11 @@ static void menu_confirm(ui_t *ui)             /* run current menu item */
         break;
     case 1:                                    /* SAVE */
         ui->in_menu = MENU_NAME;
-        ui->name_len = 0;
-        ui->name[0] = '\0';
+        /* PLAN_LAST_SAVED_NAME: prefill with the last SUCCESSFUL save's
+         * name, if any; the grid cursor stays 0,0 (it picks the NEXT
+         * character — the text starts fully typed). */
+        snprintf(ui->name, sizeof ui->name, "%s", ui->last_saved_name);
+        ui->name_len = (int)strlen(ui->last_saved_name);
         ui->save_err[0] = '\0';
         ui->grid_x = ui->grid_y = 0;
         SDL_StartTextInput();
@@ -186,6 +189,10 @@ static void name_save(ui_t *ui)
         snprintf(ui->save_err, sizeof ui->save_err, "%.63s", err);
         return;                                /* errors inline, stay */
     }
+    /* PLAN_LAST_SAVED_NAME: record successes only — failed saves must
+     * not change what the next SAVE prefills. */
+    snprintf(ui->last_saved_name, sizeof ui->last_saved_name, "%s",
+             ui->name);
     menu_close(ui);
 }
 

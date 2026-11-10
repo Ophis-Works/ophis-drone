@@ -54,3 +54,12 @@
   parse does not clamp sub amount per dest (UI ladder clamps ±50 for
   PITCH, ±100 otherwise; a hand-written preset could hold out-of-ladder
   amounts — with the vibrato fix that means up to ±100 Hz depth).
+
+## RETRACTION (owner order 2026-11-10, PLAN_VALKEY_NO_RETRIG.md)
+
+The 2026-11-05 order above ("holding X or Y must produce RETRIGGERS")
+is DISOWNED by the owner: X/Y were never to trigger anything. The rule
+is inclusion, pinned by test_valkey_no_retrig: value keys apply values
+ONLY (press, hold repeats, DEC — no retrig_req, no trigger_req, no TRIG
+flash); the single trigger path in the whole UI is ACT_TRIGGER (the
+TRIGGER key). val_edit no longer touches the mailbox or the flash.
