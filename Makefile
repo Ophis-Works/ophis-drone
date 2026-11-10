@@ -1,4 +1,4 @@
-# ophis-drone build (IMPLEMENTATION.md §5)
+# ophis-drone build
 WARNFLAGS = -Wall -Wextra -Wpedantic -Werror -Wconversion -Wsign-conversion -Wfloat-equal -Wcast-qual -Wcast-align -Wstrict-prototypes -Wmissing-prototypes -Wshadow -Wundef -Wpointer-arith -Wwrite-strings -Wredundant-decls -Wold-style-definition -Wmissing-field-initializers -Wswitch-enum -Wformat=2
 CFLAGS  = -std=c23 -O2 $(WARNFLAGS) -D_POSIX_C_SOURCE=200809L \
           -fstack-protector-strong -D_FORTIFY_SOURCE=2 \
@@ -13,10 +13,10 @@ SEQ_SRC = $(wildcard src/seq/*.c)
 PRESET_SRC = $(wildcard src/preset/*.c)
 AUDIO_SRC = src/audio/alsa_pcm.c src/audio/mailbox.c src/audio/engine.c \
             src/audio/f32tos16.c
-# font8x8.c: a real TU (AMENDED, owner order) — the embedded 8x8 face
-# plus the 10x10 per-pixel scaled cache (font_glyph10), PLAN §8.6
-# seq_items.c: the pure SEQ page item table (AMENDED, owner order,
-# PLAN §8.2) — plain data linked into every UI build, SDL-free
+# font8x8.c: a real TU — the embedded 8x8 face plus the 10x10 per-pixel
+# scaled cache (font_glyph10)
+# seq_items.c: the pure SEQ page item table — plain data linked into every
+# UI build, SDL-free
 UI_SRC    = src/ui/keymap.c src/ui/ui.c src/ui/ui_menu.c src/ui/ui_draw.c \
             src/ui/valrepeat.c \
             src/ui/theme.c src/ui/range.c src/ui/seq_items.c src/ui/font8x8.c
@@ -47,7 +47,7 @@ build/rg28xx build/rg28xx/obj/compat build/deploy/ports \
 build/deploy/Roms/PORTS:
 	mkdir -p $@
 
-# --- handheld (R36S, PLAN.md §11 M6, owner ruling) --------------------------
+# --- handheld (R36S) --------------------------------------------------------
 # Build ON THE HOST with aarch64-linux-gnu-gcc; glibc-2.28 target met with
 # symbol pinning, not static linking / container:
 #   - fully dynamic link against arm64 SDL2/ALSA (/usr/lib/aarch64-linux-gnu);
@@ -120,19 +120,19 @@ $(DEPLOY)/ports/Ophis-Drone.sh: tools/r36s-launcher.sh | $(DEPLOY)/ports
 	chmod +x $@
 
 # Preset staging: presets/*.json ship inside the program folder (the
-# launcher cds there, PLAN_KEYMAP_REBIND §6). The staged directory is
-# rebuilt from the current presets/ by the zip recipe itself (F13): a
+# launcher cds there). The staged directory is
+# rebuilt from the current presets/ by the zip recipe itself: a
 # per-file pattern rule leaves stale copies behind when a preset is
 # renamed or deleted (the wildcard drops it from the prerequisites and
 # only 'make clean' removes staging). rm -rf + fresh copy on every zip
 # build means stale files cannot survive.
 PRESETS      = $(wildcard presets/*.json)
 
-# --- desktop release archive (PLAN_DESKTOP_TARGZ.md) -----------------------
+# --- desktop release archive -----------------------------------------------
 # make desktop: build the desktop binary, stage a fresh program folder and
 # tar.gz it: ophis-drone-desktop/{ophis-drone, presets/, MANUAL.md}.
-# README.md stays repo-only (user order 2026-11-10). Staging is rebuilt
-# from scratch on every run (F13 lesson, same as the handheld zips): no
+# README.md stays repo-only. Staging is rebuilt
+# from scratch on every run (same as the handheld zips): no
 # stale presets can survive.
 desktop: $(DEPLOY)/ophis-drone-desktop.tar.gz
 
@@ -155,7 +155,7 @@ $(DEPLOY)/ophis-drone-r36s.zip: $(DEPLOY)/ports/ophis-drone/ophis-drone \
 	rm -rf $(DEPLOY)/ports/ophis-drone/presets
 	mkdir -p $(DEPLOY)/ports/ophis-drone/presets
 	# no bundled controller db: the app uses the OS databases only — a
-	# stale staged copy from an older build must not ship (F13 lesson)
+	# stale staged copy from an older build must not ship
 	rm -f $(DEPLOY)/ports/ophis-drone/gamecontrollerdb.txt
 	for f in presets/*.json; do \
 	  if [ -e "$$f" ]; then cp "$$f" $(DEPLOY)/ports/ophis-drone/presets/; fi; \
@@ -165,7 +165,7 @@ $(DEPLOY)/ophis-drone-r36s.zip: $(DEPLOY)/ports/ophis-drone/ophis-drone \
 	@echo "HANDHELD OK: $@"
 
 # RG28XX staging: same program-folder layout, zipped with the device's
-# Roms/PORTS/ paths (owner-confirmed layout) so the zip extracts at the
+# Roms/PORTS/ paths so the zip extracts at the
 # SD card's roms-partition root. The launcher template is generic.
 $(DEPLOY)/Roms/PORTS/ophis-drone/ophis-drone: build/rg28xx/ophis-drone \
                                              | $(DEPLOY)/Roms/PORTS
@@ -189,7 +189,7 @@ $(DEPLOY)/ophis-drone-rg28xx.zip: $(DEPLOY)/Roms/PORTS/ophis-drone/ophis-drone \
 	cd $(DEPLOY) && zip -r ophis-drone-rg28xx.zip Roms
 	@echo "RG28XX OK: $@"
 
-# Unit tests: src/dsp/* only — no SDL/ALSA (IMPLEMENTATION.md §5).
+# Unit tests: src/dsp/* only — no SDL/ALSA.
 test: $(TESTS:%=build/tests/%)
 	@pass=0; total=0; failed=0; \
 	for b in $(TESTS); do \
@@ -204,7 +204,7 @@ test: $(TESTS:%=build/tests/%)
 	echo "TOTAL: $$pass/$$total passed"; \
 	exit $$failed
 
-# Render benchmark (PLAN_POLYBLEP.md MS1): desktop-only, engine + DSP —
+# Render benchmark: desktop-only, engine + DSP —
 # no SDL/ALSA; times 2000 engine_render_block calls, prints µs/block.
 build/tests/bench_render: tools/bench_render.c $(DSP_SRC) $(SEQ_SRC) \
                           $(PRESET_SRC) src/audio/engine.c | build/tests
@@ -219,15 +219,15 @@ bench: build/tests/bench_render
 $(TESTS): test_%: build/tests/test_%
 	@./build/tests/test_$*
 
-# Unit tests: src/dsp/* + src/seq/* + src/preset/* only — no SDL/ALSA
-# (IMPLEMENTATION.md §5). json.c has no deps; preset.c uses C stdio/mkdir.
+# Unit tests: src/dsp/* + src/seq/* + src/preset/* only — no SDL/ALSA.
+# json.c has no deps; preset.c uses C stdio/mkdir.
 build/tests/test_%: tests/test_%.c tests/harness.h $(DSP_SRC) $(SEQ_SRC) \
                     $(PRESET_SRC) | build/tests
 	$(CC) $(CFLAGS) -Isrc tests/test_$*.c $(DSP_SRC) $(SEQ_SRC) \
 	    $(PRESET_SRC) -o $@ -lm
 
-# test_engine_seq: sequencer application at the engine level (PLAN §6
-# amendment: step pitch persists; vel scales the level) — engine + DSP,
+# test_engine_seq: sequencer application at the engine level (step pitch
+# persists; vel scales the level) — engine + DSP,
 # NO ALSA (unlike test_engine).
 build/tests/test_engine_seq: tests/test_engine_seq.c tests/harness.h \
                              $(DSP_SRC) $(SEQ_SRC) $(PRESET_SRC) \
@@ -235,14 +235,14 @@ build/tests/test_engine_seq: tests/test_engine_seq.c tests/harness.h \
 	$(CC) $(CFLAGS) -Isrc tests/test_engine_seq.c $(DSP_SRC) $(SEQ_SRC) \
 	    $(PRESET_SRC) src/audio/engine.c -o $@ -lm
 
-# test_autoquit: OPHIS_AUTOQUIT_MS parse helper (PLAN_CODE_REVIEW_FIXES.md
-# Phase 6 P3) — SDL-free; links only src/app/autoquit.c.
+# test_autoquit: OPHIS_AUTOQUIT_MS parse helper —
+# SDL-free; links only src/app/autoquit.c.
 build/tests/test_autoquit: tests/test_autoquit.c tests/harness.h \
                            src/app/autoquit.h src/app/autoquit.c | build/tests
 	$(CC) $(CFLAGS) -Isrc tests/test_autoquit.c src/app/autoquit.c -o $@
 
-# test_mailbox: lock-free channel contracts (PLAN_CODE_REVIEW_FIXES.md
-# Phase 2, H1/H2) — SDL/ALSA-free; links only mailbox.c (+ pthread for the
+# test_mailbox: lock-free channel contracts — SDL/ALSA-free; links only
+# mailbox.c (+ pthread for the
 # interleave validity tests).
 build/tests/test_mailbox: tests/test_mailbox.c tests/harness.h \
                           src/audio/mailbox.h src/audio/mailbox.c | build/tests
@@ -250,7 +250,7 @@ build/tests/test_mailbox: tests/test_mailbox.c tests/harness.h \
 	    -lpthread -o $@
 
 # test_keymap: compile-level binding check + keymap_label() caller-buffer
-# contract (F5) — config.h desktop KB_* must be OUR ophis_key_t ids.
+# contract — config.h desktop KB_* must be OUR ophis_key_t ids.
 # SDL-linked: labels come from SDL_GetKeyName via ui/keymap.c.
 build/tests/test_keymap: tests/test_keymap.c tests/harness.h src/config.h \
                          src/ui/keymap.h src/ui/keymap.c | build/tests
@@ -259,8 +259,8 @@ build/tests/test_keymap: tests/test_keymap.c tests/harness.h src/config.h \
 	    $(shell pkg-config --libs sdl2)
 
 # test_keymap_r36s: same check for the handheld target — config.h R36S
-# KB_* must be SDL logical gamepad button constants (PLAN_KEYMAP_REBIND
-# §1) + the keymap_label() short-form pins (PLAN_HINT_SHORT §1.3).
+# KB_* must be SDL logical gamepad button constants
+# + the keymap_label() short-form pins.
 # SDL-linked like test_keymap_events_r36s: labels come from ui/keymap.c.
 build/tests/test_keymap_r36s: tests/test_keymap_r36s.c tests/harness.h \
                               src/config.h src/ui/keymap.h src/ui/keymap.c \
@@ -269,8 +269,8 @@ build/tests/test_keymap_r36s: tests/test_keymap_r36s.c tests/harness.h \
 	    tests/test_keymap_r36s.c src/ui/keymap.c -o $@ \
 	    $(shell pkg-config --libs sdl2)
 
-# test_keymap_events: event-level keymap_action() checks (remediation F1
-# auto-repeat gate, F6 controller-button collision) — SDL-linked, builds
+# test_keymap_events: event-level keymap_action() checks (auto-repeat
+# gate, controller-button collision) — SDL-linked, builds
 # SDL_Event structs. One source, two objects/targets mirroring
 # test_keymap / test_keymap_r36s.
 build/tests/test_keymap_events: tests/test_keymap_events.c tests/harness.h \
@@ -289,7 +289,7 @@ build/tests/test_keymap_events_r36s: tests/test_keymap_events.c \
 	    $(shell pkg-config --libs sdl2)
 
 # test_keymap_rg28xx / test_keymap_events_rg28xx: the same compile-level
-# binding checks for the RG28XX target (PLAN_RG28XX_BUILD M3) — same
+# binding checks for the RG28XX target — same
 # sources, compiled with -DTARGET_RG28XX against config.h's RG28XX block.
 build/tests/test_keymap_rg28xx: tests/test_keymap_r36s.c tests/harness.h \
                                 src/config.h src/ui/keymap.h src/ui/keymap.c \
@@ -306,7 +306,7 @@ build/tests/test_keymap_events_rg28xx: tests/test_keymap_events.c \
 	    tests/test_keymap_events.c src/ui/keymap.c -o $@ \
 	    $(shell pkg-config --libs sdl2)
 
-# test_f32tos16: the float→S16 conversion helper (PLAN_RG28XX_BUILD M2)
+# test_f32tos16: the float→S16 conversion helper
 # for the ALSA S16_LE fallback — SDL/ALSA-free pure-math module.
 build/tests/test_f32tos16: tests/test_f32tos16.c tests/harness.h \
                            src/audio/f32tos16.h src/audio/f32tos16.c | build/tests
@@ -319,27 +319,27 @@ build/tests/test_theme: tests/test_theme.c tests/harness.h src/ui/theme.h \
 	$(CC) $(CFLAGS) -Isrc tests/test_theme.c src/ui/theme.c -o $@ -lm
 
 # test_range: hostile-input safety + ladder sanity for the pure position
-# helpers (PLAN §8.3 ladders, log1p-based) — SDL-free pure-math module.
+# helpers (log1p-based) — SDL-free pure-math module.
 build/tests/test_range: tests/test_range.c tests/harness.h src/ui/range.h \
                         src/ui/range.c | build/tests
 	$(CC) $(CFLAGS) -Isrc tests/test_range.c src/ui/range.c -o $@ -lm
 
-# test_seq_items: the SEQ page item table (PLAN §8.2 AMENDED, owner
-# order) — pure data, SDL-free; 7 items (NO BPM — the global tempo lives
+# test_seq_items: the SEQ page item table — pure data, SDL-free; 7 items
+# (NO BPM — the global tempo lives
 # on MASTER), exact order, MODE/ONCE present, MASTER_ITEMS exported.
 build/tests/test_seq_items: tests/test_seq_items.c tests/harness.h \
                             src/ui/seq_items.h src/ui/seq_items.c | build/tests
 	$(CC) $(CFLAGS) -Isrc tests/test_seq_items.c src/ui/seq_items.c -o $@
 
-# test_font: 10x10 scaled-font metrics + scaler invariants (PLAN §8.6
-# AMENDED, owner order) — SDL-free; the scaled glyph cache lives in
+# test_font: 10x10 scaled-font metrics + scaler invariants — SDL-free; the
+# scaled glyph cache lives in
 # ui/font8x8.c.
 build/tests/test_font: tests/test_font.c tests/harness.h src/ui/font8x8.h \
                        src/ui/font8x8.c | build/tests
 	$(CC) $(CFLAGS) -Isrc tests/test_font.c src/ui/font8x8.c -o $@
 
-# test_ui_menu: menu_action() contracts (PLAN_CODE_REVIEW_FIXES.md Phase 4,
-# U4) — NAV/VAL inert in MENU_MAIN/CONFIRM/LOAD, MENU_NAME grid picker
+# test_ui_menu: menu_action() contracts — NAV/VAL inert in
+# MENU_MAIN/CONFIRM/LOAD, MENU_NAME grid picker
 # kept. SDL-linked (ui.c is an SDL TU); runs headless on the dummy video
 # driver, no window. Preset I/O via the presets/ dir staged beside the test
 # binary (build/tests/presets).
@@ -363,8 +363,7 @@ build/tests/test_ui_menu: tests/test_ui_menu.c tests/harness.h src/config.h \
                           src/preset/schema_write.c -o $@ $(shell pkg-config --libs sdl2) \
 	    -lpthread -lm
 
-# test_engine is the ONLY test linking ALSA (device "null", IMPLEMENTATION
-# .md §5/§8 M4).
+# test_engine is the ONLY test linking ALSA (device "null").
 build/tests/test_engine: tests/test_engine.c tests/harness.h $(DSP_SRC) \
                          $(SEQ_SRC) $(PRESET_SRC) $(AUDIO_SRC) | build/tests
 	$(CC) $(CFLAGS) -Isrc tests/test_engine.c $(DSP_SRC) $(SEQ_SRC) \

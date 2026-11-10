@@ -1,8 +1,6 @@
-/* tests/test_fx.c — FX stage tests (PLAN §10 row test_fx.c, PLAN §2/§5
- * amended signal chain, IMPLEMENTATION.md §2 dsp/fx.c contract).
- * TDD: written BEFORE dsp/fx.h / dsp/fx.c exist.
+/* tests/test_fx.c — FX stage tests.
  *
- * Contract exercised (IMPLEMENTATION.md §2, owner-ordered):
+ * Contract exercised:
  *   void fx_process(fx_state_t *fx, const fx_params_t *p,
  *                   float in_l, float in_r, float *out_l, float *out_r,
  *                   double sr);
@@ -12,7 +10,7 @@
  * Order per sample: delay -> reverb -> safety (HP60+LP18k cascaded
  * biquads, or bypass when safety=0) -> master level -> gate.
  *
- * Checks (ask, owner-ordered):
+ * Checks:
  *   delay  — impulse -> first echo at time_l with mix-scaled amplitude;
  *            feedback decays geometrically; tone LP attenuates a 10 kHz
  *            echo vs 100 Hz; mix 0 = dry passthrough
@@ -276,7 +274,7 @@ int main(void)
         CHECK(d0 < d100);
     }
 
-    /* 9b. STABILITY GRID (owner order; the shipped presets crashed the
+    /* 9b. STABILITY GRID (the shipped presets crashed the
      * sound system): the reverb comb loop must be bounded for EVERY
      * size/damp combination AND the shipped preset values — a constant
      * input for 2 s must stay finite and < 1e3 (an unstable comb loop
@@ -349,12 +347,12 @@ int main(void)
         double db_lo = h_db(amp[0] / amp[1]);  /* 50 Hz  vs 440 */
         double db_hi = h_db(amp[2] / amp[1]);  /* 19 kHz vs 440 */
         /* Measured with the binding HP60 + LP18k 4th-order cascade:
-         * -30.6 dB @ 50 Hz, -13.8 dB @ 19 kHz (owner ruling on the step-2
+         * -30.6 dB @ 50 Hz, -13.8 dB @ 19 kHz (on the step-2
          * escalation: the -20 dB @ 19 kHz threshold was over-specified —
-         * unattainable 0.079 oct above an 18 kHz corner — amended to
+         * unattainable 0.079 oct above an 18 kHz corner — relaxed to
          * -10 dB; the 18 kHz corner itself is untouched). */
-        CHECK(db_lo <= -20.0);                 /* owner: keep -20 dB */
-        CHECK(db_hi <= -10.0);                 /* owner-ruled threshold */
+        CHECK(db_lo <= -20.0);                 /* keep -20 dB */
+        CHECK(db_hi <= -10.0);                 /* -10 dB threshold */
     }
 
     /* 11. safety off = bypass: |out - in| < 1e-6 (mixes 0, master 100,
@@ -376,7 +374,7 @@ int main(void)
     CHECK(OPHIS_DEFAULTS.delay.mix == 0 && OPHIS_DEFAULTS.reverb.mix == 0);
     CHECK(OPHIS_DEFAULTS.safety == 1);
 
-    /* 13. REGRESSION (Phase 1 S1/S2, PLAN_CODE_REVIEW_FIXES.md): the
+    /* 13. REGRESSION: the
      * safety biquads are fixed-fc — they must keep the FULL
      * state-clearing set: after a render their coefficients are
      * identical to an independent biquad_set, and two identical renders

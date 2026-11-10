@@ -1,5 +1,5 @@
 /* tests/test_f32tos16.c — the float→S16 conversion helper used by the
- * ALSA S16 fallback (PLAN_RG28XX_BUILD.md M2). SDL/ALSA-free pure math:
+ * ALSA S16 fallback. SDL/ALSA-free pure math:
  * stereo-interleaved, clamp to [-1, 1], scale by 32767, round-to-nearest. */
 #include "harness.h"
 #include "audio/f32tos16.h"

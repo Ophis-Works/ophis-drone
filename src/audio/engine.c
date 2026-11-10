@@ -1,5 +1,5 @@
-/* src/audio/engine.c — audio-thread engine block loop, per IMPLEMENTATION
- * .md §4 pseudocode: events and gate are block-level; intra-block sample
+/* src/audio/engine.c — audio-thread engine block loop: events and gate
+ * are block-level; intra-block sample
  * accuracy comes from per-sample osc/adsr/biquad inside chain_render and a
  * per-sample mixer_render. No malloc/printf in the render path. */
 #include <string.h>
@@ -20,8 +20,8 @@ void engine_init(engine_t *e, double sr)
     for (int c = 0; c < 3; c++) {
         chain_init(&e->ch[c], 0x9E3779B97F4A7C15ull
                               + (uint64_t)c * (uint64_t)0x1000ull);
-        /* owner-ordered modes amendment: per-instance deterministic seed,
-         * same pattern as chain_init (random/markov PRNG, PLAN §6) */
+        /* per-instance deterministic seed,
+         * same pattern as chain_init (random/markov PRNG) */
         seq_init(&e->sq[c], 0x9E3779B97F4A7C15ull
                             + (uint64_t)c * (uint64_t)0x1000ull);
         e->prev_seq_on[c] = 0;
@@ -34,7 +34,7 @@ void engine_init(engine_t *e, double sr)
 }
 
 /* THE live step the UI is fed (engine.h): the playing step window,
- * mode-independent (B-SEQ1). */
+ * mode-independent. */
 void engine_seq_steps(const engine_t *e, int out[3])
 {
     for (int c = 0; c < 3; c++)
@@ -49,11 +49,11 @@ void engine_panic_reset(engine_t *e)
         seq_init(&e->sq[c], 0x9E3779B97F4A7C15ull
                             + (uint64_t)c * (uint64_t)0x1000ull);
         e->prev_seq_on[c] = e->p.seq[c].on;
-        e->cur_valid[c] = 0;       /* PANIC: full state reset (PLAN §6) */
+        e->cur_valid[c] = 0;       /* PANIC: full state reset */
     }
     memset(&e->mx, 0, sizeof e->mx);
     fx_reset(&e->fx);           /* PANIC: clear delay lines, reverb,
-                                   safety biquads (owner-ordered) */
+                                   safety biquads */
     e->prev_gate = 0;
     e->prev_run  = 0;
 }
@@ -69,7 +69,7 @@ void engine_render_block(engine_t *e, float *out_stereo, int frames,
     if (panic_req) {
         engine_panic_reset(e);
         e->p.run = 0;           /* ONE-BLOCK guard: RUN is the mailbox's
-                                   (UI owns RUN, H3) — the next block's
+                                   (UI owns RUN) — the next block's
                                    mailbox read restores it; after PANIC
                                    the UI commits draft.run = 0 */
     }
@@ -78,7 +78,7 @@ void engine_render_block(engine_t *e, float *out_stereo, int frames,
     int gate_rise = gate && !e->prev_gate;
     e->prev_gate  = gate;
 
-    /* once-mode restarts (owner-ordered modes amendment, PLAN §6):
+    /* once-mode restarts:
      * RUN off->on or a seq toggled off->on restarts that sequencer */
     int run = e->p.run;
     int run_rise = run && !e->prev_run;
@@ -86,7 +86,7 @@ void engine_render_block(engine_t *e, float *out_stereo, int frames,
     for (int c = 0; c < 3; c++) {
         if ((run_rise || (e->p.seq[c].on && !e->prev_seq_on[c]))) {
             seq_reset(&e->sq[c]);
-            /* S3 (review): the restart must not keep the previous
+            /* the restart must not keep the previous
              * window's step — the stale cur_step/cur_valid from before
              * the reset would hold the old pitch until the first new
              * boundary; the restart starts fresh at step 0 */
@@ -100,7 +100,7 @@ void engine_render_block(engine_t *e, float *out_stereo, int frames,
     chain_params_t cp[3];
     for (int c = 0; c < 3; c++) {
         cp[c] = e->p.chain[c];
-        /* seq step window (owner order, PLAN §6): the chain plays the
+        /* seq step window: the chain plays the
          * CURRENT step's pitch_hz for that step's whole window — vel 0
          * steps change the pitch without a retrigger; sequencer OFF
          * returns the chain to the oscillator's freq parameter. */
@@ -122,7 +122,7 @@ void engine_render_block(engine_t *e, float *out_stereo, int frames,
             ev[c].vel       = (float)e->p.chain[c].vel / 100.0f;
         }
         if (e->p.run && e->p.seq[c].on) {           /* sequencer drives */
-            /* bpm: the GLOBAL tempo (AMENDED, PLAN §6) */
+            /* bpm: the GLOBAL tempo */
             int st = seq_tick(&e->sq[c], &e->p.seq[c], e->p.bpm,
                               e->now, e->sr);
             if (st >= 0) {
@@ -138,11 +138,11 @@ void engine_render_block(engine_t *e, float *out_stereo, int frames,
         }
     }
 
-    /* AMENDED (owner-ordered FX amendment, PLAN §5): mixer params carry
+    /* mixer params carry
      * only the cross-mod slots; master level and the transport gate are
      * applied in the FX stage (fxp) after the safety filter. */
     mixer_params_t mxp;
-    mxp.synth = &e->p;    /* S4: the mixer reads the live params — no
+    mxp.synth = &e->p;    /* the mixer reads the live params — no
                              per-block copies to drift out of sync */
 
     fx_params_t fxp;
@@ -159,7 +159,7 @@ void engine_render_block(engine_t *e, float *out_stereo, int frames,
             out[c] = chain_render(&e->ch[c], &cp[c], xm, &ev[c], e->sr,
                                   gate);
         }
-        /* mod sources (D2): ids 1..9 from the ONE modsrc table — all
+        /* mod sources: ids 1..9 from the ONE modsrc table — all
          * are the RAW pre-everything taps, consumed one sample late */
         for (int id = 1; id <= MODSRC_COUNT; id++) {
             const modsrc_t *ms = modsrc_get(id);

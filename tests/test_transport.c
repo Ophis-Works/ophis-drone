@@ -1,4 +1,4 @@
-/* tests/test_transport.c — PLAN.md §10 (M2) + §7, reworked for the global
+/* tests/test_transport.c — transport contracts, reworked for the global
  * engine clock: transport_process takes a trailing `now` (seconds on the
  * engine's sample clock). one_shot_deadline is an ABSOLUTE timestamp:
  * set to now + 30.0 on trigger edge; force-close when now >= deadline;
@@ -7,7 +7,7 @@
  * retriggers at each chain's VEL, gate auto-closes when all envelopes reach
  * 0 (or at the absolute 30 s deadline); PANIC -> gate 0 instant, one-shot
  * cleared, run cleared, deadline 0; sequencers untouched by TRIGGER.
- * Contract: src/seq/transport.h (IMPLEMENTATION.md §2). */
+ * Contract: src/seq/transport.h. */
 #include <string.h>
 #include "harness.h"
 #include "seq/transport.h"
@@ -23,7 +23,7 @@ static seq_params_t mksp_default(void)
 {
     seq_params_t p;
     memset(&p, 0, sizeof p);
-    p.on = 1;                    /* BPM is GLOBAL (AMENDED, PLAN §6): no
+    p.on = 1;                    /* BPM is GLOBAL: no
                                     per-seq bpm member anymore */
     return p;
 }

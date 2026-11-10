@@ -1,6 +1,6 @@
-/* src/seq/transport.c — RUN/TRIGGER/PANIC state machine (PLAN §7,
- * IMPLEMENTATION.md §2). Pure; called once per audio block. Gate ramp is
- * 10 ms; gate semantics edge-compatible with the M1 chain/mixer gate
+/* src/seq/transport.c — RUN/TRIGGER/PANIC state machine.
+ * Pure; called once per audio block. Gate ramp is
+ * 10 ms; gate semantics edge-compatible with the chain/mixer gate
  * (1 = held). */
 #include "seq/transport.h"
 
@@ -28,8 +28,8 @@ void transport_process(transport_state_t *t, int run, int trigger_req,
      * deadline timestamp is reached. NOT evaluated on the block where
      * trigger_req arrived: the engine fires the retriggers after
      * transport_process, so the envelopes are still all-zero at entry
-     * and the gate would never open from idle (M4 integration fix;
-     * PLAN §7: TRIGGER opens the gate for one envelope). */
+     * and the gate would never open from idle.
+     * TRIGGER opens the gate for one envelope. */
     if (t->one_shot && !trigger_req) {
         int all_zero = (env_level[0] <= 0.0f && env_level[1] <= 0.0f &&
                         env_level[2] <= 0.0f);

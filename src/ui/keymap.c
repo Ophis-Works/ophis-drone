@@ -1,5 +1,5 @@
-/* src/ui/keymap.c — dispatch over config.h KB_* values only (PLAN §9:
- * config.h is the only target difference; this file is byte-identical
+/* src/ui/keymap.c — dispatch over config.h KB_* values only (config.h is
+ * the only target difference; this file is byte-identical
  * between builds). Desktop KB_* are OUR key ids (ophis_key_t); the ONE
  * place they are resolved to SDL keycodes is the table below. Handheld
  * KB_* are SDL controller button numbers; both event types are checked
@@ -31,7 +31,7 @@ static const SDL_Keycode key_to_sdl[] = {
 /* OUR key id (already resolved) -> action. KB_CONFIRM is a dead case
  * label on the handheld (-1: A keeps the RUN/confirm double role via
  * KB_RUN_CONFIRMS_MENU); on desktop Enter maps to ACT_CONFIRM (menu
- * select only, owner order 2026-11-05). */
+ * select only). */
 static int map_code(int code, ui_action_t *out)
 {
     switch (code) {
@@ -69,8 +69,7 @@ static int sdl_to_ophis(SDL_Keycode sym)
  * Compile-time constant: folds per target, file stays byte-identical. */
 #define KB_LABELS_ARE_BUTTONS ((int)(KB_SEL_UP) > (int)SDL_CONTROLLER_BUTTON_START)
 
-/* Short hint-bar names for the controller buttons (owner order
- * 2026-11-07 "please shorten", PLAN_HINT_SHORT §1.2): indexed by
+/* Short hint-bar names for the controller buttons: indexed by
  * SDL_GameControllerButton (A=0, B=1, X=2, Y=3, BACK=4, GUIDE=5, START=6,
  * LEFTSHOULDER=9, RIGHTSHOULDER=10, DPUP=11, DPDOWN=12, DPLEFT=13,
  * DPRIGHT=14); NULL entries fall back to the SDL string uppercased.
@@ -112,7 +111,7 @@ int keymap_val_release(const SDL_Event *e)
  * Compile-time constant: folds per target, file stays byte-identical. */
 /* Copy s into buf (NUL-terminated, uppercased if upper) and return buf;
  * NULL if s is NULL or does not fit in n bytes. Caller-buffer form of
- * keymap_label (remediation F5: the single static buffer aliased every
+ * keymap_label (the single static buffer aliased every
  * label in one snprintf to one pointer). */
 static const char *label_copy(const char *s, char *buf, size_t n, int upper)
 {
@@ -150,7 +149,7 @@ int keymap_action(SDL_Event *e, ui_action_t *out)
         ui_action_t a;
         if (k < 0 || !map_code(k, &a))
             return 0;
-        /* Remediation F1: auto-repeat only on the value keys — holding
+        /* auto-repeat only on the value keys — holding
          * RUN/MENU/tabs/selection must not re-fire per repeat. */
         if (e->key.repeat && a != ACT_VAL_INC && a != ACT_VAL_DEC)
             return 0;
@@ -158,7 +157,7 @@ int keymap_action(SDL_Event *e, ui_action_t *out)
         return 1;
     }
     case SDL_CONTROLLERBUTTONDOWN:
-        /* Remediation F6: when KB_* are ophis key ids (desktop) they
+        /* when KB_* are ophis key ids (desktop) they
          * collide numerically with the SDL button constants — map
          * nothing; on button-constant targets (handheld) unchanged. */
         return KB_LABELS_ARE_BUTTONS

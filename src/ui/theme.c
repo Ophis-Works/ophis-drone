@@ -1,5 +1,5 @@
-/* theme.c — dark-purple palette definitions (IMPLEMENTATION.md §6, amended
- * 6e7c513 + 6e26d5b). Values chosen so tests/test_theme.c passes WCAG AA
+/* theme.c — dark-purple palette definitions. Values chosen so
+ * tests/test_theme.c passes WCAG AA
  * (>= 4.5:1) on every pair, with margin:
  *   text/bg 15.0, dim/bg 6.0, sel-text/sel-fill 13.2, bar/track 7.3,
  *   flash-text/flash-fill 9.4 (ratios at time of writing). */
@@ -19,8 +19,7 @@ const ophis_rgb_t THEME_BAR        = { 196, 166, 240 }; /* light violet   */
 const ophis_rgb_t THEME_FLASH_TEXT = { 255, 208, 214 }; /* pink-white     */
 const ophis_rgb_t THEME_ACCENT     = { 186, 132, 255 }; /* bright violet  */
 const ophis_rgb_t THEME_SEQ_SEL    = { 0, 230, 255 };   /* SEQ selected-step
-                                            * border (PLAN_KEYMAP_REBIND
-                                            * §5): strong-saturation cyan,
+                                            * border: strong-saturation cyan,
                                             * clearly stronger than ACCENT
                                             * (bg 12.3:1 vs 7.0:1, sel-fill
                                             * 9.4:1) */

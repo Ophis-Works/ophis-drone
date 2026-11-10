@@ -1,9 +1,9 @@
-/* tests/test_osc.c — PLAN.md §10 (M1):
+/* tests/test_osc.c —
  * zero-crossing rate ±1 for sine/tri/saw/square; white: DC≈0, RMS≈1/√3,
  * flat spectrum (Goertzel), seeded determinism (xoshiro256**, fixed seed
  * per instance); pink: DC≈0, ≈−3 dB/octave slope (Goertzel, ±1.5 dB);
  * no |x|>1 for any waveform.
- * Approved plan change (commits eacb368+fix): square DUTY — pulse width
+ * square DUTY — pulse width
  * percent 5..95 default 50; measured as the high-time fraction of one
  * period at the zero-crossing level; duty is ignored by all other waves. */
 #include <string.h>
@@ -14,7 +14,7 @@
 #define SR 44100.0
 #define N  44100
 
-/* ---- PLAN_POLYBLEP.md MS1: naive reference + structural contracts ----
+/* ---- naive reference + structural contracts ----
  * The test mirrors the PRE-PolyBLEP osc_next math (naive formulas + the
  * identical phase accumulation and PRNG path) so the contracts below are
  * pins against the naive output, not self-comparisons. */
@@ -82,11 +82,11 @@ static double naive_next(naive_t *n, wave_t w, double f, double sr)
     return x;
 }
 
-/* ---- PLAN_POLYBLEP.md MS2 (owner ruling 2026-11-10): MS1 1x reference
- * mirror — the pre-MS2 osc_next (1x phase path + PolyBLEP window dt, the
- * MS1-approved kernel) as the comparison arm of the alias probe ---- */
+/* ---- 1x reference
+ * mirror — the pre-2x osc_next (1x phase path + PolyBLEP window dt, the
+ * single-kernel PolyBLEP) as the comparison arm of the alias probe ---- */
 
-/* MS1 PolyBLEP kernel: window dt, edges {0} (saw, A=-2) /
+/* 1x PolyBLEP kernel: window dt, edges {0} (saw, A=-2) /
  * {0, duty/100} (square, A=+2 wrap, A=-2 duty) */
 static double ms1_kernel(double x, wave_t w, int duty, double p, double dt)
 {
@@ -118,7 +118,7 @@ static double ms1_kernel(double x, wave_t w, int duty, double p, double dt)
     return x;
 }
 
-/* one MS1 1x output sample (mirror of the pre-MS2 osc_next tonal path) */
+/* one 1x output sample (mirror of the pre-2x osc_next tonal path) */
 static double ms1_ref_next(naive_t *n, wave_t w, double f, double sr)
 {
     double dt = f / sr;
@@ -170,7 +170,7 @@ static int near_edge(wave_t w, double p, int duty, double dt)
     return 0;
 }
 
-/* MS2 far-from-edge deviation bound: with 2x oversampling the output is
+/* far-from-edge deviation bound: with 2x oversampling the output is
  * the box average of two dt/2 sub-steps, so even far from an edge it can
  * deviate from the naive point value by at most slope*dt/2 (square slope
  * 0 far from edges -> still bit-exact). */
@@ -267,7 +267,7 @@ int main(void)
     slope /= 6.0;
     CHECK(fabs(fabs(slope) - 3.01) <= 1.5);                    /* −3 dB/oct */
 
-    /* ---- amplitude bound (owner ruling 2026-11-10): saw/square may
+    /* ---- amplitude bound: saw/square may
      * overshoot +-1 up to a hard |x| <= 2.0 (PolyBLEP edge smoothing;
      * downstream tanh + master safety filter contain it); sine/tri/
      * white/pink stay within +-1 ---- */
@@ -280,7 +280,7 @@ int main(void)
         CHECK(over == 0);
     }
 
-    /* ---- square DUTY (PLAN §5, approved change) ----
+    /* ---- square DUTY ----
      * f = 20 Hz at 44100 Hz -> one period = 2205 samples, sampled densely.
      * duty% == fraction of samples > 0 (the zero-crossing level) over one
      * period, ±1 percentage-point tolerance. */
@@ -344,9 +344,9 @@ int main(void)
         #undef DUTY_PCT
     }
 
-    /* ==== PLAN_POLYBLEP.md MS1 contracts ============================== */
+    /* ==== PolyBLEP contracts ========================================== */
 
-    /* -- 1. far-from-edge pin + golden-pin rule (MS2 re-pin: 2x
+    /* -- 1. far-from-edge pin + golden-pin rule (2x
      * oversampling box-averages the tonal waves, so far from an edge the
      * output may deviate from the naive point value by at most
      * slope*dt/2 — square far region stays bit-exact); the ONLY samples
@@ -367,7 +367,7 @@ int main(void)
             for (int i = 0; i < MS1_N; i++) {
                 double nv = naive_next(&n, edge_cases[c].w, MS1_F, SR);
                 if (!fexact(out[i], nv)) {
-                    /* MS2: the half-band FIR mixes +-3h (1.5*dt) taps
+                    /* the half-band FIR mixes +-3h (1.5*dt) taps
                      * around each output sample, so corrected sub-values
                      * influence samples up to 2*dt + 1.5*dt of an edge */
                     if (near_edge(edge_cases[c].w, n.phase,
@@ -382,8 +382,8 @@ int main(void)
     }
 
     /* -- 2. continuity (the alias killer): every per-sample jump strictly
-     * < 2.0 over >= 4 periods (owner ruling 2026-11-10 replacing the
-     * plan's 4*dt bound, which no band-limited saw can meet; the naive
+     * < 2.0 over >= 4 periods (replacing the
+     * earlier 4*dt bound, which no band-limited saw can meet; the naive
      * SQUARE jumps exactly 2.0 at the wrap and duty edge and must fail
      * this loudly) -- */
     {
@@ -416,7 +416,7 @@ int main(void)
         }
     }
 
-    /* -- 4. untouched waves (MS2 re-pin): white/pink (noise, stays 1x)
+    /* -- 4. untouched waves: white/pink (noise, stays 1x)
      * bit-exact to the naive reference over >= 4 periods; sine/tri
      * (tonal, now 2x oversampled) within the averaging deviation bound
      * slope*dt/2 of naive -- */
@@ -464,10 +464,10 @@ int main(void)
         CHECK(fabs(mean) <= 1.0 / (2.0 * MS1_PERIOD));
     }
 
-    /* ==== PLAN_POLYBLEP.md MS2 contracts ============================== */
+    /* ==== 2x-oversampling contracts =================================== */
 
-    /* -- 6. (owner ruling 2026-11-10) MS2 alias-floor probes: Goertzel
-     * ENERGY at two harmonic folds of 220 Hz, compared against the MS1
+    /* -- 6. alias-floor probes: Goertzel
+     * ENERGY at two harmonic folds of 220 Hz, compared against the
      * 1x PolyBLEP reference (mirror above). Renders are 44100 samples =
      * exactly 220 periods, so every true harmonic lands on a bin k*220
      * and leaks ~nothing into the non-harmonic probe bins.
@@ -479,7 +479,7 @@ int main(void)
      * the 149th, 32780 Hz -> 11320 Hz, |H(32780)| = 0.0177 (~3183x).
      * RED threshold: the 2x path must drop the bin's energy >= 10x vs
      * the 1x reference. Negative controls (verified against temporary
-     * naive and 1x builds, LOG_POLYBLEP.md MS2 entry 4): the naive
+     * naive and 1x builds): the naive
      * wave carries the full harmonic and the 1x path keeps it
      * ~unattenuated — both fail the 10x drop.
      *

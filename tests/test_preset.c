@@ -1,11 +1,11 @@
-/* tests/test_preset.c — M3 preset file I/O + factory defaults tests
- * (PLAN §10, contracts per IMPLEMENTATION.md §2/§7). TDD: written BEFORE
+/* tests/test_preset.c — preset file I/O + factory defaults tests
+ * (contracts per the preset/preset.h + schema layer). TDD: written BEFORE
  * preset/preset.c / preset/defaults.c exist.
- * Approved plan change (commits eacb368+fix): OPHIS_DEFAULTS gains
+ * OPHIS_DEFAULTS gains
  * duty 50 on every main osc and sub; delay {time_l 0.0, time_r 0.0,
  * feedback 0, tone 20000, mix 0}; reverb {size 0, damp 0, mix 0,
-  * width 0} — silent defaults, engine-ignored until the FX milestone.
-  * BPM is GLOBAL (AMENDED, owner order, PLAN §6): one top-level bpm
+  * width 0} — silent defaults.
+  * BPM is GLOBAL: one top-level bpm
   * (roundtrip must preserve it); seq entries carry no bpm. */
 #include "harness.h"
 #include "../src/preset/preset.h"
@@ -28,7 +28,7 @@ static void fill_params(synth_params_t *p)
 {
     memset(p, 0, sizeof *p);
     p->master = 88;
-    p->bpm = 137;              /* GLOBAL tempo (AMENDED): non-default so the
+    p->bpm = 137;              /* GLOBAL tempo (non-default): so the
                                   roundtrip proves the value travels */
     for (int c = 0; c < 3; c++) {
         p->chain[c].freq_hz = 41.5f * (float)(c + 1);
@@ -52,10 +52,10 @@ static void fill_params(synth_params_t *p)
         p->chain[c].sub[0].level = 20 * (c + 1);   /* 20/40/60 */
     }
     for (int q = 0; q < 3; q++) {
-        p->seq[q].on = 1;      /* no per-seq bpm (GLOBAL, AMENDED, PLAN §6) */
+        p->seq[q].on = 1;      /* no per-seq bpm (GLOBAL tempo) */
         p->seq[q].div = 1 + 6 * q;   /* 1/7/13 — distinct, in 1..16 */
-        /* owner-ordered modes amendment: seq gains mode (step order) and
-         * once (loop=0/once=1) — PLAN §6/§9 REQUIRED fields */
+        /* seq gains mode (step order) and
+         * once (loop=0/once=1) — REQUIRED fields */
         p->seq[q].mode = (q == 0) ? 1 : (q == 1 ? 2 : 4); /* 1/2/4; mode 3
                                      (markov) covered in main below */
         p->seq[q].once = q % 2;      /* 0/1/0 */
@@ -65,7 +65,7 @@ static void fill_params(synth_params_t *p)
         }
     }
     /* xmod: TWO ACTIVE slots at 0..1 — prefix-canonical for schema v2
-     * (M2, R2/R3: the writer emits active slots only in ascending slot
+     * (the writer emits active slots only in ascending slot
      * order, so nonzero slots must sit at a 0..k prefix for the save/
      * load round-trip to land back in place) */
     p->xmod[0].src = 2; p->xmod[0].dest = 3; p->xmod[0].amount = 66.0f;
@@ -74,7 +74,7 @@ static void fill_params(synth_params_t *p)
     p->delay.feedback = 55;  p->delay.tone = 6000;  p->delay.mix = 25;
     p->reverb.size = 70; p->reverb.damp = 40; p->reverb.mix = 35;
     p->reverb.width = 90;
-    p->safety = 0; /* owner-ordered FX amendment: serialized boolean */
+    p->safety = 0; /* serialized boolean */
     p->run = 1; /* excluded from presets */
 }
 
@@ -83,14 +83,14 @@ int main(void)
     char dirbuf[512], err[256];
     synth_params_t p, q;
 
-    /* temp dir via mkdtemp (PLAN §10: roundtrip in a temp dir) */
+    /* temp dir via mkdtemp (roundtrip in a temp dir) */
     snprintf(dirbuf, sizeof dirbuf, "/tmp/ophis_test_preset.XXXXXX");
     char *dir = mkdtemp(dirbuf);
     CHECK(dir != NULL);
 
     /* 1. save -> list -> load roundtrip */
     fill_params(&p);
-    p.seq[1].mode = 3;  /* owner-ordered modes amendment: fill_params modes
+    p.seq[1].mode = 3;  /* fill_params modes
                            are 1/2/4; markov (3) rides along in slot 1 so
                            the roundtrip covers modes 1..4 and once 0/1 */
     CHECK(preset_save(dir, "round_trip", &p, err, sizeof err) == 0);
@@ -141,8 +141,8 @@ int main(void)
         if (strcmp(names[i - 1], names[i]) > 0) ordered = 0;
     CHECK(ordered);
 
-    /* 3b. preset_list rejects unsafe *.json names (H-1/L-3,
-     * PLAN_REVIEW_2026-11-10.md MS1): over-long base names would corrupt
+    /* 3b. preset_list rejects unsafe *.json names: over-long base names
+     * would corrupt
      * the 33-byte row, dotted names are unloadable — only "ok" is listed */
     {
         char d2buf[512];
@@ -207,8 +207,8 @@ int main(void)
     CHECK(preset_load(dir, "no_such_preset", &q, err, sizeof err) == -1);
     CHECK(params_equal(&q, &keep));
 
-    /* 4b. oversize preset rejected (M-2, PLAN_REVIEW_2026-11-10.md MS2):
-     * a valid preset padded with trailing spaces past the 64 KiB buffer
+    /* 4b. oversize preset rejected: a valid preset padded with trailing
+     * spaces past the 64 KiB buffer
      * must be rejected, not parsed from its leading bytes */
     {
         char d3buf[512];
@@ -230,7 +230,7 @@ int main(void)
         if (system(fp) != 0) { /* best-effort cleanup */ }
     }
 
-    /* 4c. atomic save (M-3, MS2): the temp file is renamed away (no
+    /* 4c. atomic save: the temp file is renamed away (no
      * <name>.json.tmp left behind) and the final file round-trips */
     {
         fill_params(&p);
@@ -243,7 +243,7 @@ int main(void)
         CHECK(params_equal(&p, &q));
     }
 
-    /* 4d. presets dir mode 0755 (L-4, MS2): umask(0) so the raw mkdir
+    /* 4d. presets dir mode 0755: umask(0) so the raw mkdir
      * mode is visible — group/other write bits must not survive */
     {
         char d4buf[512];
@@ -263,10 +263,10 @@ int main(void)
         if (system(cmd) != 0) { /* best-effort cleanup */ }
     }
 
-    /* 5. OPHIS_DEFAULTS sanity (IMPLEMENTATION.md §2) */
+    /* 5. OPHIS_DEFAULTS sanity */
     const synth_params_t *d = &OPHIS_DEFAULTS;
     CHECK(d->master == 70 && d->run == 0);
-    /* GLOBAL tempo (AMENDED, owner order, PLAN §6): one top-level bpm 60 */
+    /* GLOBAL tempo: one top-level bpm 60 */
     CHECK(d->bpm == 60);
     /* A: 55.0 saw, level 100, vel 100, subs off, A.05/D.2/S100/R.5, LP800 */
     CHECK(fexactf(d->chain[0].freq_hz, 55.0f) && d->chain[0].wave == WAVE_SAW);
@@ -275,7 +275,7 @@ int main(void)
           fexactf(d->chain[0].adsr.d, 0.2f) &&
           d->chain[0].adsr.s == 100 && fexactf(d->chain[0].adsr.r, 0.5f));
     CHECK(d->chain[0].fmode == FILT_LP && fexactf(d->chain[0].fc, 800.0f));
-    /* B: 55.5 square, level 50, vel 100, subs silent (O2 voices:
+    /* B: 55.5 square, level 50, vel 100, subs silent (voices:
        div 1 sine level 0), A.05/D.2/S100/R.5, LP600 */
     CHECK(fexactf(d->chain[1].freq_hz, 55.5f) && d->chain[1].wave == WAVE_SQUARE);
     CHECK(d->chain[1].level == 50 && d->chain[1].vel == 100);
@@ -300,7 +300,7 @@ int main(void)
     CHECK(d->chain[0].sub[0].level == 0 &&
           d->chain[0].sub[1].level == 0);
     /* filter expansion defaults: res 10, envamt 0, poles 12 on ALL chains
-     * (approved plan: recorded in preset/defaults.c) */
+     * (see preset/defaults.c) */
     for (int c = 0; c < 3; c++) {
         CHECK(d->chain[c].res == 10 && d->chain[c].envamt == 0 &&
               d->chain[c].poles == 12);
@@ -320,11 +320,11 @@ int main(void)
           d->delay.mix == 0);
     CHECK(d->reverb.size == 0 && d->reverb.damp == 0 &&
           d->reverb.mix == 0 && d->reverb.width == 0);
-    /* master safety filter default ON (owner-ordered FX amendment) */
+    /* master safety filter default ON */
     CHECK(d->safety == 1);
-    /* seq: all off, div 1 (approved tabbed-UI amendment), mode fwd (0),
-     * once loop (0) (owner-ordered modes amendment), all steps {55.0 Hz,
-     * vel 100} — NO per-seq bpm (GLOBAL, AMENDED, PLAN §6) */
+    /* seq: all off, div 1, mode fwd (0),
+     * once loop (0), all steps {55.0 Hz,
+     * vel 100} — NO per-seq bpm (GLOBAL tempo) */
     for (int s = 0; s < 3; s++) {
         CHECK(d->seq[s].on == 0);
         CHECK(d->seq[s].div == 1);
@@ -338,13 +338,12 @@ int main(void)
         CHECK(d->xmod[x].src == 0 && d->xmod[x].dest == 0 &&
               fexactf(d->xmod[x].amount, 0.0f));
 
-    /* 6. preset_dir() — THE ONLY rule (user-set): presets/ next to the
+    /* 6. preset_dir() — THE ONLY rule: presets/ next to the
      * running executable, computed at runtime from /proc/self/exe.
      * No env var, no HOME, no fallbacks, no error taxonomy. Pins:
-     * byte-exact resolution, argument validation (B3), exact-fit buffer
-     * boundary. The /proc/self/exe-unreadable guards (B1/B2/B4) cannot
-     * be triggered in-process — code-covered only, per
-     * PLAN_PRESET_DIR_REVIEW_FIXES.md. */
+     * byte-exact resolution, argument validation, exact-fit buffer
+     * boundary. The /proc/self/exe-unreadable guards cannot
+     * be triggered in-process — code-covered only. */
     {
         char db[512], exe[1024], want[1024];
         ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
@@ -368,7 +367,7 @@ int main(void)
         CHECK(strcmp(db, want) == 0);
     }
 
-    /* 6b. preset_ensure_dir (F1a, user order 2026-11-05): mkdir -p over
+    /* 6b. preset_ensure_dir: mkdir -p over
      * every missing prefix, EEXIST tolerated. LOAD opens the presets dir
      * through this, so a fresh install finds an empty-but-existing
      * folder. -1 on NULL/empty/too-long/not creatable. */
@@ -401,8 +400,8 @@ int main(void)
         rmdir("build/tests/ensure_dir_probe");
     }
 
-    /* 8. preset_path behavior pins (X2, PLAN_CODE_REVIEW_FIXES.md
-     * Phase 8): the lexical normalizer's accepted behavior, pinned BEFORE
+    /* 8. preset_path behavior pins: the lexical normalizer's accepted
+     * behavior, pinned BEFORE
      * the component-stack normalizer is simplified to the dir-walk walk —
      * the same pins must stay green after. Categories: absolute /
      * relative components, ".." pops, "." drops, duplicate components,

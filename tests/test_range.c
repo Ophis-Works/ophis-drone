@@ -1,15 +1,15 @@
 /* test_range.c — ladder sanity for the pure position helpers
- * (src/ui/range.c). PLAN_HZ_EDIT.md P5/R9: the Hz-ladder pins
+ * (src/ui/range.c). The Hz-ladder pins
  * (pos_to_hz/hz_to_pos, pos 0..212) are DELETED — the 1/12-octave edit
  * ladder is going away with the odometer-box rework; the ADSR seconds
- * ladder (D6) is untouched and stays pinned here.
+ * ladder is untouched and stays pinned here.
  * SDL-free: pure math module src/ui/range.c. */
 #include "harness.h"
 #include "../src/ui/range.h"
 
 int main(void)
 {
-    /* ADSR seconds ladder (D6, R9 untouched): pos 0 = 0 s;
+    /* ADSR seconds ladder: pos 0 = 0 s;
      * 1..50 = 0.001*60000^((pos-1)/49), so pos 1 = 0.001 s and
      * pos 50 = 60 s (0.001 * 60000^1). */
     CHECK(fexact(adsr_pos_to_s(0), 0.0));      /* exact ladder endpoints */

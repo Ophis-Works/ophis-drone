@@ -1,6 +1,6 @@
 /* src/dsp/filter.c — RBJ biquad (Audio EQ Cookbook), modes LP/HP/BP/BR.
- * Contract: IMPLEMENTATION.md §2. Q comes in via biquad_set_coefs's q
- * param (RES mapping lives in chain.c, PLAN §5). Pure. No SDL/ALSA. */
+ * Q comes in via biquad_set_coefs's q
+ * param (RES mapping lives in chain.c). Pure. No SDL/ALSA. */
 #include <math.h>
 
 #include "filter.h"
@@ -45,7 +45,7 @@ void biquad_set_coefs(biquad_t *b, filt_mode_t m, float fc, double sr,
     /* normalize by a0 */
     b->b0 /= a0; b->b1 /= a0; b->b2 /= a0;
     b->a1 /= a0; b->a2 /= a0;
-    /* z1/z2 untouched (S1): per-sample coefficient sweeps keep the
+    /* z1/z2 untouched: per-sample coefficient sweeps keep the
      * filter history; use biquad_set to clear it */
 }
 

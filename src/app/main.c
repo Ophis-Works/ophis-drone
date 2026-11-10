@@ -1,10 +1,10 @@
-/* src/app/main.c — M5: real UI loop (IMPLEMENTATION.md §6, PLAN §4).
+/* src/app/main.c — real UI loop.
  * UI thread (SDL events + draw) and host thread (pthreads) running the
  * engine via ALSA over the lock-free mailbox. Event-driven redraw with a
- * 100 ms status refresh (<= 10 Hz, PLAN §8.6). No quit key — exit is
- * menu-only (PLAN §2). On exit the LAST line printed is: XRUNS <n>
+ * 100 ms status refresh (<= 10 Hz). No quit key — exit is
+ * menu-only. On exit the LAST line printed is: XRUNS <n>
  * (desktop gate: must be 0). Set OPHIS_UI_LOG=1 to log each mailbox
- * commit with a one-line param delta summary (M5 smoke aid). */
+ * commit with a one-line param delta summary (smoke aid). */
 #include <SDL.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -32,7 +32,7 @@ static int         g_log = 0;
 static SDL_GameController *g_ctrl = NULL;
 #endif
 
-/* --- host thread: engine + ALSA (PLAN §4 architecture) ----------------- */
+/* --- host thread: engine + ALSA ---------------------------------------- */
 static void *audio_thread_fn(void *arg)
 {
     (void)arg;
@@ -52,7 +52,7 @@ static void *audio_thread_fn(void *arg)
     ui_status_t st;
 
     while (!atomic_load_explicit(&quit, memory_order_relaxed)) {
-        /* M-1: bounded read — 0 = retries exhausted (*out untouched):
+        /* bounded read — 0 = retries exhausted (*out untouched):
          * keep the previous block's params instead of spinning. */
         if (mailbox_read(&mb, &snap))
             eng.p = snap;
@@ -65,7 +65,7 @@ static void *audio_thread_fn(void *arg)
         st.gate = eng.tr.gate;
         for (int c = 0; c < 3; c++)
             st.env[c] = eng.ch[c].env.level;
-        /* B-SEQ1 (owner order 2026-11-05): the live step is the
+        /* the live step is the
          * engine's step WINDOW — mode-independent; never the
          * sequencer's order cursor (frozen at 0 in random/markov) */
         engine_seq_steps(&eng, st.step);
@@ -102,7 +102,7 @@ int main(void)
     }
 
     /* Load the OS's own controller databases — AUTHORITATIVE, no bundled
-     * fallback (owner order 2026-11-05: our bundled RG351-line fallback
+     * fallback (our bundled RG351-line fallback
      * was never device-verified and once replaced the device-correct
      * mapping SDL had already loaded, killing Start/Select). ArkOS /
      * PortMaster carry the numbers for this exact unit; every working
@@ -147,7 +147,7 @@ int main(void)
 #if defined(TARGET_RG28XX)
     /* EmuELEC-family firmware SDL2 ships no mapping for the H700 pad —
      * register one from the runtime GUID and retry. Raw indices measured
-     * on the device (owner test): printed A=0 B=1 Y=2 X=3, L1=4 R1=5
+     * on the device: printed A=0 B=1 Y=2 X=3, L1=4 R1=5
      * L2=6 R2=7, Select=8 Start=9 Menu=10 (the firmware maps the top
      * Menu key to BTN_START, so MENU opens on M); D-pad is a hat
      * (probe: buttons=15 hats=1). */
@@ -202,7 +202,7 @@ int main(void)
         return 1;
     }
 #if defined(TARGET_RG28XX)
-    /* Portrait panel (PLAN_RG28XX_BUILD M3): the output is 480x640, so
+    /* Portrait panel: the output is 480x640, so
      * the 640x480 UI renders into an offscreen texture and is presented
      * rotated. OPHIS_ROT=90 flips the direction (default 270 = CCW
      * quarter turn). R36S and desktop keep direct rendering. */
@@ -245,7 +245,7 @@ int main(void)
     memset(&st, 0, sizeof st);
     Uint32 last_refresh = 0;
     /* Optional smoke auto-quit (env, ms); exit remains menu-only otherwise.
-     * P3 (PLAN_CODE_REVIEW_FIXES.md Phase 6): strtol with validation —
+     * strtol with validation —
      * junk rejected / range clamped in autoquit_parse, not bare atoi. */
     Uint32 autoquit = 0, t0 = SDL_GetTicks();
     {
@@ -259,10 +259,10 @@ int main(void)
         int dirty = 0;
         while (SDL_PollEvent(&e)) {
             ui_action_t act;
-            /* U2 (see ui_event_filter in ui.c — S3 moved the policy
-             * there): text entry owns the keyboard while naming. */
+            /* (see ui_event_filter in ui.c — policy lives there):
+             * text entry owns the keyboard while naming. */
             int mapped = 0;
-            if (ui_event_filter(&ui, &e))    /* S3: policy lives in the UI */
+            if (ui_event_filter(&ui, &e))    /* policy lives in the UI */
                 mapped = keymap_action(&e, &act);
             if (mapped) {
                 ui_handle_action(&ui, act);
@@ -278,7 +278,7 @@ int main(void)
             }
         }
         if (SDL_GetTicks() - last_refresh >= REFRESH_MS) {
-            /* <= 10 Hz refresh; H2: a 0 return means the host published
+            /* <= 10 Hz refresh; a 0 return means the host published
              * mid-read — keep the last good status (skip this redraw) */
             if (mailbox_status_read(&mb, &st))
                 dirty = 1;

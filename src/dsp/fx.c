@@ -1,5 +1,4 @@
-/* src/dsp/fx.c — master-path FX + safety + master level + gate (PLAN §2/§5
- * amended signal chain, IMPLEMENTATION.md §2 dsp/fx.c contract).
+/* src/dsp/fx.c — master-path FX + safety + master level + gate.
  *
  * Per sample: delay -> reverb -> safety -> master level -> gate.
  *   delay : stereo ring buffers (fixed 2 s @44100), feedback loop with a
@@ -186,7 +185,7 @@ void fx_process(fx_state_t *fx, const fx_params_t *p,
                      biquad_next(&fx->hp1, (double)s_r))));
     }
 
-    /* --- 4. master level, 5. gate (amended order: gate AFTER safety) --- */
+    /* --- 4. master level, 5. gate (gate AFTER safety) --- */
     float g = (float)p->master / 100.0f * p->gate;
     *out_l = s_l * g;
     *out_r = s_r * g;

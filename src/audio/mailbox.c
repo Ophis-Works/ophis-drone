@@ -1,7 +1,7 @@
-/* src/audio/mailbox.c — lock-free host <-> UI channels (IMPLEMENTATION.md
- * §2/§3). No mutex, no condvar — stdatomic only.
+/* src/audio/mailbox.c — lock-free host <-> UI channels.
+ * No mutex, no condvar — stdatomic only.
  *
- * Seqlock mechanics (Phase 2, H1): the parameter mailbox keeps a u64
+ * Seqlock mechanics: the parameter mailbox keeps a u64
  * sequence counter that is EVEN at rest and ODD while a publish is in
  * flight (double increment); the published slot is (seq >> 1) & 1. With a
  * u64 counter the ABA window of the old 1-bit version index is closed
@@ -53,7 +53,7 @@ void mailbox_write(mailbox_t *mb, const synth_params_t *p)
 
 int mailbox_read(mailbox_t *mb, synth_params_t *out)
 {
-    /* M-1: bounded retries — the audio thread must never spin forever.
+    /* bounded retries — the audio thread must never spin forever.
      * 1 = complete snapshot in *out, 0 = exhausted (*out untouched,
      * caller keeps its last params). The copy goes to a scratch first:
      * an interleaved publish between copy and reload must not leave a

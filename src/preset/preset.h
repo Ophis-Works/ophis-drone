@@ -1,5 +1,5 @@
-/* src/preset/preset.h — preset file I/O over json.c (IMPLEMENTATION.md §2,
- * §7: all preset functions take explicit paths/dirs, testable). */
+/* src/preset/preset.h — preset file I/O over json.c (all preset functions
+ * take explicit paths/dirs, testable). */
 #ifndef OPHIS_PRESET_H
 #define OPHIS_PRESET_H
 
@@ -16,7 +16,7 @@ int preset_dir(char *out, int out_len);
  * Returns 0, or -1 on error (dir unreadable). */
 int preset_list(const char *dir, char names[][33], int *count, int max);
 
-/* mkdir -p equivalent (IMPLEMENTATION.md §7): create every missing path
+/* mkdir -p equivalent: create every missing path
  * prefix of dir, EEXIST tolerated. Returns 0, or -1 (NULL/empty dir,
  * path >= 1024 bytes, prefix not creatable — e.g. a file in the way). */
 int preset_ensure_dir(const char *dir);
@@ -33,7 +33,7 @@ int preset_save(const char *dir, const char *name, const synth_params_t *p,
 int preset_load(const char *dir, const char *name, synth_params_t *p,
                 char *err, int err_len);
 
-/* LOAD folder navigator (PLAN §8.4): list the subdirectories of dir plus
+/* LOAD folder navigator: list the subdirectories of dir plus
  * ".." (to go up), alphabetically. Fills names[][33] (NUL-terminated
  * entry names, WITHOUT a trailing "/"), *count = found.
  * Returns 0, or -1 on error (dir unreadable). */

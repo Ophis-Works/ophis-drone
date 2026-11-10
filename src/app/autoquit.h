@@ -1,5 +1,5 @@
-/* src/app/autoquit.h — OPHIS_AUTOQUIT_MS smoke auto-quit parsing
- * (PLAN_CODE_REVIEW_FIXES.md Phase 6 P3). SDL-free so the unit test can
+/* src/app/autoquit.h — OPHIS_AUTOQUIT_MS smoke auto-quit parsing.
+ * SDL-free so the unit test can
  * link it without the window stack. */
 #ifndef OPHIS_AUTOQUIT_H
 #define OPHIS_AUTOQUIT_H

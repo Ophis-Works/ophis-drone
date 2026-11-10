@@ -1,4 +1,4 @@
-/* src/preset/defaults.h — factory defaults (IMPLEMENTATION.md §2). */
+/* src/preset/defaults.h — factory defaults. */
 #ifndef OPHIS_DEFAULTS_H
 #define OPHIS_DEFAULTS_H
 

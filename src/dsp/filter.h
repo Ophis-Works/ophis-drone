@@ -1,5 +1,5 @@
 /* src/dsp/filter.h — RBJ biquad, modes LP/HP/BP/BR.
- * Contract: IMPLEMENTATION.md §2. Declarations only. */
+ * Declarations only. */
 #ifndef OPHIS_FILTER_H
 #define OPHIS_FILTER_H
 
@@ -11,7 +11,7 @@ typedef struct {
 } biquad_t;
 
 /* compute + normalize the coefficients for m/fc/q; z1/z2 are NOT
- * touched (S1, PLAN_CODE_REVIEW_FIXES.md Phase 1): the per-sample
+ * touched: the per-sample
  * ENV-cutoff path updates coefficients while the filter keeps its
  * history */
 void   biquad_set_coefs(biquad_t *b, filt_mode_t m, float fc, double sr,
@@ -21,7 +21,7 @@ void   biquad_set_coefs(biquad_t *b, filt_mode_t m, float fc, double sr,
 void   biquad_set(biquad_t *b, filt_mode_t m, float fc, double sr, float q);
 double biquad_next(biquad_t *b, double x);
 
-/* poles=24 (PLAN §5): two identical biquads sharing one cutoff/Q,
+/* poles=24: two identical biquads sharing one cutoff/Q,
  * cascaded. Sets both stages and zeroes their state; render with
  * y = biquad_next(&s2, biquad_next(&s1, x)). */
 void   biquad_cascade_set(biquad_t *s1, biquad_t *s2, filt_mode_t m,

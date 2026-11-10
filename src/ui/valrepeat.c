@@ -1,6 +1,5 @@
 /* src/ui/valrepeat.c — the value-key edit + synthesized hold-repeat
- * state machine (M1 split, PLAN_OPTIMIZATION.md O6). Owner order
- * 2026-11-10 (PLAN_VALKEY_NO_RETRIG.md): value keys NEVER trigger —
+ * state machine. Value keys NEVER trigger —
  * no retrig, no TRIG flash; the single trigger path is ACT_TRIGGER.
  * val_edit applies the value and arms the repeat; ui_tick drives
  * valrepeat_tick. No state of its own — the hold lives in ui_t

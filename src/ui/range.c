@@ -1,5 +1,5 @@
-/* src/ui/range.c — pure ladder conversions (PLAN §8.3). The 1/12-octave
- * frequency ladder (pos_to_hz/hz_to_pos) is DELETED (PLAN_HZ_EDIT.md R9:
+/* src/ui/range.c — pure ladder conversions. The 1/12-octave
+ * frequency ladder (pos_to_hz/hz_to_pos) is DELETED:
  * the frequency rows are integer-Hz odometer boxes now, helpers in
  * seq_items.c); only the ADSR seconds ladder remains. */
 #include "range.h"

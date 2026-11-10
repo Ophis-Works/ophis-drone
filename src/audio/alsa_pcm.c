@@ -1,4 +1,4 @@
-/* src/audio/alsa_pcm.c — thin ALSA PCM wrapper (IMPLEMENTATION.md §2).
+/* src/audio/alsa_pcm.c — thin ALSA PCM wrapper.
  * No malloc/printf in the steady-state write path. Pure C11. */
 #include <stdlib.h>
 #include <alsa/asoundlib.h>
@@ -12,8 +12,8 @@ struct alsa_pcm {
     int        period_frames;
     long       xruns;      /* cumulative recovered xrun count */
     int        use_s16;    /* device lacks the format plug: write converts
-                            float→S16 (H700/EmuELEC firmware, PLAN_RG28XX
-                            M2); 0 = native FLOAT, no conversion */
+                            float→S16 (H700/EmuELEC firmware);
+                            0 = native FLOAT, no conversion */
     int16_t   *scratch;    /* PERIOD frames * 2 ch, allocated at open */
 };
 

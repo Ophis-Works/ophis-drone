@@ -1,5 +1,5 @@
-/* tests/test_mailbox.c — lock-free mailbox contracts (PLAN_CODE_REVIEW_FIXES
- * .md Phase 2, H1/H2). SDL/ALSA-free: links only src/audio/mailbox.c plus
+/* tests/test_mailbox.c — lock-free mailbox contracts (the u64-seqlock
+ * contracts). SDL/ALSA-free: links only src/audio/mailbox.c plus
  * pthread for the two interleave tests; everything else is the documented
  * single-threaded semantics.
  *
@@ -7,12 +7,12 @@
  *  - mailbox_read always returns a COMPLETE synth_params_t: every field
  *    comes from one mailbox_write commit — possibly one commit stale (the
  *    documented one-block bound), or from the zeroed mailbox_init state
- *    before the first commit — never a torn mix (H1).
+ *    before the first commit — never a torn mix.
  *  - An odd number of commits before a read never stalls the reader (the
  *    seqlock internals — parity, seq value, slot choice — are private to
  *    mailbox.c; main.c does exactly one commit before audio starts).
  *  - mailbox_status_read returns 1 on a stable snapshot, 0 when a publish
- *    interleaved (H2: the caller keeps the last good status); a 1 return
+ *    interleaved (the caller keeps the last good status); a 1 return
  *    never carries a torn snapshot. */
 #include "harness.h"
 
@@ -87,7 +87,7 @@ static void fill_status(ui_status_t *s, int tag)
     s->gate = (float)tag;
     for (int c = 0; c < 3; c++) {
         s->env[c]  = (float)tag;
-        s->step[c] = tag;      /* tag carrier (B-SEQ1: no seq_cursor) */
+        s->step[c] = tag;      /* tag carrier (no seq_cursor) */
     }
 }
 
@@ -183,10 +183,10 @@ static void test_status_single_threaded(void)
     CHECK(status_valid(&out) && out.step[0] == 6);
 }
 
-/* --- interleave: H1 torn-snapshot validity under a committing writer ---- */
+/* --- interleave: torn-snapshot validity under a committing writer ------- */
 /* A writer commits N_COMMITS times while the reader reads; every snapshot
  * the reader accepts must be one whole commit (tag-consistent). This is
- * the H1 observable: with the old 1-bit version, two commits between the
+ * the observable: with the old 1-bit version, two commits between the
  * reader's version loads flip it back (ABA) while the second commit
  * overwrites the slot the reader is copying — a torn mix gets accepted. */
 
@@ -275,7 +275,7 @@ static void test_bounded_read(void)
     CHECK(got > 0);                     /* not permanently starved */
 }
 
-/* --- interleave: H2 stability flag toggles under a publishing writer ---- */
+/* --- interleave: stability flag toggles under a publishing writer ------- */
 
 static atomic_int g_status_done;
 
@@ -309,7 +309,7 @@ static void test_status_interleave(void)
                 tears++;               /* 1 must never carry a torn copy */
         } else {
             unstable++;                /* publish interleaved: caller keeps
-                                          the last good status (H2) */
+                                          the last good status */
         }
         if (atomic_load(&g_status_done))
             break;
@@ -321,7 +321,7 @@ static void test_status_interleave(void)
     CHECK(stable > 0);                 /* flag usable on the stable path */
     if (unstable == 0)
         printf("note: no interleaved publish observed (serialized "
-               "scheduler, e.g. under valgrind); the H2 retry path is "
+               "scheduler, e.g. under valgrind); the retry path is "
                "unexercised this run, not violated\n");
     CHECK(tears == 0);                 /* stable never means torn */
 }

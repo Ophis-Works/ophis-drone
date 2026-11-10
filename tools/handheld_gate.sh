@@ -1,8 +1,8 @@
 #!/bin/sh
-# tools/handheld_gate.sh — machine-checked M6 gate (PLAN.md §11 M6, owner ruling):
+# tools/handheld_gate.sh — machine-checked handheld gate:
 #   1. binary must be an aarch64 ELF;
 #   2. no required glibc version in .gnu.version_r may exceed GLIBC_2.28
-#      (ArkOS lineage is Ubuntu 19.10 / glibc 2.28, PLAN.md §1).
+#      (ArkOS lineage is Ubuntu 19.10 / glibc 2.28).
 # Usage: tools/handheld_gate.sh <binary> ; exit 0 = pass, 1 = fail.
 set -e
 

@@ -1,5 +1,5 @@
 /* src/dsp/adsr.h — sample-accurate GATE-DRIVEN A/D/S/R state machine.
- * Contract: IMPLEMENTATION.md §2 (adsr_reset/adsr_trigger/adsr_next only).
+ * API: adsr_reset/adsr_trigger/adsr_next only.
  * Pure C11. Declarations only. */
 #ifndef OPHIS_ADSR_H
 #define OPHIS_ADSR_H

@@ -1,10 +1,10 @@
-/* tests/test_json.c — M3 preset JSON tests (PLAN §10, format per PLAN §9).
+/* tests/test_json.c — preset JSON tests.
  * TDD: written BEFORE preset/json.c exists.
- * Approved plan change (commits eacb368+fix): duty on every osc and sub
+ * duty on every osc and sub
  * object (always serialized, always required, 5..95 enforced); dest gains
  * "phase"; top-level delay + reverb objects are REQUIRED (engine-ignored),
  * with missing/duplicate/range violations rejecting the whole file.
- * BPM is GLOBAL (AMENDED, owner order, PLAN §6/§9): the REQUIRED
+ * BPM is GLOBAL: the REQUIRED
  * top-level integer "bpm" (1..500) sits next to "master"; seq objects
  * carry NO "bpm" key anymore (a stray per-seq "bpm" is an unknown key —
  * ignored). Reworked BEFORE the implementation change (strict TDD). */
@@ -25,8 +25,8 @@ static void fill_params(synth_params_t *p)
     static const filt_mode_t fmode[4] = { FILT_LP, FILT_HP, FILT_BP, FILT_BR };
     memset(p, 0, sizeof *p);
     p->master = 73;
-    p->bpm = 137;               /* GLOBAL tempo (AMENDED): non-default so
-                                    the roundtrip proves the value travels */
+    p->bpm = 137;               /* GLOBAL tempo (non-default): so the
+                                    roundtrip proves the value travels */
     p->run = 1; /* excluded from JSON — must not break the roundtrip */
     for (int c = 0; c < 3; c++) {
         chain_params_t *ch = &p->chain[c];
@@ -47,7 +47,7 @@ static void fill_params(synth_params_t *p)
         for (int s = 0; s < 2; s++) {
             subosc_params_t *so = &ch->sub[s];
             int idx = c * 2 + s;
-            so->div   = 1 + (idx * 5) % 16;     /* distinct, 1..16 (O2) */
+            so->div   = 1 + (idx * 5) % 16;     /* distinct, 1..16 */
             so->wave  = waves[(idx + 2) % 4];   /* subs: sin/tri/saw/sq */
             so->duty  = 5 + ((20 + 25 * idx) % 91); /* distinct, 5..95 */
             so->level = (idx * 30) % 101;       /* distinct, 0..100 */
@@ -57,7 +57,7 @@ static void fill_params(synth_params_t *p)
         seq_params_t *sq = &p->seq[q];
         sq->on  = q % 2;
         sq->div = 1 + q * 7;    /* 1 / 8 / 15 — distinct, in 1..16 */
-        /* owner-ordered modes amendment (PLAN §9): mode/once REQUIRED per
+        /* mode/once REQUIRED per
          * seq — q = 0..2 gives modes 0,1,2 and once 0,1,0 */
         sq->mode = q % 5;
         sq->once = q % 2;
@@ -71,8 +71,8 @@ static void fill_params(synth_params_t *p)
         p->xmod[x].dest   = x % 5;   /* covers off/pitch/phase */
         p->xmod[x].amount = -100.0f + 70.0f * (float)x;
     }
-    /* delay / reverb (reserved for the FX milestone, serialized per PLAN
-     * §9 — roundtrip must be bit-identical through them) */
+    /* delay / reverb (serialized — roundtrip must be bit-identical
+     * through them) */
     p->delay.time_l   = 0.37f;
     p->delay.time_r   = 0.51f;
     p->delay.feedback = 35;
@@ -82,8 +82,8 @@ static void fill_params(synth_params_t *p)
     p->reverb.damp  = 35;
     p->reverb.mix   = 30;
     p->reverb.width = 100;
-    /* master safety filter boolean (owner-ordered FX amendment, PLAN §9:
-     * REQUIRED top-level, default true). 0 here so the roundtrip proves
+    /* master safety filter boolean (REQUIRED top-level, default true).
+     * 0 here so the roundtrip proves
      * the value travels (not just the default). */
     p->safety = 0;
 }
@@ -112,19 +112,19 @@ static int replace_once(char *buf, const char *from, const char *to)
     return 0;
 }
 
-/* runtime-bound xmod slot accessor (P2, PLAN_MOD_MATRIX_16.md §1.3):
+/* runtime-bound xmod slot accessor:
  * noinline keeps gcc from proving slot 5..15 out of bounds against
- * today's xmod[3] — the M2 type-widen (xmod[3] -> xmod[16]) must leave
- * these pins RUNTIME reds, not compile reds (§10 precedent) */
+ * today's xmod[3] — the type-widen (xmod[3] -> xmod[16]) must leave
+ * these pins RUNTIME reds, not compile reds */
 static __attribute__((noinline)) xmod_params_t *h_xmod(synth_params_t *p,
                                                        int s)
 {
     return &p->xmod[s];
 }
 
-/* schema v2 (M2, PLAN_MOD_MATRIX_16.md R2): build_doc emits version 2 —
+/* schema v2: build_doc emits version 2 —
  * the "xmod" array holds 0..16 ACTIVE slots, version 1 is REJECTED.
- * build_doc_v2 is the plain 3/2/8-shape alias kept for the P2 pins. */
+ * build_doc_v2 is the plain 3/2/8-shape alias kept for the pins. */
 static int build_doc(char *buf, int n_chains, int n_subs, int n_steps,
                      int n_xmod);
 static int build_doc_v2(char *buf, int n_xmod)
@@ -193,14 +193,14 @@ int main(void)
     CHECK(schema_parse_params(buf, wlen, &q, err, sizeof err) == 0);
     CHECK(params_equal(&p, &q));           /* every field, bit-identical */
 
-    /* error path must not leave *p half-written (IMPLEMENTATION §7) */
+    /* error path must not leave *p half-written */
     synth_params_t keep = q;
     CHECK(schema_parse_params("{", 1, &q, err, sizeof err) == -1);
     CHECK(params_equal(&q, &keep));
 
-    /* 2. enum-string mapping — writer emits PLAN §9 lowercase strings.
+    /* 2. enum-string mapping — writer emits lowercase preset strings.
      * Written doc for a distinctive param set must contain each string. */
-    /* subs cover only sin/tri/saw/square now (O2); white/pink remain
+    /* subs cover only sin/tri/saw/square; white/pink remain
      * MAIN-osc waves and are covered parse-side by the mapping loop */
     CHECK(strstr(buf, "\"saw\"") && strstr(buf, "\"square\"") &&
           strstr(buf, "\"tri\"")  && strstr(buf, "\"sine\""));
@@ -219,14 +219,14 @@ int main(void)
      * parse mapping loop below */
     CHECK(strstr(buf, "\"off\"") && strstr(buf, "\"b_osc\"") &&
           strstr(buf, "\"b_sub1\""));
-    /* 2b. writer emits the per-chain filter expansion fields (PLAN §9:
+    /* 2b. writer emits the per-chain filter expansion fields:
      * "res"/"env"/"poles" on every filter object; poles "12db"|"24db") */
     CHECK(strstr(buf, "\"res\":") && strstr(buf, "\"env\":") &&
           strstr(buf, "\"poles\":"));
-    /* 2c'. writer emits per-seq "div" (approved tabbed-UI amendment) */
+    /* 2c'. writer emits per-seq "div" */
     CHECK(strstr(buf, "\"div\":"));
-    /* 2c''. writer emits per-seq "mode"/"once" (owner-ordered modes
-     * amendment, PLAN §9); fill_params sets modes 0,1,2 so the doc
+    /* 2c''. writer emits per-seq "mode"/"once"; fill_params sets modes
+     * 0,1,2 so the doc
      * contains fwd, pingpong, oddeven — random/markov are covered by the
      * string-mapping loop below */
     CHECK(strstr(buf, "\"mode\":\"fwd\"") &&
@@ -235,11 +235,11 @@ int main(void)
     CHECK(strstr(buf, "\"once\":true") && strstr(buf, "\"once\":false"));
     CHECK(strstr(buf, "\"poles\":\"12db\"") &&
           strstr(buf, "\"poles\":\"24db\""));
-    /* 2d. writer emits the top-level "safety" boolean (owner-ordered FX
-     * amendment, PLAN §9); the roundtrip above already proves the value
+    /* 2d. writer emits the top-level "safety" boolean; the roundtrip
+     * above already proves the value
      * survives (fill_params sets safety 0) */
     CHECK(strstr(buf, "\"safety\":"));
-    /* 2e. BPM is GLOBAL (AMENDED, owner order, PLAN §6/§9): writer emits
+    /* 2e. BPM is GLOBAL: writer emits
      * the top-level "bpm" next to "master"; seq objects contain NO
      * "bpm" key; the roundtrip preserves the non-default global bpm */
     CHECK(strstr(buf, "\"master\":73,\"bpm\":137") != NULL);
@@ -379,8 +379,8 @@ int main(void)
                                 err, sizeof err) == -1);
         CHECK(params_equal(&q, &keep));
 
-        /* missing field: drop top-level "safety" (owner-ordered FX
-         * amendment, PLAN §9: REQUIRED boolean, default true — but the
+        /* missing field: drop top-level "safety" (REQUIRED boolean,
+         * default true — but the
          * LOADER requires the field per "every listed field is
          * required") */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
@@ -389,8 +389,8 @@ int main(void)
                                 err, sizeof err) == -1);
         CHECK(params_equal(&q, &keep));
 
-        /* missing field: drop top-level "bpm" (AMENDED, owner order,
-         * PLAN §6/§9: the GLOBAL tempo is a REQUIRED top-level integer
+        /* missing field: drop top-level "bpm" (the GLOBAL tempo is a
+         * REQUIRED top-level integer
          * 1..500 next to "master" — a file without it is invalid) */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
         CHECK(replace_once(buf, "\"bpm\":60,", "") == 0);
@@ -426,7 +426,7 @@ int main(void)
         CHECK(q.bpm == 500);
         q = keep;   /* restore the no-half-write baseline */
 
-        /* wrong version: schema 1 is REJECTED (M2, R2 — the old
+        /* wrong version: schema 1 is REJECTED (the old
          * fixed-length-3 contract is gone) */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
         CHECK(replace_once(buf, "\"version\":2", "\"version\":1") == 0);
@@ -462,7 +462,7 @@ int main(void)
         CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                                 err, sizeof err) == -1);
         /* xmod length: v2 accepts 0..16 entries — 2 is legal now, 17
-         * rejects (M2, R2) */
+         * rejects */
         CHECK(build_doc(buf, 3, 2, 8, 2) == 0);
         memset(&q, 0xEE, sizeof q);
         CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
@@ -476,7 +476,7 @@ int main(void)
                                 err, sizeof err) == -1);
         CHECK(params_equal(&q, &keep));
 
-        /* filter expansion (PLAN §9): res/env/poles are REQUIRED parts of
+        /* filter expansion: res/env/poles are REQUIRED parts of
          * version 2 — a file without them is missing required fields */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
         CHECK(replace_once(buf, "\"res\":10,", "") == 0);
@@ -496,7 +496,7 @@ int main(void)
                                 err, sizeof err) == -1);
         CHECK(params_equal(&q, &keep));
 
-        /* whitespace leniency (PLAN §9 "lenient about whitespace"):
+        /* whitespace leniency:
          * a space before a literal value (safety bool) must parse —
          * lit() used to memcmp at the raw position without skipping */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
@@ -560,8 +560,8 @@ int main(void)
         CHECK(q.master == 70 && q.bpm == 60 &&
               fexactf(q.chain[0].freq_hz, 55.0f));  /* 55.0 is exact */
 
-        /* stray per-seq "bpm" is an UNKNOWN key now (AMENDED, PLAN §6:
-         * BPM is global) — ignored, global bpm untouched */
+        /* stray per-seq "bpm" is an UNKNOWN key now (BPM is global) —
+         * ignored, global bpm untouched */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
         CHECK(replace_once(buf, "{\"on\":false,\"div\":1",
                             "{\"on\":false,\"bpm\":999,\"div\":1") == 0);
@@ -571,7 +571,7 @@ int main(void)
         CHECK(q.bpm == 60);                   /* the global tempo, unchanged */
     }
 
-    /* 4. approved change (eacb368+fix): dest "phase" — sub and xmod slots
+    /* 4. dest "phase" — sub and xmod slots
      * parse to MOD_PHASE */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
     CHECK(replace_once(buf, "\"dest\":\"off\",\"amount\":0.0}",
@@ -579,7 +579,7 @@ int main(void)
     memset(&q, 0, sizeof q);
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                             err, sizeof err) == 0);
-    /* subs have NO dest/amount (O2): the keys are unknown -> skipped */
+    /* subs have NO dest/amount: the keys are unknown -> skipped */
     CHECK(q.chain[0].sub[0].div == 1);
 
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
@@ -590,7 +590,7 @@ int main(void)
                             err, sizeof err) == 0);
     CHECK(q.xmod[0].dest == MOD_PHASE);
 
-    /* 5. duty (approved change): REQUIRED on every osc and sub object,
+    /* 5. duty: REQUIRED on every osc and sub object,
      * range 5..95 enforced regardless of wave; roundtrip covered by the
      * fill_params roundtrip above */
     keep = q;
@@ -638,7 +638,7 @@ int main(void)
     CHECK(q.chain[0].duty == 95);
     keep = q;
 
-    /* 5b. seq "div" (approved tabbed-UI amendment): REQUIRED per seq,
+    /* 5b. seq "div": REQUIRED per seq,
      * integer 1..16 enforced; roundtrip covered by fill_params above */
     keep = q;
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
@@ -660,8 +660,7 @@ int main(void)
     CHECK(params_equal(&q, &keep));
 
     /* boundaries 1 and 16 are valid and land in the struct (the
-     * pattern must hit the SEQ div — subs have a "div" of their own
-     * since O2) */
+     * pattern must hit the SEQ div — subs have a "div" of their own) */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
     CHECK(replace_once(buf, "\"on\":false,\"div\":1",
                        "\"on\":false,\"div\":16") == 0);
@@ -676,7 +675,7 @@ int main(void)
     CHECK(q.seq[0].div == 1);
     keep = q;
 
-    /* 5c. seq "mode"/"once" (owner-ordered modes amendment, PLAN §9):
+    /* 5c. seq "mode"/"once":
      * REQUIRED per seq; mode enum strings fwd|pingpong|oddeven|random|
      * markov; once boolean. Writer covered above; here: parse mapping,
      * bad string and missing once. */
@@ -723,7 +722,7 @@ int main(void)
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q, err, sizeof err) == -1);
     CHECK(params_equal(&q, &keep));
 
-    /* 6. delay / reverb (approved change): REQUIRED top-level objects,
+    /* 6. delay / reverb: REQUIRED top-level objects,
      * engine-ignored but parsed, ranges enforced */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
     CHECK(replace_once(buf,
@@ -851,10 +850,10 @@ int main(void)
     memset(&q, 0, sizeof q);
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q, err, sizeof err) == 0);
 
-    /* 7. duplicate keys reject at every object level (PLAN_CODE_REVIEW_
-     * FIXES.md Phase 7: the schema layer walks the json.h DOM, which
+    /* 7. duplicate keys reject at every object level (the schema layer
+     * walks the json.h DOM, which
      * preserves member order, so a second occurrence of a known key is
-     * flagged). delay/reverb duplicates are covered by section 6 above;
+     * rejected). delay/reverb duplicates are covered by section 6 above;
      * every other level gets one here. Whole file rejects, *p untouched. */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
     memset(&q, 0, sizeof q);
@@ -920,8 +919,8 @@ int main(void)
                             err, sizeof err) == -1);
     CHECK(params_equal(&q, &keep));
 
-    /* 8. over-long keys reject (Phase 6 P5, absorbed into the Phase 7
-     * schema layer): any object key longer than 15 characters is
+    /* 8. over-long keys reject (absorbed into the schema layer):
+     * any object key longer than 15 characters is
      * rejected instead of silently truncated (no "time_lxxxx" aliasing). */
     /* a 20-char unknown key at top level rejects (all required keys still
      * present — the reject is about the key length, not a missing field) */
@@ -952,19 +951,18 @@ int main(void)
     CHECK(q.master == 70 && q.bpm == 60);
     q = keep;
 
-    /* 8. numeric range validation (owner mandate 2026-11-05, PLAN_
-     * SCHEMA_RANGE_VALIDATION.md): the seven fields the parser read raw
+    /* 8. numeric range validation: the seven fields the parser read raw
      * now REJECT values outside their documented ranges — including
      * JSON-legal "1e999" (strtod -> inf -> NaN poison). Reject style:
      * -1, *p untouched. Boundaries are inclusive. */
     {
         static const struct { const char *from, *to; } bad[] = {
-            /* PLAN_FREQ_DECIMALS.md P3 (R4): the floor widens to
+            /* the freq floor widens to
              * 0.01 Hz — 0.05 is VALID now; 0.009 (sub-centi) rejects */
             { "\"freq_hz\":55.0",       "\"freq_hz\":0.009"  },
             { "\"freq_hz\":55.0",       "\"freq_hz\":1e999"  },
             { "\"freq_hz\":55.0",       "\"freq_hz\":20001"  },
-            /* sub freq/fmode/amount keys are GONE (O2); the amount
+            /* sub freq/fmode/amount keys are GONE; the amount
              * bounds live on the xmod slots now */
             { "\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
               "\"amount\":0.0}",
@@ -993,7 +991,7 @@ int main(void)
                                       err, sizeof err) == -1);
         }
         /* boundaries are inclusive: parse ok — freq_hz / step pitch_hz
-         * floors are 0.01 now (PLAN_FREQ_DECIMALS.md P3, R4) */
+         * floors are 0.01 now */
         CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
         CHECK(replace_once(buf, "\"freq_hz\":55.0", "\"freq_hz\":0.01") == 0);
         CHECK(replace_once(buf, "\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
@@ -1014,8 +1012,8 @@ int main(void)
     }
 
     /* 9. dest enum ring/fm bounds — XMOD slots only (subs have no
-     * dest since O2). RING 0..100 (negative rejects), FM ±100 (101
-     * rejects), dest "mix" GONE (M4b/D4 new format only) */
+     * dest). RING 0..100 (negative rejects), FM ±100 (101
+     * rejects), dest "mix" GONE (new format only) */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
     CHECK(replace_once(buf, "\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
           "\"amount\":0.0}",
@@ -1049,7 +1047,7 @@ int main(void)
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                               err, sizeof err) == 0);
     CHECK(q.chain[0].sub[0].div == 1 && q.chain[0].sub[0].level == 0);
-    /* SP4 bounds: div 0 / 17 reject; level 101 reject; missing
+    /* sub bounds: div 0 / 17 reject; level 101 reject; missing
      * div/level reject */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
     CHECK(replace_once(buf, "{\"div\":1,", "{\"div\":0,") == 0);
@@ -1083,9 +1081,9 @@ int main(void)
                               err, sizeof err) == 0);
     CHECK(q.xmod[0].dest == MOD_RING);
 
-    /* D2 (PLAN_OPTIMIZATION.md O1): the mod-source id table is ONE
+    /* the mod-source id table is ONE
      * source of truth — the frozen historical ids (1..6 = B/C, 7..9 =
-     * A; M2 compat) and schema's src names must agree with modsrc_get */
+     * A) and schema's src names must agree with modsrc_get */
     {
         static const struct { int id, chain, sub; } FROZEN[9] = {
             { 1, 1, -1 }, { 2, 1, 0 }, { 3, 1, 1 },
@@ -1119,7 +1117,7 @@ int main(void)
         }
     }
 
-    /* P6 (PLAN_MOD_ROUTING.md M4): CHFM is REMOVED — a preset carrying
+    /* CHFM is REMOVED — a preset carrying
      * "chfm" parses (generic unknown-key skip) and nothing else changes */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
     CHECK(replace_once(buf, "\"level\":100,\"vel\":100",
@@ -1129,8 +1127,8 @@ int main(void)
                               err, sizeof err) == 0);
     CHECK(fexactf(q.chain[0].freq_hz, 55.0f));  /* 55.0 exact; parsed normally */
 
-    /* tgt (PLAN_MOD_ROUTING.md M1): optional 0..2, default 0 = A;
-     * out-of-range rejects (P5 tgt part / P7) */
+    /* tgt: optional 0..2, default 0 = A;
+     * out-of-range rejects */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);   /* no tgt key: default 0 */
     memset(&q, 0, sizeof q);
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
@@ -1155,9 +1153,9 @@ int main(void)
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                               err, sizeof err) == -1);
 
-    /* A sources (PLAN_MOD_ROUTING.md M2): ids 7..9 = a_osc/a_sub1/
+    /* A sources: ids 7..9 = a_osc/a_sub1/
      * a_sub2 — APPENDED after the B/C ids so old presets keep their
-     * meaning (src 1 is still B.osc); self-routing legal (D3 yes) */
+     * meaning (src 1 is still B.osc); self-routing legal */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);
     CHECK(replace_once(buf, "\"xmod\":[{\"src\":\"off\",\"dest\":\"off\","
           "\"amount\":0.0}",
@@ -1174,7 +1172,7 @@ int main(void)
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                               err, sizeof err) == 0);
     CHECK(q.xmod[0].src == 9);
-    /* mixvol (PLAN_MOD_ROUTING.md M3): optional 0..100 per chain,
+    /* mixvol: optional 0..100 per chain,
      * default 100 (absent must NOT mean silent) */
     CHECK(build_doc(buf, 3, 2, 8, 3) == 0);   /* no mixvol key */
     memset(&q, 0, sizeof q);
@@ -1205,7 +1203,7 @@ int main(void)
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                               err, sizeof err) == -1);
 
-    /* 10. PR3 (PLAN_OSC_NAMING.md §1.0e/R0g, §1.4): the dest split —
+    /* 10. the dest split —
      * "flt_res" parses (amount 0) and rejects amount 101 (±100, same
      * percent rule), "flt_cut" parses, and the old "filter" dest
      * REJECTS (new format only, §1.0e). Red until schema_tab.c's
@@ -1250,20 +1248,19 @@ int main(void)
     CHECK(schema_parse_params(buf, (int)strlen(buf), &q,
                               err, sizeof err) == -1);
 
-    /* 11. P2 (PLAN_MOD_MATRIX_16.md §1.3, M2): schema v2 — the "xmod"
+    /* 11. schema v2 — the "xmod"
      * array holds ONLY the active slots, 0..16 entries; slots missing
      * from the array are OFF (dest off); version key must be 2 (version
      * 1 REJECTED — the fixed-length-3 contract is gone); "xmod" stays
-     * REQUIRED (empty array = matrix fully off). RED pre-M2 (parser
-     * demanded version 1 and exactly 3 entries; see the M2 PIN log
-     * section), GREEN post-M2. Runtime-bound h_xmod access kept from the
+     * REQUIRED (empty array = matrix fully off). Runtime-bound h_xmod
+     * access kept from the
      * pin — now plain in-bounds slot reads on xmod[16]. */
     {
         synth_params_t v2;
 
         /* 5 active entries parse; array index == slot index (entry 0 is
          * made ACTIVE to prove the positional mapping); slots 5..15 are
-         * OFF (dest off — vacuous until the M2 widen makes them exist) */
+         * OFF (dest off) */
         CHECK(build_doc_v2(buf, 5) == 0);
         CHECK(replace_once(buf,
               "{\"src\":\"off\",\"dest\":\"off\",\"amount\":0.0}",
@@ -1304,7 +1301,7 @@ int main(void)
             CHECK(h_xmod(&v2, s)->dest == MOD_OFF);
     }
 
-    /* 12. MS2 (PLAN_MOD_FENV_ADSR_DIV.md): the five NEW dest strings —
+    /* 12. the five NEW dest strings —
      * "flt_env" + "adsr_a/d/s/r" — are written, parse back and round-trip
      * byte-comparably; an unknown "adsr_x" rejects naming "xmod[0].dest";
      * the ±100 amount rule applies to the new dests (101 on flt_env

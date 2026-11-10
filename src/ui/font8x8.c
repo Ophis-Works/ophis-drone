@@ -1,11 +1,11 @@
-/* src/ui/font8x8.c — embedded bitmap font, IMPLEMENTATION.md §6 (amended,
- * commit 6e7c513): classic 5x7-in-8x8 cell face, ASCII 0x20-0x7F
+/* src/ui/font8x8.c — embedded bitmap font: classic 5x7-in-8x8 cell face,
+ * ASCII 0x20-0x7F
  * (96 glyphs x 8 bytes = 768 bytes; U+7F DEL added blank). Data source:
  * the classic fixed-space 5x7 font as distributed in Adafruit-GFX
  * glcdfont.c (classic public 5x7 PC/CGA-style set, permissively
  * licensed); converted here from its column/bit0-top format to
- * row/bit0-leftmost. A real translation unit (AMENDED, owner order,
- * PLAN §8.6): exports the table plus font_glyph10(), the 10x10
+ * row/bit0-leftmost. A real translation unit: exports the table plus
+ * font_glyph10(), the 10x10
  * per-pixel scaled cache (letters +2 pts; a "line" = 10 px), built
  * lazily once. No external assets. */
 #include "font8x8.h"

@@ -1,7 +1,7 @@
-/* src/preset/schema_write.c — the preset writer (M2 split,
- * PLAN_OPTIMIZATION.md O5): the synth_params_t DOM is built into a
+/* src/preset/schema_write.c — the preset writer: the synth_params_t DOM
+ * is built into a
  * fixed arena (overflow -> -1, the 8 KiB contract) and serialized with
- * json.h's minified writer. See PLAN_OPTIMIZATION.md O5 and the M2 log. */
+ * json.h's minified writer. */
 #include "schema_priv.h"
 
 #include <json.h>
@@ -157,7 +157,7 @@ static int wael(warena *w, json_value_t *av, json_value_t *vv)
     do { if (wael((w), (arr), (val))) return -1; } while (0)
 
 /* A slot equal to the canonical OFF state (src 0, dest off, amount +0,
- * mix 0, tgt 0) is INACTIVE — omitted from the v2 array (R2/R3). memcmp,
+ * mix 0, tgt 0) is INACTIVE — omitted from the v2 array. memcmp,
  * not float ==, so -0.0 amount slots stay distinct (and round-trip). */
 static int xmod_is_off(const xmod_params_t *x)
 {
@@ -165,7 +165,7 @@ static int xmod_is_off(const xmod_params_t *x)
     return memcmp(x, &OFF, sizeof *x) == 0;
 }
 
-/* Build the full DOM in the same member order the Phase 1-6 writer used
+/* Build the full DOM in the same member order the original writer used
  * (shipped presets round-trip byte-comparable after the one-time v2
  * migration). */
 static int build_dom(warena *w, const synth_params_t *p)
@@ -175,8 +175,7 @@ static int build_dom(warena *w, const synth_params_t *p)
     ADD(w, root, "app", wstr(w, "ophis-drone"));
     ADD(w, root, "version", wnumd(w, 2));
     ADD(w, root, "master", wnumd(w, p->master));
-    /* top-level "bpm" next to "master": the GLOBAL tempo (AMENDED,
-     * owner order, PLAN §6/§9) */
+    /* top-level "bpm" next to "master": the GLOBAL tempo */
     ADD(w, root, "bpm", wnumd(w, p->bpm));
 
     json_value_t *chains = warr_new(w);
@@ -190,14 +189,14 @@ static int build_dom(warena *w, const synth_params_t *p)
         ADD(w, cv, "duty", wnumd(w, ch->duty));
         ADD(w, cv, "level", wnumd(w, ch->level));
         ADD(w, cv, "vel", wnumd(w, ch->vel));
-        /* master send (owner order 2026-11-06, M3) */
+        /* master send */
         ADD(w, cv, "mixvol", wnumd(w, ch->mixvol));
         json_value_t *subs = warr_new(w);
         ADD(w, cv, "sub", subs);
         for (int s = 0; s < 2; s++) {
             const subosc_params_t *so = &ch->sub[s];
             json_value_t *ov = wobj_new(w);
-            /* Spice/Subharmonicon sub (O2): divider, wave, duty, level */
+            /* Spice/Subharmonicon sub: divider, wave, duty, level */
             ADD(w, ov, "div", wnumd(w, so->div));
             ADD(w, ov, "wave", wstr(w, enum_name(wave_tab, 6, so->wave)));
             ADD(w, ov, "duty", wnumd(w, so->duty));
@@ -225,7 +224,7 @@ static int build_dom(warena *w, const synth_params_t *p)
         const seq_params_t *sq = &p->seq[q];
         json_value_t *qv = wobj_new(w);
         AEL(w, seqs, qv);
-        /* no per-seq "bpm" (AMENDED, owner order, PLAN §6/§9) */
+        /* no per-seq "bpm" */
         ADD(w, qv, "on", wbool(w, sq->on));
         ADD(w, qv, "div", wnumd(w, sq->div));
         ADD(w, qv, "mode", wstr(w, enum_name(seqmode_tab, 5, sq->mode)));
@@ -240,7 +239,7 @@ static int build_dom(warena *w, const synth_params_t *p)
         }
     }
 
-    /* schema v2 (owner order 2026-11-09, R3): ACTIVE slots only, in
+    /* schema v2: ACTIVE slots only, in
      * ascending slot order, same 5 keys per entry — the parser fills
      * absent slots with exactly the OFF state xmod_is_off tests */
     json_value_t *xmods = warr_new(w);
@@ -253,14 +252,13 @@ static int build_dom(warena *w, const synth_params_t *p)
         ADD(w, xv, "src", wstr(w, enum_name(src_tab, 10, xp->src)));
         ADD(w, xv, "dest", wstr(w, enum_name(dest_tab, 13, xp->dest)));
         ADD(w, xv, "amount", wnumf(w, xp->amount));
-        /* the slot's own ADD knob (owner order 2026-11-06) */
+        /* the slot's own ADD knob */
         ADD(w, xv, "mix", wnumd(w, xp->mix));
-        /* routing target 0..2 (owner order 2026-11-06, M1) */
+        /* routing target 0..2 */
         ADD(w, xv, "tgt", wnumd(w, xp->tgt));
     }
 
-    /* delay / reverb: REQUIRED top-level objects, reserved for the FX
-     * milestone (PLAN §9, approved change eacb368+fix) */
+    /* delay / reverb: REQUIRED top-level objects */
     json_value_t *delay = wobj_new(w);
     ADD(w, root, "delay", delay);
     ADD(w, delay, "time_l", wnumf(w, p->delay.time_l));
@@ -275,8 +273,7 @@ static int build_dom(warena *w, const synth_params_t *p)
     ADD(w, reverb, "mix", wnumd(w, p->reverb.mix));
     ADD(w, reverb, "width", wnumd(w, p->reverb.width));
 
-    /* top-level "safety": REQUIRED boolean (owner-ordered FX amendment,
-     * PLAN §9) */
+    /* top-level "safety": REQUIRED boolean */
     ADD(w, root, "safety", wbool(w, p->safety));
 
     return w->overflow ? -1 : 0;

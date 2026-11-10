@@ -1,5 +1,5 @@
 /* src/dsp/chain.h — chain graph: subs -> main osc -> AM -> ADSR*vel -> biquad.
- * Contract: IMPLEMENTATION.md §2 + render order PLAN.md §5. Declarations only. */
+ * Declarations only. */
 #ifndef OPHIS_CHAIN_H
 #define OPHIS_CHAIN_H
 
@@ -14,17 +14,14 @@ typedef struct {
   /* double accumulators: mod_apply adds double products with a single
      rounding per term (no per-term float rounding) */
   double detune_hz, amp_mod, filter_mod;
-  double phase_mod;  /* INTERFACE ADDITION to IMPLEMENTATION.md §2 (flagged,
-                     approved plan change eacb368+fix): normalized PM input
+  double phase_mod;  /* normalized PM input
                      amount/100 × m (-1..1); chain adds phase_mod × pi rad
-                     to the carrier phase (A.PHASE xmod dest, PLAN §5). */
-  double res_mod;    /* FLT_RES dest (owner order 2026-11-07,
-                     PLAN_OSC_NAMING.md R0c): normalized resonance input
+                     to the carrier phase (A.PHASE xmod dest). */
+  double res_mod;    /* FLT_RES dest: normalized resonance input
                      amount/100 × m (-1..1); the chain adds res_mod × 100
                      percent to the RES knob (clamped 0..100). 0 = the
                      static-res coefficient caches apply unchanged. */
-  double env_mod;    /* FLT_ENV dest (owner order 2026-11-10,
-                     PLAN_MOD_FENV_ADSR_DIV.md MS1): normalized ENV AMT
+  double env_mod;    /* FLT_ENV dest: normalized ENV AMT
                      input amount/100 × m (-1..1); the chain adds
                      env_mod × 100 percent points to the ENV AMT knob
                      (clamped ±100). */
@@ -42,15 +39,14 @@ typedef struct {
   subosc_state_t sub[2];
   adsr_state_t   env;
   biquad_t       filt;
-  biquad_t       filt2;       /* second cascade stage (poles=24, PLAN §5);
+  biquad_t       filt2;       /* second cascade stage (poles=24);
                                identical cutoff/Q, shared state clear */
   float          vel;          /* current retrigger level 0..1 */
   float          f_osc;        /* current main frequency (Hz) */
   double         raw_osc_out;  /* mod source for xmod (post-wave, pre-AM) */
-  double         raw_sub_out[2]; /* M4 INTERFACE ADDITION (flagged): raw
+  double         raw_sub_out[2]; /* INTERFACE ADDITION: raw
                                     sub-osc outputs, engine feeds mixer
-                                    mod-source ids 2/3/5/6 (IMPLEMENTATION
-                                    .md §4 "set mx.src[6] from raw outs"). */
+                                    mod-source ids 2/3/5/6. */
   float          last_fc;      /* cached biquad settings (avoid resetting
                                   the filter state every sample) */
   filt_mode_t    last_mode;
@@ -64,17 +60,17 @@ typedef struct {
                                   (true PM, not integrated FM) */
 } chain_state_t;
 
-/* INTERFACE ADDITION to IMPLEMENTATION.md §2 (flagged): seeds the chain's
+/* INTERFACE ADDITION: seeds the chain's
  * PRNGs (main osc + both subs) and zeroes env/filt — the contract names no
- * constructor but deterministic noise subs need a seed (PLAN §5). */
+ * constructor but deterministic noise subs need a seed. */
 void chain_init(chain_state_t *c, uint64_t seed);
 
-/* FLT_RES Q table (M-4): Q = 0.5 × 40^(pos/50) for pos 0..50, computed
+/* FLT_RES Q table: Q = 0.5 × 40^(pos/50) for pos 0..50, computed
  * lazily on first use (audio thread, no malloc, no lock) — bit-identical
  * to the per-sample pow expression it replaces. */
 double chain_q_lut(int pos);
 
-/* render one sample (PLAN §5 order: detune -> wave -> AM -> env*vel*level
+/* render one sample (order: detune -> wave -> AM -> env*vel*level
    -> biquad -> level/100). gate is the chain's gate: on its falling edge
    (edge kept in chain_state_t) the envelope is driven into release by
    passing gate=0 to adsr_next. */

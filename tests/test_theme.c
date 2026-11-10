@@ -1,5 +1,5 @@
-/* test_theme.c — WCAG AA contrast for the dark-purple UI palette
- * (IMPLEMENTATION.md §6 as amended in 6e7c513 + 6e26d5b). Every pair the UI
+/* test_theme.c — WCAG AA contrast for the dark-purple UI palette.
+ * Every pair the UI
  * uses must reach >= 4.5:1; the background family must actually be dark
  * purple so the test cannot pass on black/white. SDL-free: reads only the
  * constants declared in src/ui/theme.h. */
@@ -55,7 +55,7 @@ int main(void)
     CHECK_PAIR("flash-text/flash-fill", THEME_FLASH_TEXT, THEME_FLASH_FILL);
     CHECK_PAIR("accent/bg",      THEME_ACCENT,     THEME_BG);
     CHECK_PAIR("error/bg",       THEME_ERROR,      THEME_BG);
-    /* SEQ selected-step border (PLAN_KEYMAP_REBIND §5): drawn as a frame
+    /* SEQ selected-step border: drawn as a frame
      * on the dark backgrounds, so it must pass WCAG AA against the
      * background family AND be clearly stronger than THEME_ACCENT (the
      * old 3-px frame color). */
@@ -63,7 +63,7 @@ int main(void)
     CHECK_PAIR("seq-sel/sel-fill", THEME_SEQ_SEL,  THEME_SEL_FILL);
     CHECK(contrast(&THEME_SEQ_SEL, &THEME_BG) >
           contrast(&THEME_ACCENT, &THEME_BG));
-    /* SEQ step markers (owner order): the playing-now dot is ORANGE and
+    /* SEQ step markers: the playing-now dot is ORANGE and
      * sits on all three cell backgrounds */
     CHECK_PAIR("orange/bg",      THEME_ORANGE,     THEME_BG);
     CHECK_PAIR("orange/track",   THEME_ORANGE,     THEME_TRACK);

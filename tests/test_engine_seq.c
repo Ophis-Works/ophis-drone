@@ -1,5 +1,5 @@
-/* tests/test_engine_seq.c — engine-level sequencer application (PLAN §6
- * amendment): a fired step's pitch PERSISTS — the chain keeps playing it
+/* tests/test_engine_seq.c — engine-level sequencer application: a fired
+ * step's pitch PERSISTS — the chain keeps playing it
  * until the next step event; vel scales the sustained level; sequencer
  * OFF returns the chain to the oscillator's frequency parameter.
  * Pure: engine + DSP, no ALSA (alsa_pcm.c is not linked). */
@@ -24,7 +24,7 @@ static void setup(int step_vel)
     engine_init(&e, SR);
     e.p = OPHIS_DEFAULTS;
     e.p.run = 1;
-    e.p.bpm = 60;                       /* GLOBAL tempo (PLAN §6) */
+    e.p.bpm = 60;                       /* GLOBAL tempo */
     for (int c = 0; c < 3; c++)
         e.p.chain[c].level = (c == 0) ? 100 : 0;   /* mute B and C */
     e.p.chain[0].wave = WAVE_SINE;
@@ -71,7 +71,7 @@ int main(void)
     static float mono[60000];
     int total = (int)(0.8 * SR);      /* covers window C [0.56, 0.71] */
 
-    /* step window semantics (owner order): EVERY step's pitch applies
+    /* step window semantics: EVERY step's pitch applies
      * DURING ITS OWN WINDOW — including vel-0 steps (no retrigger, the
      * envelope sustains, but the pitch follows the step). Step 0 fires
      * at t=0 (100 Hz, vel 100), step 1 at t=0.25 (200 Hz, vel 0 — NO
@@ -107,7 +107,7 @@ int main(void)
     printf("  direct freq=%.1f Hz\n", fd);
     CHECK(fd > 45.0 && fd < 65.0);             /* back at the osc param */
 
-    /* S3 (Phase 1, PLAN_CODE_REVIEW_FIXES.md): after a seq off->on
+    /* after a seq off->on
      * restart the FIRST rendered pitch is step 0's — the stale
      * pre-restart step window (cur_step/cur_valid) must not survive
      * seq_reset(). Play into step 1's window (200 Hz), toggle the seq
@@ -125,12 +125,12 @@ int main(void)
     printf("  restart freq=%.1f Hz\n", fr);
     CHECK(fr > 85.0 && fr < 115.0);            /* step 0 (100 Hz), not 200 */
 
-    /* B-SEQ1 (owner order 2026-11-05): the LIVE step the UI is fed is
+    /* the LIVE step the UI is fed is
      * mode-INDEPENDENT — the engine's step window (cur_step/cur_valid),
      * never the sequencer's ORDER cursor (fwd/pingpong/oddeven only;
      * random/markov emit from prev and leave cursor at 0 — the old
-     * status froze the marker at step 0 in those modes). Pins, per
-     * PLAN_SEQ_LIVE_MARKER.md: fwd matches the predicted order; random
+     * status froze the marker at step 0 in those modes). Pins:
+     * fwd matches the predicted order; random
      * and markov CHANGE over time and equal the sequencer's own
      * emitted-step state (sq.prev) after the first emission — internals
      * readable here in the test, never in UI code; seq off -> -1;
@@ -168,8 +168,8 @@ int main(void)
                 CHECK(win[bpw + 5] == 1);
                 CHECK(win[2 * bpw + 5] == 2);
             } else if (mode == 3 || mode == 4) {
-                /* random/markov: NOT frozen at step 0 (B-SEQ1
-                 * regression pin) and every window equals the
+                /* random/markov: NOT frozen at step 0 (regression pin)
+                 * and every window equals the
                  * sequencer's own emitted-step state (sq.prev) —
                  * internals readable HERE, never in UI code */
                 int distinct = 0;
@@ -203,11 +203,10 @@ int main(void)
         CHECK(live[0] == -1);
     }
 
-    /* Item 1 (owner report 2026-11-06, PLAN_MOD_REVAMP_SEQ_MARKER_
-     * RETRIG.md): the live step must be PER-CHAIN — all three
+    /* the live step must be PER-CHAIN — all three
      * sequencers run at once with distinct modes, and EACH chain's
      * engine_seq_steps must move and match its own sq[c] state. The
-     * B-SEQ1 pins drove chain A only; chains B/C were never pinned
+     * earlier pins drove chain A only; chains B/C were never pinned
      * (the device report: the marker works for OSC 1 only). */
     {
         engine_init(&e, SR);
@@ -243,8 +242,7 @@ int main(void)
         }
     }
 
-    /* Item 3 (owner order 2026-11-06, PLAN_MOD_REVAMP_SEQ_MARKER_
-     * RETRIG.md): the value-key retrig is PER-CHAIN — retrig_mask bit c
+    /* the value-key retrig is PER-CHAIN — retrig_mask bit c
      * retrigs chain c at its own vel; the other chains' envelopes stay
      * at 0 (the old val_edit fired trigger_req = ALL chains). */
     {
@@ -265,7 +263,7 @@ int main(void)
         CHECK(fexactf(e.ch[2].env.level, 0.0f));   /* C untouched */
     }
 
-    /* ---- P2 (PLAN_MOD_ROUTING.md M1): TARGET routing end-to-end —
+    /* ---- TARGET routing end-to-end —
      * slot SRC B.osc TARGET C TYPE FM AMT 100 gives C FM sidebands at
      * 200±110k; TARGET A gives none (A's level is 0: the modulation
      * dies with the target's own post-LEVEL output). Probe 310 =
@@ -305,7 +303,7 @@ int main(void)
         CHECK(g310_on > 5.0 * g310_off);
     }
 
-    /* ---- P3 (PLAN_MOD_ROUTING.md M2): SRC extension — slot SRC
+    /* ---- SRC extension — slot SRC
      * A.osc TARGET B TYPE RING AMT 100: B's output carries A×B
      * sidebands at 110±200 (90/310); A unaffected. Probe 310 =
      * 200+110 (odd-order tanh intermod hits 290/330/420, never 310).
@@ -343,7 +341,7 @@ int main(void)
         CHECK(g310_on > 5.0 * g310_off);
     }
 
-    /* ---- P4 (PLAN_MOD_ROUTING.md M3): MIX VOLUME — mixvol B = 0
+    /* ---- MIX VOLUME — mixvol B = 0
      * makes B inaudible at master, but a slot SRC B.osc still drives
      * A's PITCH (vibrato) at full depth. A 200 Hz carrier vibrato
      * ±50 Hz at B's 110 Hz rate -> sidebands at 90/310 (J1(0.45)≈0.22).
@@ -390,7 +388,7 @@ int main(void)
         CHECK(g310_on > 5.0 * g310_off);         /* vibrato at full depth */
     }
 
-    /* ---- SP3 (PLAN_OPTIMIZATION.md O2): a sub's LEVEL never scales
+    /* ---- a sub's LEVEL never scales
      * what the matrix taps — B's sub0 is INAUDIBLE (level 0) but a slot
      * SRC B.SUB1 RING into A at amount 100 still produces the A×sub
      * sidebands at 200±110 (probe 310 = 200+110; tanh odd-symmetry

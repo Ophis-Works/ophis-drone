@@ -1,13 +1,12 @@
-/* src/seq/transport.h — transport contract (IMPLEMENTATION.md §2, PLAN §7).
- * Pure. Called once per audio block by the engine.
- * Headers only in M2 turn 1 (TDD: tests watched failing first). */
+/* src/seq/transport.h — transport contract.
+ * Pure. Called once per audio block by the engine. */
 #ifndef OPHIS_TRANSPORT_H
 #define OPHIS_TRANSPORT_H
 
 typedef struct {
     int    one_shot;           /* TRIGGER override: gate held open */
     float  gate;               /* 0..1, 10 ms ramp (edge-compatible with the
-                                * M1 chain/mixer gate: 1 = held) */
+                                * chain/mixer gate: 1 = held) */
     double one_shot_deadline;  /* ABSOLUTE timestamp in seconds on the
                                 * engine clock (now + 30.0 on trigger);
                                 * 0 = none */

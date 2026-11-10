@@ -1,5 +1,4 @@
 /* src/dsp/osc.c — oscillator: sine, tri, saw, square, white, pink.
- * Contract: IMPLEMENTATION.md §2, waveforms per PLAN.md §5.
  * Pure, deterministic (no time()/rand()). No SDL/ALSA. */
 #include <math.h>
 
@@ -8,7 +7,7 @@
 
 #define OPHIS_2PI 6.28318530717958647692
 
-/* MS2 half-band FIR decimator (owner ruling 2026-11-10, option b):
+/* half-band FIR decimator:
  * 9-tap linear-phase half-band, cutoff at the 2x-domain quarter rate
  * (22050 Hz at the 88200 Hz sub rate). Ideal taps h[k] =
  * sin(pi*k/2)/(pi*k) (nonzero only at odd k: +-1 -> 1/pi, +-3 ->
@@ -18,7 +17,7 @@
  * centre written as 1-2*(a1+a3), which makes the DC sum exactly 1 in
  * floating point. bc-verified: H(220)=1.0001, H(10000)=1.083,
  * H(15000)=0.986, H(22220)=0.534 (fold bin: in-band 21880 leakage
- * x0.560). Derivation in LOG_POLYBLEP.md MS2 entry 3. */
+ * x0.560). */
 #define HB_A1 0.30129089216171939
 #define HB_A3 (-0.074770331172671340)
 #define HB_C0 (1.0 - 2.0 * (HB_A1 + HB_A3))
@@ -29,9 +28,8 @@ static double wrap01(double p)
     return p - floor(p);
 }
 
-/* PRNG: xoshiro256** seeded via splitmix64 (PLAN §5: fixed seed per
- * instance so tests are reproducible) — shared module dsp/prng.{h,c}
- * (Phase 5 item 1). */
+/* PRNG: xoshiro256** seeded via splitmix64 (fixed seed per
+ * instance so tests are reproducible) — shared module dsp/prng.{h,c}. */
 
 /* uniform double in [-1, 1) from the PRNG */
 static double white_sample(osc_t *o)
@@ -49,7 +47,7 @@ void osc_init(osc_t *o, wave_t w, uint64_t seed)
     o->pink_init = 1;
 }
 
-/* Paul Kellet 3-stage filtered pink noise (PLAN §5), driven by xoshiro,
+/* Paul Kellet 3-stage filtered pink noise, driven by xoshiro,
  * state in o->pink. Scaled to stay within -1..1 (test_osc range gate). */
 static double pink_sample(osc_t *o)
 {
@@ -63,17 +61,17 @@ static double pink_sample(osc_t *o)
     return out;
 }
 
-/* PolyBLEP unit-step residual (PLAN_POLYBLEP.md). Verified against the
+/* PolyBLEP unit-step residual. Verified against the
  * Si-symmetric ideal band-limited step: the sample just BEFORE a rising
  * unit step at fractional distance s (0..1) gains +0.5*(1-s)^2, the
  * sample just AFTER loses 0.5*s^2 — the step value diff of 1 is spread
- * over the pair (max adjacent jump 1.5 for a +-2 step, owner ruling
- * 2026-11-10 bound < 2.0). For a step of amplitude A at edge e
+ * over the pair (max adjacent jump 1.5 for a +-2 step, bound < 2.0).
+ * For a step of amplitude A at edge e
  * (d = p - e wrapped to (-0.5, 0.5], |d| < dt): pre-side x += A*0.5*u^2,
  * post-side x -= A*0.5*s^2, u = 1 - s. Step directions: SAW wrap =
  * FALLING -2 (A=-2); SQUARE wrap p~0 = RISING +2 (A=+2); SQUARE duty
  * crossing = FALLING -2 (A=-2). `phase` is the evaluated phase, dt the
- * correction window (MS2 owner ruling: window = output dt at the dt/2
+ * correction window (window = output dt at the dt/2
  * sub-step rate — a 4-tap kernel: 2 pre + 2 post sub-steps; guard
  * dt >= 0.5, freq >= sr/2, naive output is noise there). */
 static double polyblep_correct(double x, const osc_t *o, double phase,
@@ -108,7 +106,7 @@ static double polyblep_correct(double x, const osc_t *o, double phase,
     return x;
 }
 
-/* naive tonal value at an arbitrary phase (MS2: sub-steps are evaluated
+/* naive tonal value at an arbitrary phase (sub-steps are evaluated
  * around the output centre, so the value is a pure function of phase) */
 static double tonal_eval(const osc_t *o, double phase, double window)
 {
@@ -124,7 +122,7 @@ static double tonal_eval(const osc_t *o, double phase, double window)
         x = 2.0 * phase - 1.0;
         break;
     case WAVE_SQUARE:
-        /* DUTY (approved plan change eacb368+fix): pulse width percent
+        /* DUTY: pulse width percent
          * 5..95 — two-thresholds-per-period phase compare against the
          * duty fraction. Out-of-range duty clamps to 5 / 95. */
         {
@@ -161,7 +159,7 @@ double osc_next(osc_t *o, double freq_hz, double sr)
         break;
     }
 
-    /* tonal waves: 2x oversampled (MS2, owner ruling 2026-11-10) — the
+    /* tonal waves: 2x oversampled — the
      * sub-domain signal lives at dt/2 sub-step spacing, recentered on
      * the output phase; o->phase holds the centre of the last output;
      * mod inputs (PM/FM) land in it BEFORE osc_next and shift the
@@ -173,7 +171,7 @@ double osc_next(osc_t *o, double freq_hz, double sr)
     o->phase = c;
 
     if (o->wave == WAVE_SAW || o->wave == WAVE_SQUARE) {
-        /* half-band FIR decimation (owner ruling option b): the 9-tap
+        /* half-band FIR decimation: the 9-tap
          * kernel is evaluated BY SYNTHESIS at the tap phases (the
          * corrected sub-domain signal is a pure function of phase), so
          * there is no history, no latency, no osc_t change. The

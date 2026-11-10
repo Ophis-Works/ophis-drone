@@ -1,4 +1,4 @@
-/* src/compat/crt0.s — M6 minimal crt0 for the R36S build (owner ruling).
+/* src/compat/crt0.s — minimal crt0 for the R36S build. */
  * The toolchain's Scrt1.o bakes __libc_start_main@GLIBC_2.34, which ArkOS
  * (glibc 2.28) cannot resolve; linked with -nostartfiles in its place.
  * .symver pins the call to __libc_start_main@GLIBC_2.17, the version that

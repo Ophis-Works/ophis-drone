@@ -1,5 +1,5 @@
-/* src/dsp/prng.h — shared deterministic PRNG (Phase 5 item 1,
- * PLAN_CODE_REVIEW_FIXES.md): xoshiro256** seeded via splitmix64 — the
+/* src/dsp/prng.h — shared deterministic PRNG: xoshiro256** seeded via
+ * splitmix64 — the
  * one copy of the algorithm previously duplicated in dsp/osc.c and
  * seq/sequencer.c. Pure, deterministic (no time()/rand()). No SDL/ALSA.
  * The identical generators+seeds guarantee identical numbers everywhere

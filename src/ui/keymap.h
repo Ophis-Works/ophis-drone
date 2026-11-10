@@ -1,5 +1,5 @@
-/* src/ui/keymap.h — OUR key ids + SDL event -> ui_action_t dispatch
- * (IMPLEMENTATION.md §6, PLAN §8.1/§9). Binding values come ONLY from
+/* src/ui/keymap.h — OUR key ids + SDL event -> ui_action_t dispatch.
+ * Binding values come ONLY from
  * config.h KB_* — no #ifdef outside config.h. */
 #ifndef OPHIS_KEYMAP_H
 #define OPHIS_KEYMAP_H
@@ -29,7 +29,7 @@ typedef enum {
 /* Returns 1 and fills *out if the event maps to an action, else 0.
  * Handles SDL_KEYDOWN (desktop KB_* are OUR key ids, resolved to SDL
  * keycodes here) and SDL_CONTROLLERBUTTONDOWN (handheld KB_* are button
- * numbers, PLAN §9). A keydown with e.key.repeat set maps ONLY to
+ * numbers). A keydown with e.key.repeat set maps ONLY to
  * ACT_VAL_INC / ACT_VAL_DEC (holding a value key auto-repeats; holding
  * RUN/MENU/tabs/selection must not re-fire) — every other repeated
  * action returns 0. A SDL_CONTROLLERBUTTONDOWN maps nothing when the
@@ -39,11 +39,11 @@ typedef enum {
 int keymap_action(SDL_Event *e, ui_action_t *out);
 /* +1/-1 when the event RELEASES a value key (SDL_KEYUP of the KB_VAL_
  * INC/KB_VAL_DEC binding on desktop, CONTROLLERBUTTONUP of the same on
- * handheld), else 0 — ends the value-key hold (owner order 2026-11-05:
- * holding the value keys retrigs; without this the desktop KEYUP never
+ * handheld), else 0 — ends the value-key hold (holding the value keys
+ * retrigs; without this the desktop KEYUP never
  * cleared the hold and the repeat ran away). */
 int keymap_val_release(const SDL_Event *e);
-/* THE one label place for KB_* values (hint bar, PLAN_KEYMAP_REBIND §2):
+/* THE one label place for KB_* values (hint bar):
  * an ophis key id -> SDL_GetKeyName of its keycode; a numeric button
  * constant matching an SDL_CONTROLLER_BUTTON_* value ->
  * SDL_GameControllerGetStringForButton, uppercased. Caller-buffer form:

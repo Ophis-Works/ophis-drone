@@ -1,20 +1,19 @@
-/* src/ui/ui_menu.c — SDL2 UI menu/dialog logic (PLAN §8.4; X3,
- * PLAN_CODE_REVIEW_FIXES.md Phase 8: moved out of ui.c, pure structure,
- * no behavior change). One in_menu switch: CONFIRM = select (Enter on
+/* src/ui/ui_menu.c — SDL2 UI menu/dialog logic.
+ * One in_menu switch: CONFIRM = select (Enter on
  * desktop; on the handheld A keeps it via KB_RUN_CONFIRMS_MENU), Start /
  * Esc cancel, plus TRIGGER where KB_TRIGGER_CANCELS_MENU says so
- * (owner-ordered desktop rules, 2026-11-05: Esc is the desktop's only
- * cancel; Space/T are inert in menus). U4 (Phase 4): NAV/VAL keys are
+ * (Esc is the desktop's only
+ * cancel; Space/T are inert in menus). NAV/VAL keys are
  * inert in MENU_MAIN / MENU_CONFIRM / MENU_LOAD. Sub-windows:
  *   - MENU_MAIN   NEW/SAVE/LOAD/PANIC/EXIT/BACK (cursor starts on BACK).
  *   - MENU_CONFIRM  factory-defaults YES/NO; YES loads OPHIS_DEFAULTS,
- *                   one mailbox commit (H3: PANIC commits draft.run = 0 —
+ *                   one mailbox commit (PANIC commits draft.run = 0 —
  *                   the UI owns RUN).
  *   - MENU_NAME   SAVE name entry: desktop text input (TEXTINPUT /
  *                 Backspace via ui_handle_event), R36S character-grid
  *                 picker (cells A-Z 0-9 - _ SPC DEL; VALUE keys insert /
- *                 delete — PLAN_KEYMAP_REBIND §4).
- *   - MENU_LOAD   folder navigator (PLAN §8.4): merged subdirectory +
+ *                 delete).
+ *   - MENU_LOAD   folder navigator: merged subdirectory +
  *                 *.json entry list via preset_list_dirs/preset_list,
  *                 entered with preset_path; errors inline.
  *   - MENU_QUIT   no keys (EXIT flash / WM close).
@@ -29,7 +28,7 @@
 #include "../preset/defaults.h"
 #include "../preset/preset.h"
 
-/* --- LOAD folder navigator (PLAN §8.4) -------------------------------- */
+/* --- LOAD folder navigator --------------------------------------------- */
 
 static void menu_close(ui_t *ui);            /* defined below (menu window) */
 
@@ -51,7 +50,7 @@ static void load_refresh(ui_t *ui)
     char names[32][33];
     int n = 0;
     if (preset_list_dirs(ui->load_dir, names, &n, 32) != 0) {
-        /* File-picker behavior (user order 2026-11-05): a dir that
+        /* File-picker behavior: a dir that
          * cannot be opened falls back to its parent once — preset_path
          * clamps ".." at "/", so at the root there is no parent and the
          * error shows as before. */
@@ -138,7 +137,7 @@ static void menu_confirm(ui_t *ui)             /* run current menu item */
         break;
     case 1:                                    /* SAVE */
         ui->in_menu = MENU_NAME;
-        /* PLAN_LAST_SAVED_NAME: prefill with the last SUCCESSFUL save's
+        /* prefill with the last SUCCESSFUL save's
          * name, if any; the grid cursor stays 0,0 (it picks the NEXT
          * character — the text starts fully typed). */
         snprintf(ui->name, sizeof ui->name, "%s", ui->last_saved_name);
@@ -149,7 +148,7 @@ static void menu_confirm(ui_t *ui)             /* run current menu item */
         break;
     case 2:                                    /* LOAD: folder navigator */
         snprintf(ui->load_dir, sizeof ui->load_dir, "%s", ui->preset_dir);
-        /* User order 2026-11-05: the presets dir is created on first
+        /* The presets dir is created on first
          * LOAD; on failure the parent fallback in load_refresh still
          * shows a sane folder. */
         preset_ensure_dir(ui->load_dir);
@@ -158,7 +157,7 @@ static void menu_confirm(ui_t *ui)             /* run current menu item */
         break;
     case 3:                                    /* PANIC: immediate */
         atomic_store(&ui->mb->panic_req, 1);
-        /* H3: the UI owns RUN — the engine's panic guard is one block
+        /* the UI owns RUN — the engine's panic guard is one block
          * only, so the drone stays silent after PANIC only if the UI
          * commits draft.run = 0 (one mailbox commit; UI strip agrees). */
         ui->draft.run = 0;
@@ -189,14 +188,14 @@ static void name_save(ui_t *ui)
         snprintf(ui->save_err, sizeof ui->save_err, "%.63s", err);
         return;                                /* errors inline, stay */
     }
-    /* PLAN_LAST_SAVED_NAME: record successes only — failed saves must
+    /* record successes only — failed saves must
      * not change what the next SAVE prefills. */
     snprintf(ui->last_saved_name, sizeof ui->last_saved_name, "%s",
              ui->name);
     menu_close(ui);
 }
 
-/* --- name entry charset (PLAN §8.4/§9: 1..32, [A-Za-z0-9 _-]) -------- */
+/* --- name entry charset (1..32, [A-Za-z0-9 _-]) ------------------------ */
 
 static int name_char_ok(char c)
 {
@@ -218,9 +217,9 @@ void name_delete(ui_t *ui)
         ui->name[--ui->name_len] = '\0';
 }
 
-/* SAVE name-entry grid picker (PLAN §8.4): the grid is A-Z 0-9 - _
+/* SAVE name-entry grid picker: the grid is A-Z 0-9 - _
  * (36 chars), cell 36 = SPC, cell 37 = DEL. Invoked by the VALUE keys
- * (ACT_VAL_INC inserts, ACT_VAL_DEC deletes — PLAN_KEYMAP_REBIND §4). */
+ * (ACT_VAL_INC inserts, ACT_VAL_DEC deletes). */
 static void name_grid_pick(ui_t *ui)
 {
     static const char grid[] =
@@ -251,8 +250,7 @@ void menu_action(ui_t *ui, ui_action_t act)
         case ACT_SEL_DOWN: ui->menu_cursor = (ui->menu_cursor + 1) % 6; break;
         case ACT_CONFIRM:  menu_confirm(ui); break;   /* Enter selects */
         case ACT_RUN:      /* Space confirms only where the map says so
-                            * (handheld A); desktop: inert (owner order
-                            * 2026-11-05) */
+                            * (handheld A); desktop: inert */
             if (KB_RUN_CONFIRMS_MENU) menu_confirm(ui);
             break;
         case ACT_TAB_BACK:
@@ -260,13 +258,13 @@ void menu_action(ui_t *ui, ui_action_t act)
         case ACT_NAV_LEFT:
         case ACT_NAV_RIGHT:
         case ACT_VAL_DEC:
-        case ACT_VAL_INC: break;   /* U4: NAV/VAL inert (used to close) */
+        case ACT_VAL_INC: break;   /* NAV/VAL inert (used to close) */
         case ACT_TRIGGER:          /* labeled: was falling to default */
         case ACT_MENU:             /* labeled: was falling to default */
         default:
             /* Start/Esc always close; TRIGGER closes only where the
              * B-button cancel is part of the map (handheld) — desktop
-             * cancels with Esc alone (owner order 2026-11-05). */
+             * cancels with Esc alone). */
             if (act == ACT_TRIGGER && !KB_TRIGGER_CANCELS_MENU) break;
             menu_close(ui);
             break;
@@ -287,7 +285,7 @@ void menu_action(ui_t *ui, ui_action_t act)
         case ACT_NAV_LEFT:
         case ACT_NAV_RIGHT:
         case ACT_VAL_DEC:
-        case ACT_VAL_INC: break;   /* U4: NAV/VAL inert (used to close) */
+        case ACT_VAL_INC: break;   /* NAV/VAL inert (used to close) */
         case ACT_TRIGGER:          /* labeled: was falling to default */
         case ACT_MENU:             /* labeled: was falling to default */
         default:
@@ -351,7 +349,7 @@ void menu_action(ui_t *ui, ui_action_t act)
             case ACT_NAV_LEFT:
             case ACT_NAV_RIGHT:
             case ACT_VAL_DEC:
-            case ACT_VAL_INC: break;   /* U4: NAV/VAL inert (used to close) */
+            case ACT_VAL_INC: break;   /* NAV/VAL inert (used to close) */
             case ACT_TRIGGER:          /* labeled: was falling to default
                                         * (TAB_BACK/NEXT already excluded
                                         * above; MENU inert as before) */

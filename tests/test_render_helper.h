@@ -1,7 +1,7 @@
-/* tests/test_render_helper.h — D5 (PLAN_OPTIMIZATION.md O7): the ONE
+/* tests/test_render_helper.h — the ONE
  * engine-render loop for the engine-level pins — per-block copy into a
  * contiguous mono buffer, done once, correctly (the per-pin copies
- * duplicated this and one read out of bounds before M1's fix).
+ * duplicated this and one read out of bounds before the fix).
  * Usage: double buf[N]; engine_init(...); set params;
  *        rh_render_mono(&e, buf, N); (gate on the first block only) */
 #ifndef OPHIS_TEST_RENDER_HELPER_H

@@ -1,14 +1,14 @@
-/* tests/test_sequencer.c — PLAN.md §10 (M2): step period = 60/bpm/4 * div
+/* tests/test_sequencer.c — step period = 60/bpm/4 * div
  * in samples; delivery order/values (pitch_hz + vel); on OFF -> zero events;
  * vel 0 step -> zero events; tempo change; div change; silent while RUN off.
- * Contract: src/seq/sequencer.h (IMPLEMENTATION.md §2).
- * Approved tabbed-UI amendment: seq_params_t gains div (clock divider,
- * integer 1..16, default 1; period = 60/bpm/4 * div — PLAN §6). Params are
+ * Contract: src/seq/sequencer.h.
+ * seq_params_t gains div (clock divider,
+ * integer 1..16, default 1; period = 60/bpm/4 * div). Params are
  * UI-clamped, so ONLY div values 1..16 are specified/tested here.
- * BPM is GLOBAL (AMENDED, owner order, PLAN §6): seq_params_t LOSES bpm —
+ * BPM is GLOBAL: seq_params_t LOSES bpm —
  * the GLOBAL tempo is passed per seq_tick call; the 60/bpm/4 period checks
  * use the passed bpm. Tests reworked BEFORE the signature change (TDD).
- * Owner-ordered modes amendment (PLAN §6): seq_params_t gains mode
+ * Modes: seq_params_t gains mode
  * (0=fwd default, 1=pingpong, 2=oddeven, 3=random, 4=markov) and once
  * (0=loop default, 1=once); seq_state_t gains rng[4] (xoshiro256**,
  * per-instance deterministic seed), prev (last emitted step / walk pos)
@@ -25,7 +25,7 @@ static seq_params_t mkseq(int on)
     seq_params_t p;
     memset(&p, 0, sizeof p);
     p.on  = on;
-    p.div = 1;                          /* factory default (PLAN §6) */
+    p.div = 1;                          /* factory default */
     for (int i = 0; i < 8; i++) {
         p.steps[i].pitch_hz = 100.0f + 10.0f * (float)i;  /* i <= 7: exact */
         p.steps[i].vel      = 50;
@@ -145,7 +145,7 @@ int main(void)
         CHECK(seq_tick(&s, &p, 240, 0.3125, SR) == 3);
     }
 
-    /* ---- clock divider div: period = 60/bpm/4 * div (PLAN §6) ---- */
+    /* ---- clock divider div: period = 60/bpm/4 * div ---- */
     /* only div 1..16 are specified (params are UI-clamped; 0/17 are NOT
      * tested — outside the contract) */
     {
@@ -316,7 +316,7 @@ int main(void)
         n = run_idx(&s, &p, 120, 1.0, 2.0, 0.001, idx);
         CHECK(n == 0);
         /* RUN off->on / seq off->on is modelled by the engine calling
-         * seq_reset (IMPLEMENTATION.md seq contract, PLAN §6) */
+         * seq_reset (seq contract) */
         seq_reset(&s);
         n = run_idx(&s, &p, 120, 2.0, 3.0, 0.001, idx);
         CHECK(n == 8);                        /* one pass again */

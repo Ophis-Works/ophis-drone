@@ -1,12 +1,11 @@
-/* src/ui/ui.c — SDL2 UI STATE MACHINE (PLAN §8 amended, IMPLEMENTATION.md
- * §6; X3, PLAN_CODE_REVIEW_FIXES.md Phase 8: the file was split — the
+/* src/ui/ui.c — SDL2 UI STATE MACHINE. The file was split — the
  * menu/dialog logic lives in ui/ui_menu.c, the rendering in
  * ui/ui_draw.c, their private interface in ui/ui_internal.h; this TU
  * keeps tabs/focus/cursor navigation, the value-edit pipeline and the
  * event routing, no behavior change).
  * 5 top tabs (OSC 1 | OSC 2 | OSC 3 | MOD | MASTER; Q/E desktop, L/R
  * shoulder R36S cycle, wrap), OSC tabs with sub-tabs OSC|ENV+FLT|SEQ,
- * focus model per the amended PLAN §8.2 binding text:
+ * focus model per the binding text:
  *   - arrows START on the sub-tab row (OSC tabs); LEFT/RIGHT there cycles
  *     sub-tabs; DOWN enters content; UP from the top of content returns
  *     to the sub-tab row; MOD/MASTER have no sub-tab row (content only).
@@ -15,25 +14,25 @@
  *   - cursor/focus persist per tab+sub-tab.
  * Pages are FLAT item lists (the IT_* ids, item_t, the item tables and
  * the section tables all live in ui/seq_items.{h,c} — pure data,
- * regression-tested by tests/test_seq_items.c). The page CONTENT (item
- * ids and counts per PLAN §8.2/§8.6 amended) is documented there.
- * Ranges (PLAN §8.3 as amended by PLAN_HZ_EDIT.md + PLAN_FREQ_DECIMALS.md):
+ * pinned by tests/test_seq_items.c). The page CONTENT (item
+ * ids and counts) is documented there.
+ * Ranges:
  *  - freq rows:  centi-Hz 7-digit odometer boxes (OSC FREQ / SEQ PITCH
- *                0.01..20000, FILTER CUT / DELAY TONE 20..20000, R2/R4)
+ *                0.01..20000, FILTER CUT / DELAY TONE 20..20000)
  *                — X/Z step the digit cursor's place (10000..0.01 Hz)
  *                with true carry and roll-over at the range edges; the
- *                1/12-octave ladder is gone (R9)
+ *                1/12-octave ladder is gone
  *  - ADSR A/D/R: pos 0 = 0 s; pos 1..50 = 0.001*60000^((pos-1)/49)
  *  - percents:   integer 0..100, 1 pp steps
- *  - BPM:        GLOBAL tempo (PLAN §6): integer 1..500, one value for
+ *  - BPM:        GLOBAL tempo: integer 1..500, one value for
  *                the whole synth;  SEQ DIV: integer 1..16, default 1
- *  - R11:        every numeric edit field ROLLS OVER at its bounds —
+ *  - roll-over:  every numeric edit field ROLLS OVER at its bounds —
  *                nothing clamps anymore
  *  - AMT:        PITCH -50..+50 Hz (1 Hz/step); AMP/FILTER -100..+100
- *                (1 pp/step), wrapping inside the dest range (R11);
+ *                (1 pp/step), wrapping inside the dest range;
  *                dimmed + inert when dest OFF; re-clamped on dest
  *                switch. FREQ dimmed when the wave is white/pink.
- * DUTY items (approved plan change eacb368+fix) on the OSC and ENV+FLT
+ * DUTY items on the OSC and ENV+FLT
  * pages after WAVE: percent 5..95, dimmed/inert unless the wave is square.
  * All UI->engine traffic is via mailbox.h channels only. */
 #include <math.h>
@@ -49,7 +48,7 @@
 #include "range.h"
 #include "seq_items.h"
 
-/* --- range helpers (PLAN §8.3) — the ladders live in ui/range.c (D6) - */
+/* --- range helpers — the ladders live in ui/range.c ------------------ */
 
 static int is_noise(wave_t w)
 {
@@ -57,8 +56,8 @@ static int is_noise(wave_t w)
 }
 static double amt_min(mod_dest_t dest)
 {
-    /* RING is a dry/wet mix: 0..100, no negative half (owner order
-     * 2026-11-06); PITCH keeps ±50 Hz; the rest are ±100 percent */
+    /* RING is a dry/wet mix: 0..100, no negative half; PITCH keeps
+     * ±50 Hz; the rest are ±100 percent */
     if (dest == MOD_RING) return 0.0;
     return dest == MOD_PITCH ? -50.0 : -100.0;
 }
@@ -74,10 +73,9 @@ static double amt_clamp(mod_dest_t dest, double v)
                                                    shared clamp (item 3) */
 }
 
-/* --- PLAN_HZ_EDIT.md (R1), amended by PLAN_FREQ_DECIMALS.md (R2/R3):
- * the 7-digit centi-Hz odometer boxes (10000..0.01 Hz) ----------------- */
+/* --- the 7-digit centi-Hz odometer boxes (10000..0.01 Hz) ------------ */
 
-/* R12a: "digit box" is a SPEC property (nav == NAV_DIGITS), not an id
+/* "digit box" is a SPEC property (nav == NAV_DIGITS), not an id
  * list — OSC FREQ / FILTER CUT / DELAY TONE / SEQ PITCH carry it in
  * their ITEM_SPECS entries; no id comparisons anywhere. */
 static int is_digit_box(int id)
@@ -86,7 +84,7 @@ static int is_digit_box(int id)
     return sp != NULL && sp->nav == NAV_DIGITS;
 }
 
-/* the place value of the CURRENT digit for a row, in CENTI-HZ (R2):
+/* the place value of the CURRENT digit for a row, in CENTI-HZ:
  * digit 0 = 10000s place (1000000 centi-Hz) .. digit 4 = 1s (100),
  * digit 5 = 0.1s (10), digit 6 = 0.01s (1); any other Hz row would step
  * the 1s digit (there are none left — all ITF_HZ rows are boxes) */
@@ -107,10 +105,10 @@ static int digit_place(const ui_t *ui, int id)
 int is_osc_tab(const ui_t *ui) { return ui->tab < TAB_MOD; }
 int chain_of(const ui_t *ui)           /* chain index for OSC tabs */
 {
-    /* TAB_OSC1..3 -> 0..2. U5: the SEQ-item/seq_sel users of ci only run
+    /* TAB_OSC1..3 -> 0..2. The SEQ-item/seq_sel users of ci only run
      * on OSC tabs (the "SEQ ids only on OSC tabs" invariant), so the
      * result is always a valid chain index — clamped explicitly to
-     * 0..2 (shared clamp, Phase 5 item 3) to make the bound visible to
+     * 0..2 (shared clamp) to make the bound visible to
      * static analysis (clang-tidy security.ArrayBound on d->seq[ci] /
      * ui->seq_sel[ci]). */
     return clampi((int)ui->tab, 0, 2);
@@ -126,7 +124,7 @@ static int cur_cursor_idx(const ui_t *ui)
 }
 int *cur_cursor(ui_t *ui) { return &ui->cursor[cur_cursor_idx(ui)]; }
 
-/* PR-E (PLAN_HZ_EDIT.md), R3 (PLAN_FREQ_DECIMALS.md): the digit cursor
+/* the digit cursor
  * starts over on every row entry — reset to the FIRST NON-DECIMAL digit
  * (the 1s place, index 4 of 0..6 from the left) whenever the cursor
  * lands on a digit-box row (nav == NAV_DIGITS; called after every
@@ -139,11 +137,10 @@ static void freq_digit_sync(ui_t *ui)
 }
 
 /* content item count / item for the current tab+sub-tab: the page
- * model in seq_items.c is the single source (A1) — the flat item list
+ * model in seq_items.c is the single source — the flat item list
  * is the concatenation of the page's spans; the SEQ page binds the
  * PITCH/VEL si to the selected rectangle at use time, and the MOD page
- * binds the five matrix rows to the SLOT row's slot at use time
- * (PLAN_MOD_MATRIX_16.md PR-D). */
+ * binds the five matrix rows to the SLOT row's slot at use time. */
 int content_count(const ui_t *ui)
 {
     const page_t *pg = page_get((int)ui->tab, is_osc_tab(ui)
@@ -164,7 +161,7 @@ item_t content_item(const ui_t *ui, int i)
                 it.si = ui->seq_sel[chain_of(ui)];
             else if (item_spec(it.id) != NULL &&
                      item_spec(it.id)->tgt == ITT_XMOD)
-                it.si = ui->mod_slot;  /* R4/PR-D: the SLOT row's slot */
+                it.si = ui->mod_slot;  /* the SLOT row's slot */
             return it;
         }
         i -= pg->spans[k].n;
@@ -188,12 +185,12 @@ int item_dim(const ui_t *ui, item_t it)
     }
 }
 
-/* --- spec-table access (Phase 5 item 2): the item spec table in
+/* --- spec-table access: the item spec table in
  * ui/seq_items.c is the ONE source of every item's range + format;
  * these two accessors map an item to its param slot (the si-target) —
  * everything else (clamping, wrapping, formatting) is generic below. --- */
 
-/* D3 (PLAN_OPTIMIZATION.md O4): the member accessors — ONE switch on
+/* the member accessors — ONE switch on
  * the spec's param_kind_t replaces the mirrored item_get/item_set
  * ladders. The item layer only maps (tab, si) -> slot + kind. */
 double param_get(const synth_params_t *d, param_kind_t kind, int ci,
@@ -298,8 +295,8 @@ void param_set(synth_params_t *d, param_kind_t kind, int ci, int si,
     }
 }
 
-/* the ui_t holder of an ITT_UI row's value (PR-C, PLAN_MOD_MATRIX_16.md)
- * — keyed on the SPEC's fmt, never an id (R12a): ITF_SLOT is the MOD
+/* the ui_t holder of an ITT_UI row's value
+ * — keyed on the SPEC's fmt, never an id: ITF_SLOT is the MOD
  * page's SLOT row (one selection for the whole matrix), ITF_STEPSEL the
  * SEQ page's STEP row (one rectangle per chain). */
 static const int *ui_sel_get(const ui_t *ui, const item_spec_t *sp)
@@ -315,8 +312,8 @@ static int *ui_sel_ref(ui_t *ui, const item_spec_t *sp)
 }
 
 /* one NAV_STEPSEL roll: the selection wraps across the SPEC's min..max
- * (R11) — the SEQ STEP row's rectangle 0..7, the MOD SLOT row's slot
- * 0..15 (R4). Bounds and holder both come from the spec. */
+ * the SEQ STEP row's rectangle 0..7, the MOD SLOT row's slot
+ * 0..15. Bounds and holder both come from the spec. */
 static void sel_roll(ui_t *ui, const item_spec_t *sp, int dir)
 {
     int sn = sp->max - sp->min + 1;
@@ -346,23 +343,23 @@ static void item_set(ui_t *ui, item_t it, double v)
 /* parent mod dest of an AMT item (PITCH narrows the AMT range) */
 mod_dest_t amt_dest_of(const ui_t *ui, item_t it)
 {
-    return ui->draft.xmod[it.si].dest;   /* only the matrix has AMT (O2) */
+    return ui->draft.xmod[it.si].dest;   /* only the matrix has AMT */
 }
 
-/* --- editing (LEFT/RIGHT, PLAN §8.1/§8.3) ---------------------------- */
+/* --- editing (LEFT/RIGHT) -------------------------------------------- */
 
 void commit(ui_t *ui)
 {
     mailbox_write(ui->mb, &ui->draft);
 }
 
-/* Table-driven edit (Phase 5 item 2): the spec entry (ui/seq_items.c)
+/* Table-driven edit: the spec entry (ui/seq_items.c)
  * carries the range (min/max in the fmt's edit space); this function is
  * generic — NO per-item ranges here. Dimmed items never reach this
  * (ui_handle_action breaks on item_dim; val_edit re-gates).
- * PLAN_HZ_EDIT.md: the Hz rows step the digit boxes' selected digit via
- * hz_digit_step (R4/R5); EVERY numeric field ROLLS OVER at its bounds
- * instead of clamping (R11 — the uniform rule, selectors included). */
+ * The Hz rows step the digit boxes' selected digit via
+ * hz_digit_step; EVERY numeric field ROLLS OVER at its bounds
+ * instead of clamping (the uniform rule, selectors included). */
 void edit_item(ui_t *ui, item_t it, int dir)
 {
     const item_spec_t *sp = item_spec(it.id);
@@ -370,27 +367,27 @@ void edit_item(ui_t *ui, item_t it, int dir)
         return;                            /* unknown id: inert */
     double v = item_get(ui, it);
     switch (sp->fmt) {
-    case ITF_HZ:                           /* centi-Hz odometer box (R2):
+    case ITF_HZ:                           /* centi-Hz odometer box:
                                             * snap the float param value
                                             * through centi-Hz ints, step
                                             * the selected digit's place,
-                                            * roll-over at [min, max]
-                                            * (R4/R5); the FIRST edit
+                                            * roll-over at [min, max]; the
+                                            * FIRST edit
                                             * snaps any preset fraction
-                                            * (R5 fractional rule) */
-    case ITF_TONE:                         /* same box, floor 20.00 (R2) */
+                                            * (fractional rule) */
+    case ITF_TONE:                         /* same box, floor 20.00 */
         v = hz_digit_step((int)lround(v * 100.0), digit_place(ui, it.id),
                           dir, sp->min, sp->max) / 100.0;
         break;
     case ITF_SEC: {                        /* ADSR ladder pos 0..max —
-                                            * wraps top -> 0 (R11) */
+                                            * wraps top -> 0 */
         int n = sp->max - sp->min + 1;
         int pos = adsr_s_to_pos(v);
         pos = sp->min + (((pos + dir - sp->min) % n) + n) % n;
         v = adsr_pos_to_s(pos);
         break;
     }
-    case ITF_CENTS: {                      /* 0.01 s steps, wraps (R11) */
+    case ITF_CENTS: {                      /* 0.01 s steps, wraps */
         int n = sp->max - sp->min + 1;
         int c = (int)lround(v * 100.0);
         c = sp->min + (((c + dir - sp->min) % n) + n) % n;
@@ -398,9 +395,8 @@ void edit_item(ui_t *ui, item_t it, int dir)
         break;
     }
     case ITF_AMT: {                        /* dest-dependent range kept
-                                            * (PITCH ±50, others ±100,
-                                            * §8.3) but WRAPS inside it
-                                            * (R11) */
+                                            * (PITCH ±50, others ±100)
+                                            * but WRAPS inside it */
         int lo = (int)amt_min(amt_dest_of(ui, it));
         int hi = (int)amt_max(amt_dest_of(ui, it));
         int n = hi - lo + 1;
@@ -412,7 +408,7 @@ void edit_item(ui_t *ui, item_t it, int dir)
         v = ((int)v == sp->max) ? sp->min : sp->max;
         break;
     case ITF_WAVE:                         /* wrapping selectors + integer */
-    case ITF_DUTY:                         /* fields: the same R11 roll-over */
+    case ITF_DUTY:                         /* fields: the same roll-over */
     case ITF_PCT:                          /* formula as before — these */
     case ITF_SPCT:                         /* formats had no case label and */
     case ITF_DIV:                          /* reached the default group */
@@ -431,7 +427,7 @@ void edit_item(ui_t *ui, item_t it, int dir)
                                             * mailbox commit) */
     case ITF_INT:
     case ITF_XDIV:
-    default:                               /* R11: uniform roll-over —
+    default:                               /* uniform roll-over —
                                             * percent, signed percent,
                                             * DUTY, BPM, XDIV and every
                                             * wrapping selector share the
@@ -445,8 +441,7 @@ void edit_item(ui_t *ui, item_t it, int dir)
     }
     }
     item_set(ui, it, v);
-    if (sp->fmt == ITF_DEST) {             /* re-clamp AMT on dest switch
-                                            * (PLAN §8.3) */
+    if (sp->fmt == ITF_DEST) {             /* re-clamp AMT on dest switch */
         mod_dest_t nd = (mod_dest_t)item_get(ui, it);
         if (nd != MOD_OFF) {
             item_t amt = it;
@@ -468,21 +463,21 @@ void ui_init(ui_t *ui, mailbox_t *mb)
     ui->draft = OPHIS_DEFAULTS;
     ui->menu_cursor = 5;                       /* BACK: the safe choice */
     ui->confirm_cursor = 1;                    /* NO: the safe choice   */
-    /* focus[] is per OSC tab only (0 = sub-tab row, the PLAN §8.2 start);
+    /* focus[] is per OSC tab only (0 = sub-tab row, the start);
      * MOD/MASTER have no sub-tab row — navigation keeps them on content
      * via is_osc_tab(). */
     if (preset_dir(ui->preset_dir, (int)sizeof ui->preset_dir) != 0)
         ui->preset_dir[0] = '\0';
 }
 
-/* Value-key edit + retrig (owner order 2026-11-05: holding X/Y — or
+/* Value-key edit + retrig (holding X/Y — or
  * Z/X on desktop — retrigs): the value-edit + hold-repeat state
- * machine lives in ui/valrepeat.c (M1 split, PLAN_OPTIMIZATION.md O6);
- * ui.c routes the VAL actions and the tick into it. */
+ * machine lives in ui/valrepeat.c; ui.c routes the VAL actions and the
+ * tick into it. */
 
 void ui_tick(ui_t *ui, Uint32 now)
 {
-    /* D9 (PLAN_CODE_REVIEW_FIXES.md Phase 6): retire expired flashes
+    /* retire expired flashes
      * here, as ui.h promises — 0 means "no active flash"; ui_draw then
      * tests the flag, not the clock. Call order in main.c is ui_tick
      * before ui_draw, so a flash set during this pass's actions still
@@ -491,7 +486,7 @@ void ui_tick(ui_t *ui, Uint32 now)
         ui->trig_flash_until = 0;
     if (ui->panic_flash_until && now >= ui->panic_flash_until)
         ui->panic_flash_until = 0;
-    valrepeat_tick(ui, now);   /* value-key hold (M1) */
+    valrepeat_tick(ui, now);   /* value-key hold */
 }
 
 int ui_wants_quit(const ui_t *ui)
@@ -499,9 +494,9 @@ int ui_wants_quit(const ui_t *ui)
     return ui->quitting && SDL_GetTicks() >= ui->quit_at;
 }
 
-/* --- outside-menu actions (PLAN §8.2 binding) ------------------------- */
+/* --- outside-menu actions ---------------------------------------------- */
 
-/* U2 keyboard gate input (see ui.h): OUR name-entry state. SDL's
+/* keyboard gate input (see ui.h): OUR name-entry state. SDL's
  * SDL_IsTextInputActive() is SDL_TRUE from startup on SDL >= 2.32
  * (libsdl-org/SDL#9309) and would swallow every keydown. */
 int ui_text_entry_active(const ui_t *ui)
@@ -545,7 +540,7 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
         else
             *cur = (*cur + n - 1) % n; /* move the cursor (wraps) */
         freq_digit_sync(ui);           /* row entry resets the digit
-                                        * cursor (PR-E) */
+                                        * cursor */
         break;
     case ACT_SEL_DOWN:
         if (is_osc_tab(ui) && !ui->focus[ui->tab])
@@ -553,7 +548,7 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
         else
             *cur = (*cur + 1) % n;
         freq_digit_sync(ui);           /* row entry resets the digit
-                                        * cursor (PR-E) */
+                                        * cursor */
         break;
     case ACT_NAV_LEFT:
     case ACT_NAV_RIGHT: {
@@ -568,7 +563,7 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
                 (((int)ui->sub[ci] + dir + (int)SUB_COUNT) %
                  (int)SUB_COUNT);
         } else {
-            /* R12/R12a (PLAN_HZ_EDIT.md): the row-dependent NAV dispatch
+            /* the row-dependent NAV dispatch
              * is TABLE-DRIVEN — the item spec's nav mode decides what
              * LEFT/RIGHT do; no id comparisons, no per-page flags. The
              * sub-tab branch above keeps priority exactly as before. */
@@ -577,7 +572,7 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
             switch (sp ? sp->nav : NAV_NONE) {
             case NAV_STEPSEL:          /* STEP row: move the rectangle;
                                         * SLOT row: move the matrix slot
-                                        * (R4) — both wrap across the
+                                        * — both wrap across the
                                         * spec's min..max (0..7 / 0..15) */
                 sel_roll(ui, sp, dir);
                 break;
@@ -585,19 +580,18 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
                                         * cursor — LEFT walks toward the
                                         * 10000s digit, RIGHT toward the
                                         * 0.01s; dimmed rows are
-                                        * digit-inert (R10) */
+                                        * digit-inert */
                 if (!item_dim(ui, it))
                     /* freq_digit counts FROM THE LEFT (0 = 10000s): RIGHT
                      * (+1) walks toward the 0.01s digit, LEFT (-1) toward
-                     * the 10000s; clamped 0..6 (R3) */
+                     * the 10000s; clamped 0..6 */
                     ui->freq_digit = clampi(ui->freq_digit + dir, 0, 6);
                 break;
             case NAV_NONE:             /* no nav spec (and the NULL-spec
             default:                   * guard): inert — except the MOD
-                                       * page (R4): LEFT/RIGHT roll the
-                                       * SLOT selection from ANY row (P5
-                                       * leg 3; bounds from the SLOT
-                                       * spec, PR-C) */
+                                       * page: LEFT/RIGHT roll the
+                                       * SLOT selection from ANY row
+                                       * (bounds from the SLOT spec) */
                 if (!is_osc_tab(ui) && ui->tab == TAB_MOD)
                     sel_roll(ui, item_spec(IT_MOD_SLOT), dir);
                 break;
@@ -608,7 +602,7 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
     case ACT_VAL_DEC:
     case ACT_VAL_INC: {
         int dir = act == ACT_VAL_INC ? +1 : -1;
-        val_edit(ui, dir, SDL_GetTicks());   /* valrepeat.c (M1) */
+        val_edit(ui, dir, SDL_GetTicks());   /* valrepeat.c */
         break;
     }
     case ACT_MENU:
@@ -620,10 +614,10 @@ void ui_handle_action(ui_t *ui, ui_action_t act)
     }
 }
 
-/* S3 (PLAN_OPTIMIZATION.md O6): the input-policy gate — while the SAVE
+/* the input-policy gate — while the SAVE
  * name-entry dialog is open the keyboard belongs to the TEXTINPUT/
- * BACKSPACE path; only ESC (cancel) and ENTER (confirm, owner order
- * 2026-11-05) reach the keymap. SDL 2.32 enables text input from
+ * BACKSPACE path; only ESC (cancel) and ENTER (confirm)
+ * reach the keymap. SDL 2.32 enables text input from
  * startup (libsdl-org/SDL#9309), so the gate keys off OUR state via
  * ui_text_entry_active(), never SDL_IsTextInputActive(). Gamepad
  * buttons are unaffected (no text entry on them). Lives HERE (the UI
@@ -659,8 +653,8 @@ void ui_handle_event(ui_t *ui, SDL_Event *e)
         break;
     /* R36S SAVE name entry is handled in menu_action() via the value
      * actions (ACT_VAL_INC inserts / ACT_VAL_DEC deletes — the grid
-     * picker routes through keymap_action like everything else,
-     * PLAN_KEYMAP_REBIND §4). Keyboard TEXTINPUT/Backspace above is
+     * picker routes through keymap_action like everything else).
+     * Keyboard TEXTINPUT/Backspace above is
      * desktop text entry, not a bound key. */
     case SDL_KEYUP:
     case SDL_CONTROLLERBUTTONUP:

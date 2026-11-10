@@ -1,6 +1,6 @@
 /* src/dsp/mixer.h — master sum + cross-mod matrix + tanh soft-clip; master
- * level and gate are applied in the FX/master stage (dsp/fx.c), NOT here
- * (PLAN §5 amended). Declarations only. */
+ * level and gate are applied in the FX/master stage (dsp/fx.c), NOT here.
+ * Declarations only. */
 #ifndef OPHIS_MIXER_H
 #define OPHIS_MIXER_H
 
@@ -9,13 +9,13 @@
 
 typedef struct {
   const synth_params_t *synth;   /* the live params: xmod slots, per-
-                                    chain mixvol (S4 — no copies) */
+                                    chain mixvol (no copies) */
 } mixer_params_t;
 
-/* mod-source id table (D2, PLAN_OPTIMIZATION.md O1): the ONE source of
+/* mod-source id table: the ONE source of
  * truth for ids 1..9 — id 0 is OFF (no entry). sub < 0 = the chain's
  * main osc, else the sub index. The historical ids are FROZEN (1..6 =
- * B/C, 7..9 = A appended in M2 — old presets keep their meaning). */
+ * B/C, 7..9 = A appended — old presets keep their meaning). */
 typedef struct { int chain; int sub; } modsrc_t;
 #define MODSRC_COUNT 9
 const modsrc_t *modsrc_get(int id);
@@ -25,11 +25,10 @@ typedef struct {
   xmod_in_t xm[3];         /* out: per-chain modulation computed by
                               mixer_render from p->xmod + src[]
                               (INTERFACE ADDITION: xm[] exposed in the state
-                              so the engine/tests can feed chain_render —
-                              flagged in the M1 report). */
+                              so the engine/tests can feed chain_render). */
 } mixer_state_t;
 
-/* S2 (PLAN_OPTIMIZATION.md O3): the mixer is TWO roles, split —
+/* the mixer is TWO roles, split —
  *
  *  matrix_render: computes m->xm[0..2] from the slots and m->src (the
  *      per-chain modulation the engine feeds each chain next sample),

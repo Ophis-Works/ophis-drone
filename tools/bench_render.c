@@ -1,4 +1,4 @@
-/* tools/bench_render.c — PLAN_POLYBLEP.md MS1: render benchmark.
+/* tools/bench_render.c — render benchmark.
  * Times ITERS engine_render_block calls (256 frames, 44100 Hz) with
  * OPHIS_DEFAULTS and a saw/square-heavy param set; prints µs/block.
  * The saw/square-heavy set maximizes edge density (220 Hz carriers,

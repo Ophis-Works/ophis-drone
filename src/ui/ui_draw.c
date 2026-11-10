@@ -1,11 +1,10 @@
-/* src/ui/ui_draw.c — SDL2 UI rendering (PLAN §8.6; X3,
- * PLAN_CODE_REVIEW_FIXES.md Phase 8: moved out of ui.c, pure structure,
- * no behavior change). Draws the 640x480 logical frame: status strip,
+/* src/ui/ui_draw.c — SDL2 UI rendering. Draws the 640x480 logical frame:
+ * status strip,
  * top tab bar + sub-tab bar, section-driven content pages (OSC/ENV+FLT/
  * MOD/MASTER + the SEQ page's step strip), two-line hint bar and the
- * menu window overlays (PLAN §8.4). ui_tick retires flash flags before
- * ui_draw (D9) — the draw side only tests the flags.
- * Layout (AMENDED, owner order, PLAN §8.6): 10x10 font cells (letters
+ * menu window overlays. ui_tick retires flash flags before
+ * ui_draw — the draw side only tests the flags.
+ * Layout: 10x10 font cells (letters
  * +2 pts, ui/font8x8.c); top tab bar + sub-tab bar are 20 px filled
  * strips; content starts at y=80 on every tab (2 blank lines after the
  * sub-tab bar); item row pitch is 16 px everywhere (row_cursor
@@ -17,8 +16,8 @@
  * item and the next section label (none after the last section).
  * The LOAD window shows the CURRENT FOLDER PATH on its title line;
  * subdirectories with a "/" suffix, errors inline.
- * Text: single glyph-atlas draw path (X1) — see draw_text below.
- * Palette (theme.h, IMPLEMENTATION.md §6 amended): every color comes
+ * Text: single glyph-atlas draw path — see draw_text below.
+ * Palette (theme.h): every color comes
  * from the dark-purple theme constants; no scattered literals. */
 #include <stdio.h>
 #include <string.h>
@@ -75,10 +74,10 @@ void item_value(const ui_t *ui, item_t it, char *b, size_t blen)
     double v = item_get(ui, it);
     switch (sp->fmt) {
     case ITF_DIV:     snprintf(b, blen, "/%d", (int)v); break;
-    case ITF_HZ:      /* centi-Hz odometer boxes (PLAN_FREQ_DECIMALS.md
-                       * R1/R5): "%05d.%02d Hz" — integer part + period +
+    case ITF_HZ:      /* centi-Hz odometer boxes: "%05d.%02d Hz" —
+                       * integer part + period +
                        * 2 decimals; a preset fraction is SHOWN, not
-                       * rounded (R5 fractional rule) */
+                       * rounded (fractional rule) */
     case ITF_TONE: {
                       int centi = (int)lround(v * 100.0);
                       int ip = centi / 100, dec = centi - ip * 100;
@@ -93,11 +92,11 @@ void item_value(const ui_t *ui, item_t it, char *b, size_t blen)
                        * NOT ui_enum_display's '.' separator */
                       ui_dest_display(schema_dest_name((int)v), b, blen);
     break;
-    case ITF_TGT:     /* R2: the routing target shows the OSCILLATOR
+    case ITF_TGT:     /* the routing target shows the OSCILLATOR
                        * NAME, never the raw 0/1/2 */
                       snprintf(b, blen, "OSC %d", (int)v + 1);
     break;
-    case ITF_XSRC:    /* R3: the frozen OSC-name table, not the raw
+    case ITF_XSRC:    /* the frozen OSC-name table, not the raw
                        * A/B/C-letter preset strings */
                       ui_xsrc_display((int)v, b, blen);
     break;
@@ -113,7 +112,7 @@ void item_value(const ui_t *ui, item_t it, char *b, size_t blen)
     case ITF_SEQMODE: snprintf(b, blen, "%s", SEQMODE_NAMES[(int)v]); break;
     case ITF_SEQONCE: snprintf(b, blen, "%s", SEQONCE_NAMES[(int)v]); break;
     case ITF_STEPSEL: snprintf(b, blen, "STEP %d", (int)v + 1); break;
-    case ITF_SLOT:    /* R4 (PLAN_MOD_MATRIX_16.md): the matrix slot
+    case ITF_SLOT:    /* the matrix slot
                        * shows 1-based ("SLOT 7" = ui mod_slot 6), like
                        * the STEP row's 1-based rectangle number */
                       snprintf(b, blen, "SLOT %d", (int)v + 1);
@@ -128,7 +127,7 @@ void item_value(const ui_t *ui, item_t it, char *b, size_t blen)
 
 /* --- text drawing ----------------------------------------------------- */
 
-/* X1 (PLAN_CODE_REVIEW_FIXES.md Phase 8): the 96 scaled 10x10 glyphs
+/* the 96 scaled 10x10 glyphs
  * (ASCII 0x20..0x7F — the same set font_glyph10 serves) live in ONE SDL
  * texture atlas, built once on the first draw_text call (UI thread only):
  * SDL_TEXTUREACCESS_STATIC, white lit pixels on transparent background,
@@ -172,7 +171,7 @@ static SDL_Texture *font_atlas_build(SDL_Renderer *r)
 }
 
 /* per-pixel fallback (atlas build failed: no RGBA8888 / OOM) — the
- * pre-X1 renderer, kept so a failed atlas init degrades to the old
+ * pre-atlas renderer, kept so a failed atlas init degrades to the old
  * draw cost instead of losing all text */
 static void draw_text_pixels(SDL_Renderer *r, int x, int y, const char *s,
                              SDL_Color c)
@@ -219,7 +218,7 @@ static void draw_text(SDL_Renderer *r, int x, int y, const char *s,
     }
 }
 
-/* Palette (theme.h, IMPLEMENTATION.md §6 amended): every text color comes
+/* Palette (theme.h): every text color comes
  * from the dark-purple theme constants; no scattered literals below. */
 static SDL_Color ophis_sdl_color(ophis_rgb_t c)
 {
@@ -233,8 +232,7 @@ static SDL_Color ophis_sdl_color(ophis_rgb_t c)
 #define C_GREEN  ophis_sdl_color(THEME_ACCENT)     /* active value/cursor   */
 #define C_RED    ophis_sdl_color(THEME_ERROR)      /* errors                */
 
-/* cursor highlight for a text row (16 px row pitch, owner order,
- * PLAN §8.6 amended) */
+/* cursor highlight for a text row (16 px row pitch) */
 static void row_cursor(SDL_Renderer *r, int y)
 {
     SDL_Rect row = { 0, y - 1, 640, 15 };
@@ -243,10 +241,10 @@ static void row_cursor(SDL_Renderer *r, int y)
     SDL_RenderFillRect(r, &row);
 }
 
-/* hint bar, two 10-px lines (PLAN §8.6: the keymap in effect on this
+/* hint bar, two 10-px lines (the keymap in effect on this
  * screen, in this target's binding words; labels via keymap_label() —
- * THE one label place, PLAN_KEYMAP_REBIND §2/§4). keymap_label() is
- * caller-buffer form (remediation F5): one small local buffer per label
+ * THE one label place). keymap_label() is
+ * caller-buffer form: one small local buffer per label
  * so the two snprintfs never alias. Buffer sizes are size_t — the
  * contract is the type, not a comment. */
 static void hint_binding(char *b1, size_t n1, char *b2, size_t n2)
@@ -271,8 +269,7 @@ static void hint_binding(char *b1, size_t n1, char *b2, size_t n2)
              run ? run : "?", trig ? trig : "?", menu ? menu : "?");
 }
 
-/* R3/PR-D/R12a (PLAN_HZ_EDIT.md), amended by PLAN_FREQ_DECIMALS.md
- * (PR-C/R1): the digit marker — one short underline under the ACTIVE
+/* the digit marker — one short underline under the ACTIVE
  * digit cell of the fixed-width "%05d.%02d Hz" field (value text starts
  * at x=460, one 10 px cell per glyph; cells from the left: 5 integer
  * digits, then the fixed period separator, then the 2 decimal digits —
@@ -280,13 +277,13 @@ static void hint_binding(char *b1, size_t n1, char *b2, size_t n2)
  * editable digits 0..6 from the left, so the cell index is freq_digit
  * for the integer digits (0..4) and freq_digit + 1 for the decimal
  * digits (5 -> cell 6, 6 -> cell 7), skipping the period cell. Drawn
- * only when ui_digit_marker_active() gates it on (R13): cursor row +
+ * only when ui_digit_marker_active() gates it on: cursor row +
  * content focus + not dim + NAV_DIGITS. */
 
-/* R13 (PLAN_HZ_EDIT.md): the marker's gate, factored out of the two
+/* the marker's gate, factored out of the two
  * draw paths (draw_sections + the SEQ row loop) — the mode comes from
  * the item spec, never an id comparison. The row highlight keeps its
- * own sel condition (R13 does not change it). */
+ * own sel condition. */
 int ui_digit_marker_active(const ui_t *ui, item_t it)
 {
     int slot = (int)ui->tab * SUB_COUNT +
@@ -302,7 +299,7 @@ int ui_digit_marker_active(const ui_t *ui, item_t it)
 static void draw_digit_marker(ui_t *ui, SDL_Renderer *r, int y)
 {
     /* editable digit -> cell index from the left; the period cell (5)
-     * is skipped (PR-C) */
+     * is skipped */
     int d = ui->freq_digit <= 4 ? ui->freq_digit : ui->freq_digit + 1;
     SDL_Rect mk = { 460 + d * OPHIS_FONT_W,
                     y + OPHIS_FONT_H + 1, OPHIS_FONT_W, 2 };
@@ -311,7 +308,7 @@ static void draw_digit_marker(ui_t *ui, SDL_Renderer *r, int y)
     SDL_RenderFillRect(r, &mk);
 }
 
-/* SECTION-DRIVEN page renderer (owner order, PLAN §8.2/§8.6 amended):
+/* SECTION-DRIVEN page renderer:
  * used for the OSC, ENV+FLT, MOD and MASTER pages. For each section of
  * the page's flat item list: a gray non-selectable label row at x=24,
  * then the section's items indented to x=44 (name) / x=460 (value), one
@@ -358,13 +355,13 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
     SDL_SetRenderDrawColor(r, THEME_BG.r, THEME_BG.g, THEME_BG.b, 255);
     SDL_RenderClear(r);
 
-    /* ---- status strip (PLAN §8.1): product title centered
-     * (PLAN_KEYMAP_REBIND §4); TRIGGER/PANIC flash on the right side ---- */
+    /* ---- status strip: product title centered;
+     * TRIGGER/PANIC flash on the right side ---- */
     snprintf(b, sizeof b, "RUN:%s  GATE:%.2f",
              st->run ? "ON" : "OFF", (double)st->gate);
     draw_text(r, 8, 4, b, st->run ? C_GREEN : C_WHITE);
     draw_text(r, (640 - 11 * OPHIS_FONT_W) / 2, 4, "OPHIS DRONE", C_WHITE);
-    /* D9: flash flags are retired by ui_tick (0 = inactive); no clock
+    /* flash flags are retired by ui_tick (0 = inactive); no clock
      * comparison at draw time */
     if (ui->trig_flash_until)
         draw_text(r, 560, 4, "TRIGGER", C_GREEN);
@@ -374,7 +371,7 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
     int osc = is_osc_tab(ui);
     int ci = chain_of(ui);
 
-    /* ---- top tab bar (PLAN §8.6, owner order): 20 px filled strip ---- */
+    /* ---- top tab bar: 20 px filled strip ---- */
     {
         SDL_Rect strip = { 0, 16, 640, 20 };
         SDL_SetRenderDrawColor(r, THEME_TRACK.r, THEME_TRACK.g,
@@ -404,7 +401,7 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
         SDL_RenderDrawRect(r, &box);
     }
 
-    /* ---- sub-tab bar (OSC tabs only, PLAN §8.6): 20 px filled strip ---- */
+    /* ---- sub-tab bar (OSC tabs only): 20 px filled strip ---- */
     if (osc) {
         SDL_Rect strip = { 0, 40, 640, 20 };
         SDL_SetRenderDrawColor(r, THEME_TRACK.r, THEME_TRACK.g,
@@ -433,7 +430,7 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
      * is 16 px tall — all pages fit above the hint bar (y < 456) ---- */
     int y = 80;
     if (osc && cur_sub(ui) == SUB_SEQ) {
-        /* ---- SEQ page (PLAN §8.2 AMENDED, owner order): SINGLE
+        /* ---- SEQ page: SINGLE
          * COLUMN, one parameter per row, table-driven — cursor index ==
          * item == drawn row, iterate SEQ_ITEMS top-to-bottom:
          * SEQ ON · DIV · MODE · ONCE · STEP · PITCH · VEL (NO BPM — the
@@ -444,8 +441,8 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
         int cur = *cur_cursor(ui);
         int sel = ui->seq_sel[ci];
 
-        /* the page names the chain it edits (owner order 2026-11-06:
-         * "UI should design what is currently selected") */
+        /* the page names the chain it edits ("UI should design what is
+         * currently selected") */
         snprintf(b, sizeof b, "SEQUENCER - OSC %d", ci + 1);
         draw_text(r, 24, y, b, C_GRAY);
         y += 24;
@@ -476,8 +473,7 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
                                                 THEME_TRACK.b, 255);
                         SDL_RenderFillRect(r, &sq);
                     }
-                    /* step markers (owner order, PLAN §8.2 amended by
-                     * PLAN_KEYMAP_REBIND §5): the SELECTED step
+                    /* step markers: the SELECTED step
                      * (PITCH/VEL bind to it) gets a THICK THEME_SEQ_SEL
                      * frame — 5 nested rects drawn OUTWARD so the
                      * 64x40 cell body is not shrunk; the step PLAYING
@@ -527,7 +523,7 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
                 draw_text(r, 24, y, it.name, sel_row ? C_BLACK : C_WHITE);
                 item_value(ui, it, b, sizeof b);
                 draw_text(r, 460, y, b, sel_row ? C_BLACK : C_GREEN);
-                /* R12a: the PITCH row is a digit box — the marker keys
+                /* the PITCH row is a digit box — the marker keys
                  * off the spec's nav mode, same gate as draw_sections */
                 if (ui_digit_marker_active(ui, it))
                     draw_digit_marker(ui, r, y);
@@ -541,12 +537,12 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
         y = draw_sections(ui, r, y);
     }
 
-    /* ---- hint bar: TWO lines (PLAN §8.6, owner order) ---- */
+    /* ---- hint bar: TWO lines ---- */
     hint_binding(b, sizeof b, b2, sizeof b2);
     draw_text(r, 4, 456, b, C_GRAY);
     draw_text(r, 4, 468, b2, C_GRAY);
 
-    /* ---- menu window overlay (PLAN §8.4) ---- */
+    /* ---- menu window overlay ---- */
     if (ui->in_menu == MENU_MAIN || ui->in_menu == MENU_CONFIRM) {
         SDL_Rect win = { 160, 120, 320, 300 };
         SDL_SetRenderDrawColor(r, THEME_BG.r, THEME_BG.g, THEME_BG.b, 255);
@@ -597,8 +593,8 @@ void ui_draw(ui_t *ui, SDL_Renderer *r, const ui_status_t *st)
                           gsel ? C_GREEN : C_WHITE);
             }
         }
-        /* help line in this target's binding words (PLAN_KEYMAP_REBIND
-         * §2): labels via keymap_label() — insert = the VAL_INC key,
+        /* help line in this target's binding words: labels via
+         * keymap_label() — insert = the VAL_INC key,
          * delete = the VAL_DEC key, save = CONFIRM (Enter on desktop;
          * the handheld KB_CONFIRM is unbound, so its label is NULL and
          * the RUN label shows — A saves there), cancel = MENU */

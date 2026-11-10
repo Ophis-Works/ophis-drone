@@ -1,11 +1,11 @@
 /* src/dsp/fx.h — master-path FX + safety filter + master level + gate.
- * Owner-ordered FX amendment (PLAN §2/§5): per sample the order is
+ * Per sample the order is
  *   delay -> reverb -> SAFETY (HP 60 Hz + LP 18 kHz cascaded biquads,
  *   or bypass) -> master level -> master gate.
  * The mixer ends at tanh(...); the gate is applied HERE, per sample,
- * NOT in mixer_render (amended contract, PLAN §5).
+ * NOT in mixer_render.
  * Fixed preallocated buffers only — no malloc in the RT path.
- * Contract: IMPLEMENTATION.md §2. Declarations only. */
+ * Declarations only. */
 #ifndef OPHIS_FX_H
 #define OPHIS_FX_H
 
@@ -59,7 +59,7 @@ typedef struct {
 void fx_reset(fx_state_t *fx);
 
 /* One stereo sample through the master stage. out_l / out_r receive the
- * processed pair ("stereo out" of the owner-ordered signature). */
+ * processed pair ("stereo out"). */
 void fx_process(fx_state_t *fx, const fx_params_t *p,
                 float in_l, float in_r, float *out_l, float *out_r,
                 double sr);

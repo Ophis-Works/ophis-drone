@@ -1,9 +1,8 @@
-/* src/audio/alsa_pcm.h — thin ALSA PCM wrapper (IMPLEMENTATION.md §2).
+/* src/audio/alsa_pcm.h — thin ALSA PCM wrapper.
  * The ONLY ALSA user (besides test_engine, which uses device "null").
  * S32_FLOAT (SND_PCM_FORMAT_FLOAT_LE), 44100 Hz, stereo, period 256.
  * On XRUN: snd_pcm_recover + drop the block + count it (alsa_xruns).
- * DESKTOP GATE: the cumulative count must stay exactly 0 on desktop
- * (PLAN §2/§10). */
+ * DESKTOP GATE: the cumulative count must stay exactly 0 on desktop. */
 #ifndef OPHIS_ALSA_PCM_H
 #define OPHIS_ALSA_PCM_H
 

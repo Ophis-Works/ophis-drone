@@ -1,5 +1,4 @@
-/* tests/test_presdirs.c — LOAD folder navigator contracts (approved
- * tabbed-UI amendment; PLAN §8.4, IMPLEMENTATION.md §2):
+/* tests/test_presdirs.c — LOAD folder navigator contracts:
  *   preset_list_dirs: subdirectories of dir + "..", alphabetical.
  *   preset_path: resolves <dir>/<name> (navigator uses it to enter a
  *   listed subdirectory, including "..").

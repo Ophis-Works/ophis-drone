@@ -1,5 +1,4 @@
-/* tools/migrate_presets.c — ONE-OFF dev-time migration (M4b,
- * PLAN_MOD_ROUTING.md; version-2 gate, PLAN_MOD_MATRIX_16.md R6):
+/* tools/migrate_presets.c — ONE-OFF dev-time migration (version-2 gate):
  * rewrites preset files to the current format by parse -> write
  * round-trip. The input must parse as schema version 2 — the parser's
  * version gate (schema_parse.c) rejects version 1 files LOUDLY, this

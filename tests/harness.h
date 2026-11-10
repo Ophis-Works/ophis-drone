@@ -1,6 +1,6 @@
-/* tests/harness.h — plain-C assert harness, prints "N/M passed" (PLAN §10,
- * IMPLEMENTATION.md §8 M1). Also carries the DSP measurement helpers shared
- * by the M1 tests (test-side code only). */
+/* tests/harness.h — plain-C assert harness, prints "N/M passed".
+ * Also carries the DSP measurement helpers shared
+ * by the DSP tests (test-side code only). */
 #ifndef OPHIS_HARNESS_H
 #define OPHIS_HARNESS_H
 

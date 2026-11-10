@@ -1,5 +1,5 @@
 #!/bin/sh
-# tools/r36s-launcher.sh — template for ports/Ophis-Drone.sh (PLAN.md §11 M6):
+# tools/r36s-launcher.sh — template for ports/Ophis-Drone.sh:
 # EmulationStation lists this launcher in roms/ports/; it must run the
 # binary that lives in the program folder next to it. We cd into the
 # program folder (which also contains presets/ after first save); the

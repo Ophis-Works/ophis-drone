@@ -1,11 +1,10 @@
-/* tests/test_ui_menu.c — menu_action() contracts (PLAN_CODE_REVIEW_FIXES.md
- * Phase 4, U4 + owner-ordered desktop key rules 2026-11-05): in MENU_MAIN /
+/* tests/test_ui_menu.c — menu_action() contracts: in MENU_MAIN /
  * MENU_CONFIRM / MENU_LOAD the NAV and VAL actions are NO-OPS; on desktop
  * ACT_CONFIRM (Enter) confirms, ACT_MENU (Esc) is the ONLY cancel, and
  * ACT_RUN (Space) / ACT_TRIGGER (T) do nothing inside menus. MENU_NAME
  * keeps its NAV (grid cursor) / VAL (insert/delete) handlers on purpose:
- * the SAVE grid picker is the R36S name-entry path (PLAN_KEYMAP_REBIND
- * §4) — the test pins that divergence so it cannot regress either way.
+ * the SAVE grid picker is the R36S name-entry path — the test pins that
+ * divergence so it cannot regress either way.
  * SDL-linked (ui.c is an SDL TU): SDL_Init video with the dummy driver
  * keeps SDL_StartTextInput / SDL_GetTicks headless; no window is shown.
  * Presets are staged in the dir preset_dir() itself resolves (beside the
@@ -24,7 +23,7 @@
 
 #include "../src/config.h"
 #include "../src/ui/seq_items.h"
-/* D3 accessors (ui.c) — the MENU_* mirror below keeps ui_internal.h
+/* param accessors (ui.c) — the MENU_* mirror below keeps ui_internal.h
  * out of this TU */
 #include "../src/dsp/types.h"
 #include "../src/preset/schema.h"
@@ -47,7 +46,7 @@ static char stage[1024];          /* dir preset_dir() resolves (absolute) */
 
 static void fresh_ui(void) { ui_init(&ui, &mb); }
 
-/* Remove every entry in dir, then the dir itself (F1 test hygiene: an
+/* Remove every entry in dir, then the dir itself (test hygiene: an
  * interrupted earlier run must not leave state behind). */
 static void purge_dir(const char *dir)
 {
@@ -83,7 +82,7 @@ static void test_main_nav_val_inert(void)
     fresh_ui();
     ui_handle_action(&ui, ACT_MENU);
     CHECK(ui.in_menu == MENU_MAIN);
-    /* U4: NAV/VAL do nothing — in particular they do NOT close. */
+    /* NAV/VAL do nothing — in particular they do NOT close. */
     ui_handle_action(&ui, ACT_NAV_LEFT);  CHECK(ui.in_menu == MENU_MAIN);
     ui_handle_action(&ui, ACT_NAV_RIGHT); CHECK(ui.in_menu == MENU_MAIN);
     ui_handle_action(&ui, ACT_VAL_INC);   CHECK(ui.in_menu == MENU_MAIN);
@@ -94,7 +93,7 @@ static void test_main_nav_val_inert(void)
     /* Up/down still navigate the item list. */
     ui.menu_cursor = 5;
     ui_handle_action(&ui, ACT_SEL_DOWN);  CHECK(ui.menu_cursor == 0);
-    /* Desktop (owner order 2026-11-05): Esc is the ONLY close; Space
+    /* Desktop: Esc is the ONLY close; Space
      * (ACT_RUN) and T (ACT_TRIGGER) do nothing inside menus. */
     ui_handle_action(&ui, ACT_TRIGGER);   CHECK(ui.in_menu == MENU_MAIN);
     ui_handle_action(&ui, ACT_RUN);       CHECK(ui.in_menu == MENU_MAIN);
@@ -132,11 +131,11 @@ static void test_name_grid_picker_kept(void)
     /* NAV moves the grid cursor (kept deliberately — R36S name entry). */
     ui_handle_action(&ui, ACT_NAV_RIGHT); CHECK(ui.grid_x == 1);
     ui_handle_action(&ui, ACT_NAV_LEFT);  CHECK(ui.grid_x == 0);
-    /* VAL keys insert/delete at the cursor (PLAN_KEYMAP_REBIND §4). */
+    /* VAL keys insert/delete at the cursor. */
     ui_handle_action(&ui, ACT_VAL_INC);   CHECK(ui.name_len == 1);
     ui_handle_action(&ui, ACT_VAL_DEC);   CHECK(ui.name_len == 0);
     /* Enter confirms (saves), Space does nothing, Esc cancels + stops
-     * input (owner order 2026-11-05). */
+     * input. */
     snprintf(ui.name, sizeof ui.name, "menutest");
     ui.name_len = (int)strlen(ui.name);
     ui_handle_action(&ui, ACT_RUN);       CHECK(ui.in_menu == MENU_NAME);
@@ -145,7 +144,7 @@ static void test_name_grid_picker_kept(void)
     CHECK(!SDL_IsTextInputActive());
 }
 
-/* U2 regression pin (SDL >= 2.32 enables text input by default, so
+/* regression pin (SDL >= 2.32 enables text input by default, so
  * SDL_IsTextInputActive() is SDL_TRUE from startup): main.c's keyboard
  * gate must key off OUR name-entry state, exposed as
  * ui_text_entry_active() — not on SDL's flag. */
@@ -160,7 +159,7 @@ static void test_text_entry_state_tracker(void)
     CHECK(!SDL_IsTextInputActive());
 }
 
-/* PLAN_LAST_SAVED_NAME.md (owner order 2026-11-10): SAVE opens with the
+/* SAVE opens with the
  * last SUCCESSFULLY saved name prefilled; failed saves record nothing;
  * the record updates on each success. The record lives in ui_t (one
  * instance per app session), so the reopens here stay on ONE ui — the
@@ -233,13 +232,12 @@ static void test_load_nav_val_inert(void)
     ui_handle_action(&ui, ACT_MENU);      CHECK(ui.in_menu == MENU_OFF);
 }
 
-/* F1 (user order 2026-11-05): the navigator behaves like a file picker.
+/* the navigator behaves like a file picker.
  * An existing-but-empty presets dir lists exactly ".." (up); a MISSING
  * presets dir is created by the LOAD open; an UNCREATABLE presets dir
  * falls back to its parent. Closes go through ACT_MENU (Esc) — stable
  * across both targets. */
-/* Owner order 2026-11-10 (supersedes the 2026-11-05 retrig order,
- * which the owner retracted): the value keys NEVER trigger — no retrig,
+/* The value keys NEVER trigger — no retrig,
  * no TRIG flash, no mailbox writes. The single trigger path in the
  * whole UI is ACT_TRIGGER (the TRIGGER key): inclusion principle,
  * pinned here. The synthesized hold (400 ms delay, 120 ms rate) sweeps
@@ -383,18 +381,18 @@ static void test_load_uncreatable_falls_back(void)
     CHECK(chmod(parent, 0755) == 0);
 }
 
-/* ---- P1/P2 (PLAN_WAVE_DISPLAY.md §1.3): item_value renders the DRAFT's
+/* ---- item_value renders the DRAFT's
  * enum-valued rows through the display functions. The WAVE / DEST / FILT
  * / POLES cases snprintf THROUGH the same buffer they format from
  * (overlapping in/out, C11 7.21.6.6p4) — those four rows draw empty/
- * garbage today; these pins are the red-first guard for the direct-call
- * fix. P2 guards the already-direct cases (ITF_XSRC / ITF_TGT) against a
- * sloppy rewrite. item_value is hoisted out of ui_draw.c's static scope
+ * garbage if done wrong; these pins guard the direct-call
+ * fix. The already-direct cases (ITF_XSRC / ITF_TGT) are guarded against
+ * a sloppy rewrite. item_value is hoisted out of ui_draw.c's static scope
  * as part of the fix (declared in ui_internal.h); this TU mirrors that
  * declaration locally, like param_get/param_set above. ---- */
 extern void item_value(const ui_t *ui, item_t it, char *b, size_t blen);
 extern item_t content_item(const ui_t *ui, int i);   /* flat item i (ui.c) */
-/* PLAN_HZ_EDIT.md P4/P6 edit-surface mirrors (ui_internal.h decls, same
+/* edit-surface mirrors (ui_internal.h decls, same
  * pattern as item_value/content_item above) */
 extern void   edit_item(ui_t *ui, item_t it, int dir);
 extern double item_get(const ui_t *ui, item_t it);
@@ -421,7 +419,7 @@ static void test_item_value_enum_rows(void)
     char b[32];
     item_t it;
 
-    /* P1: the four snprintf-aliasing cases — EMPTY/garbage today (red) */
+    /* the four snprintf-aliasing cases — EMPTY/garbage if done wrong */
     it = content_item(&u, 1);              /* MAIN_ITEMS[1] = WAVE */
     CHECK(it.id == IT_OSC_WAVE);
     item_value(&u, it, b, sizeof b);
@@ -429,22 +427,22 @@ static void test_item_value_enum_rows(void)
 
     u.tab = TAB_MOD;
     it = content_item(&u, 3);              /* MOD_ITEMS[3] = DEST, slot 0
-                                            * (the 6-row SLOT model, R4:
+                                            * (the 6-row SLOT model:
                                             * SLOT · SOURCE · TARGET ·
                                             * DEST · DEPTH · LEVEL) */
     CHECK(it.id == IT_XMOD_DEST && it.si == 0);
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "RING") == 0);
 
-    /* R4 (PLAN_MOD_MATRIX_16.md): the SLOT row shows 1-based ("SLOT %d",
-     * v+1) — green-today guard (repo precedent, M2 log): written with
+    /* the SLOT row shows 1-based ("SLOT %d",
+     * v+1) — green-today guard: written with
      * the implementation, not red-first */
     it = content_item(&u, 0);              /* MOD_ITEMS[0] = SLOT */
     CHECK(it.id == IT_MOD_SLOT && it.si == 0);
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "SLOT 1") == 0);
 
-    /* MS2 (PLAN_MOD_FENV_ADSR_DIV.md): the NEW dest strings ride the same
+    /* the NEW dest strings ride the same
      * table-driven display — "flt_env" -> "FLT ENV", "adsr_a" -> "ADSR A"
      * ('_' -> ' ', uppercased). Red until dest_tab gains the entries. */
     it = content_item(&u, 3);              /* MOD_ITEMS[3] = DEST again */
@@ -455,7 +453,7 @@ static void test_item_value_enum_rows(void)
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "ADSR A") == 0);
 
-    /* MS2: SEQ DIV shows "/n" (matches the sub-oscillator DIV display).
+    /* SEQ DIV shows "/n" (matches the sub-oscillator DIV display).
      * Red until ui_draw.c's ITF_XDIV switches "x%d" -> "/%d". */
     u.tab = TAB_OSC1;                      /* SEQ ids live on OSC tabs */
     u.draft.seq[0].div = 4;
@@ -475,7 +473,7 @@ static void test_item_value_enum_rows(void)
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "24DB") == 0);
 
-    /* P2: the previously-working direct cases stay correct */
+    /* the previously-working direct cases stay correct */
     u.tab = TAB_MOD;
     it = content_item(&u, 1);              /* SOURCE, slot 0 */
     CHECK(it.id == IT_XMOD_SRC && it.si == 0);
@@ -488,12 +486,11 @@ static void test_item_value_enum_rows(void)
     CHECK(strcmp(b, "OSC 3") == 0);        /* tgt 2 -> "OSC %d" (v + 1) */
 }
 
-/* ---- P2 (PLAN_FREQ_DECIMALS.md §1.3, R1/R5): the digit-box rows render
+/* ---- the digit-box rows render
  * 5 integer digits + PERIOD + 2 decimals — "00220.00 Hz", "20000.00 Hz"
  * at the ceiling, "00000.01 Hz" at the 0.01 floor, a preset-loaded 55.5
  * as "00055.50 Hz" — on the freq rows (OSC FREQ, FILTER CUT, DELAY
- * TONE; R1). Red until ui_draw.c's item_value formats the freq rows
- * "%05d.%02d Hz". ---- */
+ * TONE); ui_draw.c's item_value formats them "%05d.%02d Hz". ---- */
 static void test_item_value_freq_odometer(void)
 {
     ui_t u;
@@ -520,14 +517,14 @@ static void test_item_value_freq_odometer(void)
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "00055.50 Hz") == 0);
 
-    u.sub[0] = SUB_ENVFLT;                 /* FILTER CUT: same box (R1) */
+    u.sub[0] = SUB_ENVFLT;                 /* FILTER CUT: same box */
     it = content_item(&u, 5);              /* ADSR(4) + FILT_ITEMS[1] */
     CHECK(it.id == IT_FILT_CUT);
     u.draft.chain[0].fc = 1500.0f;
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "01500.00 Hz") == 0);
 
-    u.tab = TAB_MASTER;                    /* DELAY TONE: same box (R1) */
+    u.tab = TAB_MASTER;                    /* DELAY TONE: same box */
     it = content_item(&u, 8);              /* MASTER_ITEMS[8] = TONE */
     CHECK(it.id == IT_DLY_TONE);
     u.draft.delay.tone = 8500;
@@ -535,9 +532,9 @@ static void test_item_value_freq_odometer(void)
     CHECK(strcmp(b, "08500.00 Hz") == 0);
 }
 
-/* ---- P2 (PLAN_FREQ_DECIMALS.md §1.3, R5/PR-B): the fractional-
+/* ---- the fractional-
  * preservation rule in the centi-Hz space — a preset-loaded 55.5 Hz
- * SHOWS its fraction ("00055.50 Hz"; R5 display, no rounding — the
+ * SHOWS its fraction ("00055.50 Hz"; no rounding — the
  * value is exactly 5550 centi-Hz) and item_get still returns 55.5; the
  * first 1s-digit step snaps through centi-Hz ints (55.50 -> 56.50).
  * Driven through edit_item (ui_internal.h surface, mirrored above);
@@ -557,7 +554,7 @@ static void test_freq_fractional_rounding(void)
 
     u.draft.chain[0].freq_hz = 55.5f;
     u.freq_digit = 4;                      /* the 1s digit (first
-                                            * non-decimal digit, R3) */
+                                            * non-decimal digit) */
     char b[32];
     item_value(&u, it, b, sizeof b);
     CHECK(strcmp(b, "00055.50 Hz") == 0);  /* fraction displayed */
@@ -567,7 +564,7 @@ static void test_freq_fractional_rounding(void)
     CHECK(fexact(item_get(&u, it), 56.5));  /* 5550 +100 centi-Hz */
 }
 
-/* ---- P6 (PLAN_HZ_EDIT.md §1.4, R11): EVERY numeric edit field rolls
+/* ---- EVERY numeric edit field rolls
  * over at its bounds instead of clamping — driven through edit_item
  * (the same edit surface the val keys reach via val_edit). Red until
  * the generic clamp branch of edit_item becomes a wrap branch. ---- */
@@ -595,7 +592,7 @@ static void test_edit_rollover(void)
     edit_item(&u, it, +1);
     CHECK(fexact(item_get(&u, it), -100));
 
-    /* DUTY: 5..95 (95 -> 5, R11) */
+    /* DUTY: 5..95 (95 -> 5) */
     it = (item_t){ NULL, IT_OSC_DUTY, 0 };
     param_set(&u.draft, PK_CHAIN_DUTY, 0, 0, 95);
     edit_item(&u, it, +1);
@@ -635,7 +632,7 @@ static void test_edit_rollover(void)
     CHECK(fexact(item_get(&u, it), 100));
 }
 
-/* ---- P7 (PLAN_HZ_EDIT.md §1.1a, R12/R12a): the SEQ page joins the
+/* ---- the SEQ page joins the
  * odometer scheme with ROW-DEPENDENT LEFT/RIGHT, dispatched TABLE-DRIVEN
  * off the spec's nav mode — STEP row: the rectangle moves; PITCH row:
  * the DIGIT cursor moves (never the rectangle); VEL row: nothing moves.
@@ -669,7 +666,7 @@ static void test_seq_nav_rows(void)
     item_t it;
     char b[32];
 
-    /* PITCH row renders ZERO-PADDED with decimals (R1/R5 + the ITF_HZ
+    /* PITCH row renders ZERO-PADDED with decimals (the ITF_HZ
      * box): the bound step (si = seq_sel) shows "00220.00 Hz" */
     {
         ui_t u = seq_ui(5, 0, 3);
@@ -681,7 +678,7 @@ static void test_seq_nav_rows(void)
     }
 
     /* PITCH row: ROW ENTRY resets the digit cursor to index 4 — the 1s
-     * digit, the FIRST NON-DECIMAL digit (R3; 7 digits 0..6 counted
+     * digit, the FIRST NON-DECIMAL digit (7 digits 0..6 counted
      * from the left, the period cell skipped). Red until the reset
      * constant moves off 0. */
     {
@@ -694,7 +691,7 @@ static void test_seq_nav_rows(void)
 
     /* PITCH row: NAV moves the DIGIT cursor, NEVER the rectangle;
      * RIGHT walks toward the 0.01s digit (index 6) and a step there
-     * moves +0.01 Hz (R2/R3) */
+     * moves +0.01 Hz */
     {
         ui_t u = seq_ui(5, 4, 3);      /* default: the 1s digit */
         u.draft.seq[0].steps[3].pitch_hz = 220.0f;
@@ -711,7 +708,7 @@ static void test_seq_nav_rows(void)
 
     /* PITCH row: LEFT walks toward the 10000s digit (index 0) and a
      * step there moves +10000.00 Hz (place 10000 Hz = 1000000
-     * centi-Hz, R2 — the 7 places are 10000..0.01) */
+     * centi-Hz — the 7 places are 10000..0.01) */
     {
         ui_t u = seq_ui(5, 4, 3);
         u.draft.seq[0].steps[3].pitch_hz = 220.0f;
@@ -728,7 +725,7 @@ static void test_seq_nav_rows(void)
         CHECK(fexactf(u.draft.seq[0].steps[3].pitch_hz, 10220.0f));
     }
 
-    /* STEP row: NAV moves the rectangle (unchanged R12 behavior), 0..7
+    /* STEP row: NAV moves the rectangle (unchanged behavior), 0..7
      * wrap; the digit cursor is untouched */
     {
         ui_t u = seq_ui(4, 2, 0);
@@ -771,7 +768,7 @@ static void test_seq_nav_rows(void)
     }
 }
 
-/* P7 (R12a — "code it properly"): the nav dispatch is TABLE-DRIVEN —
+/* the nav dispatch is TABLE-DRIVEN —
  * the item spec itself carries the per-row nav mode; NO id matching in
  * ui.c. Compile-red until the nav_mode enum (NAV_STEPSEL / NAV_DIGITS /
  * NAV_NONE) and the spec field exist — expected at the pin stage. */
@@ -782,13 +779,13 @@ static void test_seq_nav_spec_modes(void)
     CHECK(item_spec(IT_STEP_VEL)->nav == NAV_NONE);
 }
 
-/* ---- P8 (PLAN_HZ_EDIT.md §1.1b, R13): the digit marker's FOCUS GATE —
+/* ---- the digit marker's FOCUS GATE —
  * the marker condition in draw_sections (src/ui/ui_draw.c:309,
  * "sel && !dim && item_spec(it.id)->nav == NAV_DIGITS" feeding
  * draw_digit_marker at :269) has NO content-focus term: with the cursor
  * parked on a digit-box row and FOCUS on the sub-tab row
  * (ui.focus[tab] == 0 after moving UP out of the content), sel is still
- * true and the underscore draws — R13 orders it must not ("the
+ * true and the underscore draws — it must not ("the
  * underscore should only appear in the digits when that line is
  * selected"). The gate is pinned as an OBSERVABLE through the
  * predicate the marker reads, exposed for the fix (extern mirror, same
@@ -869,17 +866,14 @@ static void test_digit_marker_focus_gate(void)
     }
 }
 
-/* ---- P5 (PLAN_MOD_MATRIX_16.md §1.3, M3): the MOD page's SLOT row
+/* ---- the MOD page's SLOT row
  * selects the slot the five rows below edit — NAV on the SLOT row rolls
- * the selection 0..15 WITH roll-over (R4/PR-C), and DEPTH then edits
- * the SELECTED slot's amount (PR-D: the slot rides the ui state at use
+ * the selection 0..15 WITH roll-over, and DEPTH then edits
+ * the SELECTED slot's amount (the slot rides the ui state at use
  * time, exactly like SEQ PITCH/VEL). Driven through the real key path
- * (ui_handle_action); the selection is ui_t-internal (PR-C), so it is
+ * (ui_handle_action); the selection is ui_t-internal, so it is
  * observed ONLY through the DEPTH writes. A slot whose dest is OFF dims
- * its DEPTH row (ui.c item_dim), so the edited slots are made live.
- * Red today: no SLOT row exists — NAV is inert (NAV_NONE on every MOD
- * row), and the edit lands on slot 0 (cursor row 4 = LEVEL today, DEPTH
- * of the selected slot post-M3). ---- */
+ * its DEPTH row (ui.c item_dim), so the edited slots are made live. ---- */
 static void test_mod_slot_row(void)
 {
     /* SLOT 7 (index 6): six NAV_RIGHTs from fresh SLOT 1, then DEPTH
@@ -990,15 +984,15 @@ int main(void)
     test_load_nav_val_inert();
     test_valkey_no_retrig();
     test_save_prefills_last_name();
-    /* ---- PLAN_MOD_MATRIX_16.md §1.3: the MOD SLOT row (P5) — red
-     * first (before SDL_Quit: the val path reads SDL_GetTicks) ---- */
+    /* ---- the MOD SLOT row (before SDL_Quit: the val path reads
+     * SDL_GetTicks) ---- */
     test_mod_slot_row();
     test_load_empty_shows_up();
     test_load_missing_dir_created();
     test_load_uncreatable_falls_back();
     purge_dir(stage);
     SDL_Quit();
-    /* ---- D3 (PLAN_OPTIMIZATION.md O4): param_get/param_set round-
+    /* ---- param_get/param_set round-
      * trip every kind on distinct slots — the ONE accessor pair the
      * item_get/item_set ladders collapsed into ---- */
     {
@@ -1036,7 +1030,7 @@ int main(void)
         }
     }
 
-    /* ---- S1 (PLAN_OPTIMIZATION.md O6): the display transform lives in
+    /* ---- the display transform lives in
      * the UI — schema names are RAW; ui_enum_display reproduces the old
      * UPPERCASE/'.' forms exactly ---- */
     {
@@ -1057,27 +1051,24 @@ int main(void)
         CHECK(strcmp(schema_dest_name(MOD_RING), "ring") == 0);
     }
 
-    /* ---- P1/P2 (PLAN_WAVE_DISPLAY.md): the enum value rows render the
-     * draft — WAVE/DEST/FILT/POLES red first (P1), XSRC/TGT direct (P2) */
+    /* ---- the enum value rows render the draft ---- */
     test_item_value_enum_rows();
 
-    /* ---- PLAN_HZ_EDIT.md: the freq odometer box (P2), the fractional
-     * preservation rule (P4) and the universal roll-over (P6) — red
-     * first */
+    /* ---- the freq odometer box, the fractional
+     * preservation rule and the universal roll-over ---- */
     test_item_value_freq_odometer();
     test_freq_fractional_rounding();
     test_edit_rollover();
 
-    /* ---- PLAN_HZ_EDIT.md §1.1a: the SEQ page extension (P7) — row-
-     * dependent NAV + the table-driven nav modes, red first ---- */
+    /* ---- the SEQ page extension — row-
+     * dependent NAV + the table-driven nav modes ---- */
     test_seq_nav_rows();
     test_seq_nav_spec_modes();
 
-    /* ---- PLAN_HZ_EDIT.md §1.1b: the digit marker's focus gate (P8) —
-     * red first ---- */
+    /* ---- the digit marker's focus gate ---- */
     test_digit_marker_focus_gate();
 
-    /* ---- S3: the input-policy gate ---- */
+    /* ---- the input-policy gate ---- */
     {
         ui_t ui2;
         memset(&ui2, 0, sizeof ui2);

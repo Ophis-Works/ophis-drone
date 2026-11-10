@@ -1,19 +1,19 @@
 /* tests/test_keymap_r36s.c — compile-level keymap binding check for the
- * handheld target (rebind PLAN_KEYMAP_REBIND §1). Compiled with
+ * handheld target. Compiled with
  * -DTARGET_R36S and no SDL: asserts the R36S KB_* bindings are the SDL
  * *logical* gamepad button constants (SDL translates raw bN buttons via
- * the mapping loaded in main.c), PLAN_KEYMAP_REBIND §3:
+ * the mapping loaded in main.c):
  *   A=0 RUN, B=1 TRIGGER, X=2 VAL_INC, Y=3 VAL_DEC, L=9 / R=10 tabs,
  *   Start=6 menu, d-pad 11/12 selection, 13/14 navigation.
  * The KB_* values are pinned as literals: this test pins config.h's R36S
- * KB_* numbers to the plan's agreed constants (PLAN_KEYMAP_REBIND §3) and
+ * KB_* numbers to the agreed constants and
  * is SDL-free, so it CANNOT detect a renumbering of SDL's
  * SDL_CONTROLLER_BUTTON_* enum — cross-check the numbers against
  * SDL_gamecontroller.h manually (see the config.h comment above the
  * R36S KB_* block) whenever SDL changes.
- * PLAN_HINT_SHORT §1.3 adds the keymap_label() pins: the bound handheld
- * keys must label to the SHORT hint-bar forms (owner order 2026-11-07
- * "please shorten"). keymap_label lives in src/ui/keymap.c behind SDL
+ * The keymap_label() pins: the bound handheld
+ * keys must label to the SHORT hint-bar forms. keymap_label lives in
+ * src/ui/keymap.c behind SDL
  * (SDL_GameControllerGetStringForButton), so this test is SDL-linked
  * now (same layout as test_keymap_events_r36s). */
 #include "harness.h"
@@ -40,7 +40,7 @@ int main(void)
     CHECK(KB_TAB_BACK == 9);  /* L = tab back */
     CHECK(KB_TAB_NEXT == 10); /* R = tab next */
     CHECK(KB_MENU     == 6);  /* Start = menu */
-    /* Select (BACK) = second MENU key (owner demand 2026-11-05): with
+    /* Select (BACK) = second MENU key: with
      * Start dead on the device, MENU -> EXIT must not depend on it. */
     CHECK(KB_MENU2    == 4);
     /* D-pad: selection up/down, navigation left/right. */
@@ -50,18 +50,17 @@ int main(void)
     CHECK(KB_NAV_RIGHT == 14);
     /* CONFIRM is unbound on the handheld (dead case label -1): A keeps
      * its RUN/confirm double role via KB_RUN_CONFIRMS_MENU, B keeps the
-     * menu cancel via KB_TRIGGER_CANCELS_MENU (owner order 2026-11-05:
-     * the Enter/Esc-only desktop rules must not touch the R36S map). */
+     * menu cancel via KB_TRIGGER_CANCELS_MENU (the Enter/Esc-only
+     * desktop rules must not touch the R36S map). */
     CHECK(KB_CONFIRM == -1);
     CHECK(KB_RUN_CONFIRMS_MENU == 1);
     CHECK(KB_TRIGGER_CANCELS_MENU == 1);
 
-    /* P1 (PLAN_HINT_SHORT §1.3, owner order 2026-11-07 "please shorten"):
-     * every bound handheld key labels to the SHORT hint-bar form —
+    /* every bound handheld key labels to the SHORT hint-bar form —
      *   L/R:TABS  UP/DOWN:SEL  Y/X:EDIT  A:RUN  B:TRIG  START:MENU
      * and MENU2 (Select/BACK, bound but unshown) labels "SELECT".
      * keymap_label returns NULL when the label does not fit; every
-     * pinned short form must fit a 16-byte caller buffer (the F5
+     * pinned short form must fit a 16-byte caller buffer (the
      * caller-buffer contract, same pattern as tests/test_keymap.c). */
     char lb[16];
     CHECK(keymap_label(KB_TAB_BACK, lb, sizeof lb) == lb);
@@ -85,7 +84,7 @@ int main(void)
     CHECK(keymap_label(KB_MENU2, lb, sizeof lb) == lb);
     CHECK(strcmp(lb, "SELECT") == 0);
 
-    /* P2 (PLAN_HINT_SHORT §1.3): an id NOT in the short table still
+    /* an id NOT in the short table still
      * falls back to the SDL string UPPERCASED (today's behavior). Pinned
      * against the SDL string itself — the expectation is "whatever
      * SDL_GameControllerGetStringForButton returns, uppercased", not a

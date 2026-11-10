@@ -1,4 +1,4 @@
-/* src/dsp/prng.c — shared deterministic PRNG (Phase 5 item 1): the
+/* src/dsp/prng.c — shared deterministic PRNG: the
  * xoshiro256** / splitmix64 code moved verbatim out of dsp/osc.c and
  * seq/sequencer.c (identical numbers guaranteed by their tests). */
 #include "prng.h"

@@ -1,5 +1,5 @@
 /* src/audio/f32tos16.h — float→S16 conversion for the ALSA S16_LE
- * fallback (PLAN_RG28XX_BUILD.md M2): devices whose "default" ALSA path
+ * fallback: devices whose "default" ALSA path
  * lacks the format plug reject SND_PCM_FORMAT_FLOAT_LE, so the write path
  * converts into an int16 scratch buffer. Pure C11, SDL/ALSA-free. */
 #ifndef OPHIS_F32TOS16_H

@@ -1,6 +1,6 @@
-/* src/compat/glibc_symver.c — M6 glibc-2.28 symbol pinning (owner ruling,
- * supersedes the M0 static-link decision; PLAN.md §1: ArkOS userspace is
- * Ubuntu-19.10-lineage, glibc 2.28).
+/* src/compat/glibc_symver.c — glibc-2.28 symbol pinning.
+ * ArkOS userspace is
+ * Ubuntu-19.10-lineage, glibc 2.28.
  *
  * The host cross toolchain (aarch64-linux-gnu-gcc 15.2, glibc >= 2.39)
  * binds a handful of symbols to versions NEWER than the R36S has:

@@ -1,4 +1,4 @@
-/* tests/test_mixer.c — PLAN.md §10 (M1) AS AMENDED (PLAN §5, owner order):
+/* tests/test_mixer.c —
  * mixer_render sums chains and soft-clips: out == tanh(1.5*(A+B+C)) exactly.
  * mixer_params_t carries ONLY the cross-mod slots (xmod[3]) — master level
  * and master gate are applied in the FX/master stage (dsp/fx.c), never in
@@ -13,7 +13,7 @@
 #define SR 44100.0
 #define NM 44100
 
-static synth_params_t mksp(void)   /* defaults with mixvol 100 (M3) */
+static synth_params_t mksp(void)   /* defaults with mixvol 100 */
 {
     synth_params_t sp = OPHIS_DEFAULTS;
     return sp;
@@ -22,13 +22,13 @@ static synth_params_t mksp(void)   /* defaults with mixvol 100 (M3) */
 static mixer_params_t mkp(const synth_params_t *sp)
 {
     mixer_params_t p;
-    p.synth = sp;              /* S4: the mixer reads the live params */
+    p.synth = sp;              /* the mixer reads the live params */
     return p;
 }
 
-/* runtime-bound xmod slot accessor (P3, PLAN_MOD_MATRIX_16.md §1.3):
+/* runtime-bound xmod slot accessor:
  * noinline keeps gcc from proving slot 8 out of bounds against today's
- * xmod[3] — the M2 type-widen (xmod[3] -> xmod[16]) must leave this pin
+ * xmod[3] — the type-widen (xmod[3] -> xmod[16]) must leave this pin
  * a RUNTIME red, not a compile red */
 static __attribute__((noinline)) xmod_params_t *h_xmod(synth_params_t *sp,
                                                        int s)
@@ -57,7 +57,7 @@ int main(void)
     CHECK(fabs(out - tanh(4.5)) < 1e-6);       /* saturated but < 1 */
 
     /* ---- cross-mod matrix computation ----
-     * PITCH dest (owner order 2026-11-05): VIBRATO depth — the field
+     * PITCH dest: VIBRATO depth — the field
      * carries amount × source, like every other dest (was: static
      * amount, which made the source frequency affect nothing). */
     memset(&m, 0, sizeof m);
@@ -80,7 +80,7 @@ int main(void)
     (void)mixer_render(&m, &mp, hot, SR);
     CHECK(fabs(m.xm[0].detune_hz) < 1e-9);
 
-    /* RING dest (owner order 2026-11-06): A × ((1-w) + w×src) per slot;
+    /* RING dest: A × ((1-w) + w×src) per slot;
      * amount 100 = full ring mod, amount 0 = dry */
     memset(&m, 0, sizeof m);
     m.src[0] = 0.5;
@@ -92,7 +92,7 @@ int main(void)
     out = mixer_render(&m, &mp, hot, SR);
     CHECK(fabs(out - tanh(4.5)) < 1e-6);           /* dry at amount 0 */
 
-    /* MIX knob (owner order 2026-11-06, the "usual" mixing): A'
+    /* MIX knob (the "usual" mixing): A'
      * = (1-w)×A + w×src — INDEPENDENT of the dest, so a slot can add
      * AND modulate, or either alone. mix 100 full wet, 0 dry. */
     memset(&m, 0, sizeof m);
@@ -127,7 +127,7 @@ int main(void)
     (void)mixer_render(&m, &mp, hot, SR);
     CHECK(fabs(m.xm[0].phase_mod - 2.0) < 1e-6);   /* 100/25 × 0.5 */
 
-    /* ---- TARGET routing (PLAN_MOD_ROUTING.md M1, owner order): each
+    /* ---- TARGET routing: each
      * slot carries a target chain 0..2; the modulation lands in
      * m->xm[tgt], and the RING/MIX applications hit the target's own
      * output instead of A's ---- */
@@ -156,7 +156,7 @@ int main(void)
     out = mixer_render(&m, &mp, hot, SR);
     CHECK(fabs(out - tanh(1.5 * (1.0 + 0.5 + 1.0))) < 1e-6);
 
-    /* ---- MIX VOLUME (PLAN_MOD_ROUTING.md M3, owner order): the
+    /* ---- MIX VOLUME: the
      * per-chain master send — scales the chain's post-RING/MIX output
      * into the master sum; never touches the mod sources ---- */
     memset(&m, 0, sizeof m);
@@ -169,7 +169,7 @@ int main(void)
     out = mixer_render(&m, &mp, hot, SR);
     CHECK(fabs(out - tanh(1.5 * 1.5)) < 1e-6);    /* 0.5×1 + 0×1 + 1×1 */
 
-    /* ---- S2/A2 (PLAN_OPTIMIZATION.md O3): the split — matrix_render
+    /* ---- the split — matrix_render
      * produces the post-slot outputs, master_sum is the pure tanh of
      * the mixvol-scaled sum, mixer_render is their exact composition;
      * mod_apply is the single dest-mapping site (the per-dest exact
@@ -197,8 +197,8 @@ int main(void)
         CHECK(fabs(full - ms) < 1e-12);        /* composition equality */
     }
 
-    /* A sources (PLAN_MOD_ROUTING.md M2): ids 7..9 read src[6..8] —
-     * id 7 = A.osc; self-routing A -> A is legal (D3 yes) */
+    /* A sources: ids 7..9 read src[6..8] —
+     * id 7 = A.osc; self-routing A -> A is legal */
     memset(&m, 0, sizeof m);
     m.src[6] = 0.25;                       /* A.osc: id 7 -> src[6] */
     sp0.xmod[0].src = 7; sp0.xmod[0].dest = MOD_PITCH;
@@ -207,12 +207,12 @@ int main(void)
     CHECK(fabs(m.xm[0].detune_hz - 1.0) < 1e-6);   /* 4 × 0.25 */
     CHECK(fabs(m.xm[1].detune_hz) < 1e-9);
 
-    /* PR1 (PLAN_OSC_NAMING.md §1.0g/R0b): the FLT_CUT pin — the block
+    /* the FLT_CUT pin — the block
      * below IS the matrix-level FLT_CUT spec: the mixer slot with dest
-     * MOD_FILTER (renamed "flt_cut" per §1.0e) accumulates
+     * MOD_FILTER (preset string "flt_cut") accumulates
      * filter_mod = amount/100 × src into xm->filter_mod exactly as
      * today. NO new pin written — this existing block covers it; the
-     * FLT_RES sibling lives in PR2 below. */
+     * FLT_RES sibling lives below. */
     memset(&m, 0, sizeof m);
     m.src[0] = 0.5;  /* B.osc: id 1 -> src[0] */
     sp0.xmod[0].tgt = 0;                    /* back to A (pin blocks above
@@ -225,10 +225,10 @@ int main(void)
     CHECK(fabs(m.xm[0].filter_mod - 0.5) < 1e-6);
     CHECK(fabs(m.xm[0].amp_mod) < 1e-9);
 
-    /* PR2 (PLAN_OSC_NAMING.md §1.0 R0c, §1.4): the FLT_RES pin — dest
+    /* the FLT_RES pin — dest
      * MOD_FRES accumulates res_mod = amount/100 × src into xm->res_mod
-     * (the NEW 5th xmod_in_t field, chain.h); the cutoff channel
-     * (filter_mod, PR1) stays untouched. Compile-red until types.h
+     * (the 5th xmod_in_t field, chain.h); the cutoff channel
+     * (filter_mod) stays untouched. Compile-red until types.h
      * gains MOD_FRES and chain.h the res_mod field. */
     memset(&m, 0, sizeof m);
     m.src[0] = 0.5;                                /* B.osc: id 1 -> src[0] */
@@ -238,7 +238,7 @@ int main(void)
     CHECK(fabs(m.xm[0].res_mod - 0.5) < 1e-6);     /* 100/100 × 0.5 */
     CHECK(fabs(m.xm[0].filter_mod) < 1e-9);        /* FLT_CUT untouched */
 
-    /* ---- P1 (PLAN_MOD_MATRIX_16.md §1.3): the detune accumulator is
+    /* ---- the detune accumulator is
      * EXACT at the reachable maximum — all 3 slots target chain A with
      * dest MOD_PITCH, amount 0.1f, source 1.0; the accumulated
      * detune_hz must be BIT-EQUAL to the double reference
@@ -261,7 +261,7 @@ int main(void)
         CHECK(fexact((double)m.xm[0].detune_hz, 3.0 * (double)0.1f));
     }
 
-    /* ---- P3 (PLAN_MOD_MATRIX_16.md §1.3): the matrix has 16 slots —
+    /* ---- the matrix has 16 slots —
      * slot index 8 (the 9th slot) with dest MOD_FRES modulates chain B
      * through matrix_render; slots with no params never fire. RED
      * today: no 9th slot exists (synth_params_t.xmod[3], types.h:119).
@@ -288,7 +288,7 @@ int main(void)
         CHECK(fabs(m.xm[2].res_mod) < 1e-9);         /* C: no slot fires */
     }
 
-    /* ---- PLAN_MOD_FENV_ADSR_DIV.md MS1: the FLT_ENV pin — dest
+    /* ---- the FLT_ENV pin — dest
      * MOD_FENV accumulates env_mod = amount/100 × src into xm->env_mod;
      * the filter cutoff channel (filter_mod) stays untouched. ---- */
     memset(&m, 0, sizeof m);
@@ -304,7 +304,7 @@ int main(void)
     (void)mixer_render(&m, &mp, hot, SR);
     CHECK(fabs(m.xm[0].env_mod + 0.25) < 1e-6);    /* both signs */
 
-    /* ---- PLAN_MOD_FENV_ADSR_DIV.md MS1: the ADSR pins — dests
+    /* ---- the ADSR pins — dests
      * MOD_ADSR_A/D/S/R accumulate adsr_mod[0..3] = amount/100 × src
      * (A,D,S,R index order); each leaves the other channels zero. ---- */
     for (int d = 0; d < 4; d++) {

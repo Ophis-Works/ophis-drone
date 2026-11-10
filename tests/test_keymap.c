@@ -1,11 +1,11 @@
-/* tests/test_keymap.c — compile-level keymap binding check (M6, rebind
- * PLAN_KEYMAP_REBIND §1) + the keymap_label() caller-buffer contract
- * (remediation F5). Compiled with -DTARGET_DESKTOP, SDL-linked (labels
+/* tests/test_keymap.c — compile-level keymap binding check +
+ * the keymap_label() caller-buffer contract.
+ * Compiled with -DTARGET_DESKTOP, SDL-linked (labels
  * come from SDL_GetKeyName via ui/keymap.c, so the static-buffer aliasing
- * F5 fixes is covered by comparing two separate caller buffers).
+ * fix is covered by comparing two separate caller buffers).
  * Asserts the desktop KB_* bindings are OUR key ids (src/ui/keymap.h
- * ophis_key_t), not SDL SDLK_* constants. Owner-ordered rebinding
- * (2026-11-05): T = TRIGGER, Space = RUN (outside menus only),
+ * ophis_key_t), not SDL SDLK_* constants. Desktop rebinding:
+ * T = TRIGGER, Space = RUN (outside menus only),
  * Enter = CONFIRM (menu select), Esc = MENU (desktop's only cancel). */
 #include "harness.h"
 
@@ -52,7 +52,7 @@ int main(void)
     CHECK((int)KB_TAB_NEXT  < 12);
     CHECK((int)KB_MENU      < 12);
 
-    /* F5: caller-buffer label contract — the label is written into the
+    /* caller-buffer label contract — the label is written into the
      * CALLER's buffer and buf is returned; two bindings labelled into two
      * separate buffers keep distinct strings (the old single static buffer
      * aliased every label to one pointer). */

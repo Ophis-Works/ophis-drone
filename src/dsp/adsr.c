@@ -1,5 +1,5 @@
 /* src/dsp/adsr.c — sample-accurate GATE-DRIVEN A/D/S/R state machine.
- * Contract: IMPLEMENTATION.md §2. Linear segments, exact sample counts.
+ * Linear segments, exact sample counts.
  * Pure. No SDL/ALSA. */
 #include <string.h>
 
@@ -18,7 +18,7 @@ void adsr_reset(adsr_state_t *e)
 }
 
 /* THE one ATTACK entry (used by adsr_trigger re-entry AND adsr_next's
- * rising edge — Phase 5 item 6): (re-)start ATTACK from the current
+ * rising edge): (re-)start ATTACK from the current
  * level; gate edge state untouched. */
 static void enter_attack(adsr_state_t *e)
 {

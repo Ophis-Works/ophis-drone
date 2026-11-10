@@ -1,5 +1,4 @@
-/* src/ui/seq_items.c — the whole tab-reorg item model (PLAN.md
- * §8.2/§8.6 AMENDED, owner order). Pure data, no SDL.
+/* src/ui/seq_items.c — the whole tab-reorg item model. Pure data, no SDL.
  * Pages (flat item lists + section splits):
  *   OSC (sub-tab) : MAIN (FREQ · WAVE · DUTY · LEVEL · VEL) then
  *                   SUB 1 and SUB 2 (each FMODE · FREQ · WAVE · DUTY ·
@@ -10,14 +9,14 @@
  *   SEQ            : SEQ ON · DIV · MODE · ONCE · STEP · PITCH · VEL
  *                   (7 items — NO BPM: the GLOBAL tempo lives on the
  *                   MASTER tab); the MODE and ONCE selectors are table
- *                   rows and MUST stay visible (regression-tested by
- *                   tests/test_seq_items.c).
+ *                   rows and MUST stay visible
+ *                   (tests/test_seq_items.c pins them).
  *   MOD            : SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL = 6
- *                   (PLAN_MOD_MATRIX_16.md R4 — SLOT selects the matrix
+ *                   (SLOT selects the matrix
  *                   slot the five rows below edit).
  *   MASTER         : MASTER · SAFETY · BPM + DELAY (TIME L · FEEDBACK ·
  *                   TONE · MIX) + REVERB (SIZE · DAMP · MIX · WIDTH)
- *                   = 11 (the former FX tab merged in, owner order).
+ *                   = 11 (the former FX tab merged in).
  * Section tables give each label's first flat index + item count; the
  * renderer draws one gray label row per section, its items indented,
  * and ONE empty 16 px row before the next section label. */
@@ -37,7 +36,7 @@ const item_t MAIN_ITEMS[MAIN_ITEMS_N] = {
 
 /* SUB 1 then SUB 2 (si 0 then 1) — names WITHOUT the old "SUB1 "/"SUB2 "
  * prefixes; the SUB 1/SUB 2 section labels carry the context */
-/* subs are Spice/Subharmonicon voices (O2): DIV · WAVE · DUTY · LEVEL */
+/* subs are Spice/Subharmonicon voices: DIV · WAVE · DUTY · LEVEL */
 const item_t SUB_ITEMS[SUB_ITEMS_N] = {
   { "DIV",   IT_SUB_DIV,   0 }, { "WAVE",  IT_SUB_WAVE,  0 },
   { "DUTY",  IT_SUB_DUTY,  0 }, { "LEVEL", IT_SUB_LEVEL, 0 },
@@ -53,14 +52,14 @@ const section_t OSC_SECTIONS[OSC_SECTIONS_N] = {
 
 /* ---- ENV+FLT sub-tab: ADSR + FILTER = 9 --------------------------- */
 
-/* the ADSR items that used to sit on the OSC page (owner order: they
- * live in the ENV+FLT ADSR section now) */
+/* the ADSR items that used to sit on the OSC page: they
+ * live in the ENV+FLT ADSR section now */
 const item_t ADSR_ITEMS[ADSR_ITEMS_N] = {
   { "ATTACK",   IT_A, 0 }, { "DECAY",    IT_D, 0 },
   { "SUSTAIN",  IT_S, 0 }, { "RELEASE",  IT_R, 0 },
 };
 
-const item_t FILT_ITEMS[FILT_ITEMS_N] = {           /* order PLAN §8.2/§8.3 */
+const item_t FILT_ITEMS[FILT_ITEMS_N] = {           /* ladder order */
   { "MODE",   IT_FILT_MODE,  0 }, { "CUTOFF", IT_FILT_CUT,   0 },
   { "RES",    IT_FILT_RES,   0 }, { "ENV",    IT_FILT_ENV,   0 },
   { "POLES",  IT_FILT_POLES, 0 },
@@ -71,25 +70,24 @@ const section_t ENVFLT_SECTIONS[ENVFLT_SECTIONS_N] = {
   { "FILTER", 4, 5 },
 };
 
-/* ---- SEQ page: 7 rows, single column (AMENDED, owner order) ------- */
+/* ---- SEQ page: 7 rows, single column ------------------------------ */
 
 const item_t SEQ_ITEMS[SEQ_ITEMS_N] = {
   { "SEQ ON", IT_SEQ_ON,      0 },
   { "DIV",    IT_SEQ_DIV,     0 },
   { "MODE",   IT_SEQ_MODE,    0 },   /* fwd/pingpong/oddeven/random/
-                                          markov (owner-ordered, PLAN §6) */
-  { "ONCE",   IT_SEQ_ONCE,    0 },   /* loop/once (owner-ordered) */
+                                          markov */
+  { "ONCE",   IT_SEQ_ONCE,    0 },   /* loop/once */
   { "STEP",   IT_SEQ_STEPSEL, 0 },  /* LEFT/RIGHT selects the rectangle */
   { "PITCH",  IT_STEP_PITCH,  0 },   /* si resolved to seq_sel at use */
   { "VEL",    IT_STEP_VEL,    0 },
 };
 
-/* ---- MOD tab: SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL (R4) --- */
+/* ---- MOD tab: SLOT · SOURCE · TARGET · DEST · DEPTH · LEVEL -------- */
 
-/* the 16-slot matrix (PLAN_MOD_MATRIX_16.md R4, owner order
- * 2026-11-09): ONE SLOT selector row (ITT_UI — ui.c binds the five
- * rows below to the selected slot at use time, PR-D; every si is 0
- * here). Labels are UI-only words (PLAN_OSC_NAMING.md R1/R5): SOURCE =
+/* the 16-slot matrix: ONE SLOT selector row (ITT_UI — ui.c binds the five
+ * rows below to the selected slot at use time; every si is 0
+ * here). Labels are UI-only words: SOURCE =
  * the mod source, TARGET = the routing target (values "OSC 1/2/3",
  * never raw 0/1/2), DEST, DEPTH = the amount, LEVEL = the slot's own
  * ADD knob. Preset keys stay raw
@@ -107,10 +105,10 @@ const section_t MOD_SECTIONS[MOD_SECTIONS_N] = {
 
 /* ---- MASTER tab: MASTER · SAFETY · BPM + MIX + DELAY + REVERB ----- */
 
-/* the GLOBAL tempo (PLAN §6) is edited HERE (owner order — never on the
- * SEQ pages); MIX A/B/C are the per-chain master sends (M3, si IS the
- * chain index); DELAY then REVERB are the former FX tab's items (owner
- * order, PLAN §8.2), merged into MASTER sections */
+/* the GLOBAL tempo is edited HERE (never on the
+ * SEQ pages); MIX A/B/C are the per-chain master sends (si IS the
+ * chain index); DELAY then REVERB are the former FX tab's items,
+ * merged into MASTER sections */
 const item_t MASTER_ITEMS[MASTER_ITEMS_N] = {
   { "MASTER",   IT_MASTER,    0 },
   { "SAFETY",   IT_SAFETY,    0 },
@@ -130,7 +128,7 @@ const section_t MASTER_SECTIONS[MASTER_SECTIONS_N] = {
   { "REVERB", 10, 4 },
 };
 
-/* ---- S1 (PLAN_OPTIMIZATION.md O6): the display transform for the RAW
+/* ---- the display transform for the RAW
  * preset enum strings — UPPERCASE, '_' -> '.' — a UI concern, ONCE
  * here. buf may hold up to cap bytes; truncation is fine for labels. -- */
 const char *ui_enum_display(const char *raw, char *buf, size_t cap)
@@ -144,10 +142,10 @@ const char *ui_enum_display(const char *raw, char *buf, size_t cap)
     return buf;
 }
 
-/* ---- R3 (PLAN_OSC_NAMING.md): the MOD-page SOURCE display — the
+/* ---- the MOD-page SOURCE display — the
  * FROZEN 10-entry source-name table (id order 0..9). The internal
  * A/B/C-letter forms ("A.OSC") are gone: ids 1..3 = chain B = OSC 2,
- * 4..6 = C = OSC 3, 7..9 = A = OSC 1 (A ids APPENDED, M2 — never
+ * 4..6 = C = OSC 3, 7..9 = A = OSC 1 (A ids APPENDED — never
  * renumbered). Pure, SDL-free, testable. -- */
 const char *ui_xsrc_display(int v, char *buf, size_t cap)
 {
@@ -162,7 +160,7 @@ const char *ui_xsrc_display(int v, char *buf, size_t cap)
     return buf;
 }
 
-/* ---- R0f (PLAN_OSC_NAMING.md): the MOD-page DEST display — the RAW
+/* ---- the MOD-page DEST display — the RAW
  * preset string uppercased with '_' -> ' ' ("flt_cut" -> "FLT CUT",
  * "flt_res" -> "FLT RES"). Same contract as ui_enum_display but with a
  * space separator; buf may hold up to cap bytes, truncation is fine
@@ -178,26 +176,26 @@ const char *ui_dest_display(const char *raw, char *buf, size_t cap)
     return buf;
 }
 
-/* seq mode / once option labels (owner-ordered modes amendment, PLAN §6) */
+/* seq mode / once option labels */
 const char *SEQMODE_NAMES[SEQMODE_COUNT] =
   { "FWD", "PINGPONG", "ODDEVEN", "RANDOM", "MARKOV" };
 const char *SEQONCE_NAMES[SEQONCE_COUNT] = { "LOOP", "ONCE" };
 
-/* ---- PLAN_HZ_EDIT.md (R4/R5/R6, PR-G): the pure odometer helpers —
+/* ---- the pure odometer helpers —
  * contracts documented in seq_items.h ---- */
 
 int hz_digit_step(int centi_hz, int place_centi, int dir, int floor,
                   int ceil)
 {
-    int v = centi_hz + dir * place_centi;  /* already centi-Hz ints (PR-B) */
-    if (v < floor) return ceil;            /* roll-over at the edges (R2) */
+    int v = centi_hz + dir * place_centi;  /* already centi-Hz ints */
+    if (v < floor) return ceil;            /* roll-over at the edges */
     if (v > ceil)  return floor;
     return v;
 }
 
 int hz_digits(int centi_hz, int digits[7])
 {
-    int v = centi_hz;                      /* exact centi-Hz in (R5) */
+    int v = centi_hz;                      /* exact centi-Hz in */
     if (v < 0)       v = 0;
     if (v > 2000000) v = 2000000;          /* display ceiling 20000.00 */
     for (int i = 6; i >= 0; i--) {         /* 7 digits: 10000s..0.01s */
@@ -208,22 +206,22 @@ int hz_digits(int centi_hz, int digits[7])
            digits[3] * 1000 + digits[4] * 100 + digits[5] * 10 + digits[6];
 }
 
-/* ---- item spec table (Phase 5 item 2): ONE entry per IT_* id, in id
+/* ---- item spec table: ONE entry per IT_* id, in id
  * order — {fmt, min, max, wrap, si-target, nav}. The single source of
- * every item's edit range, value format and NAV mode (PLAN §8.3,
- * PLAN_HZ_EDIT.md R12a); ui.c's item_value()/edit_item()/ACT_NAV drive
+ * every item's edit range, value format and NAV mode; ui.c's
+ * item_value()/edit_item()/ACT_NAV drive
  * off this. Entries without an explicit nav zero-init to NAV_NONE (the
  * enum's first member). See seq_items.h for the field semantics. ---- */
 
 const item_spec_t ITEM_SPECS[ITEM_SPECS_N] = {
   /* OSC MAIN section — freq bounds in the centi-Hz edit space
-   * (PLAN_FREQ_DECIMALS.md R2/R4: 1..2000000 = 0.01..20000.00 Hz) */
+   * (1..2000000 = 0.01..20000.00 Hz) */
   [IT_OSC_FREQ]   = { IT_OSC_FREQ,   ITF_HZ,      1, 2000000, 0, ITT_CHAIN , PK_CHAIN_FREQ , NAV_DIGITS },
   [IT_OSC_WAVE]   = { IT_OSC_WAVE,   ITF_WAVE,    0,    5, 1, ITT_CHAIN , PK_CHAIN_WAVE },
   [IT_OSC_DUTY]   = { IT_OSC_DUTY,   ITF_DUTY,    5,   95, 0, ITT_CHAIN , PK_CHAIN_DUTY },
   [IT_LEVEL]      = { IT_LEVEL,      ITF_PCT,     0,  100, 0, ITT_CHAIN , PK_CHAIN_LEVEL },
   [IT_VEL]        = { IT_VEL,        ITF_PCT,     0,  100, 0, ITT_CHAIN , PK_CHAIN_VEL },
-  /* serial chain FM amount (owner order 2026-11-06): this chain's osc
+  /* serial chain FM amount: this chain's osc
    * output feeds the NEXT chain's carrier phase */
   /* ADSR section (ENV+FLT): A/D/R in the 0..50 pos ladder, S percent */
   [IT_A]          = { IT_A,          ITF_SEC,     0,   50, 0, ITT_CHAIN , PK_ADSR_A },
@@ -243,17 +241,16 @@ const item_spec_t ITEM_SPECS[ITEM_SPECS_N] = {
   [IT_FILT_POLES] = { IT_FILT_POLES, ITF_POLES,  12,   24, 0, ITT_CHAIN , PK_CHAIN_POLES },
   /* MOD tab */
   [IT_XMOD_SRC]   = { IT_XMOD_SRC,   ITF_XSRC,    0,    9, 1, ITT_XMOD , PK_XMOD_SRC },
-  /* dest ladder gains FLT_ENV + the ADSR A/D/S/R rows
-   * (PLAN_MOD_FENV_ADSR_DIV.md MS2): max 7 -> 12 */
+  /* dest ladder gains FLT_ENV + the ADSR A/D/S/R rows: max 7 -> 12 */
   [IT_XMOD_DEST]  = { IT_XMOD_DEST,  ITF_DEST,    0,   12, 1, ITT_XMOD , PK_XMOD_DEST },
   [IT_XMOD_AMT]   = { IT_XMOD_AMT,   ITF_AMT,  -100,  100, 0, ITT_XMOD , PK_XMOD_AMT },
-  /* the slot's own ADD knob (owner order 2026-11-06): independent of
+  /* the slot's own ADD knob: independent of
    * the dest — a slot can add AND modulate, or either alone */
   [IT_XMOD_MIX]   = { IT_XMOD_MIX,   ITF_PCT,     0,  100, 0, ITT_XMOD , PK_XMOD_MIX },
-  /* the routing target shows the OSCILLATOR NAME ("OSC 1/2/3", R2):
+  /* the routing target shows the OSCILLATOR NAME ("OSC 1/2/3"):
    * ITF_TGT in ui_draw.c, not the raw 0/1/2 */
   [IT_XMOD_TGT]   = { IT_XMOD_TGT,   ITF_TGT,     0,    2, 1, ITT_XMOD , PK_XMOD_TGT },
-  /* the MOD page SLOT row (PLAN_MOD_MATRIX_16.md R4/PR-C): UI state,
+  /* the MOD page SLOT row: UI state,
    * NAV_STEPSEL roll-over across the 16 slots 0..15 — the ONE
    * NAV_STEPSEL entry with those bounds (the SEQ STEPSEL stays 0..7) */
   [IT_MOD_SLOT]   = { IT_MOD_SLOT,   ITF_SLOT,    0,   15, 1, ITT_UI , PK_NONE , NAV_STEPSEL },
@@ -288,7 +285,7 @@ const item_spec_t *item_spec(int id)
     return &ITEM_SPECS[id];
 }
 
-/* ---- A1 (PLAN_OPTIMIZATION.md O4): the page model -------------------
+/* ---- the page model -------------------------------------------------
  * (sub_tab_t lives in ui.h; the OSC rows index it — duplicate the
  * 0/1/2 order here as plain indices to keep this TU SDL-free) ------- */
 enum { PG_OSC = 0, PG_ENVFLT = 1, PG_SEQ = 2 };

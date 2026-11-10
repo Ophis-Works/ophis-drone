@@ -1,5 +1,5 @@
 /* tests/test_font.c — font metrics + 8x8->10x10 scaler invariants
- * (PLAN.md §8.6/§10 AMENDED, owner order: letters +2 pts, a "line" =
+ * (letters +2 pts, a "line" =
  * 10 px). OPHIS_FONT_W/H == 10. font_glyph10() is a faithful per-pixel
  * scale of the embedded 8x8 face: (1) every set scaled pixel at (dx,dy)
  * implies the source bit ((dy*8)/10, (dx*8)/10) is set; (2) every set
@@ -13,7 +13,7 @@
 
 int main(void)
 {
-    /* ---- metrics: glyphs render in 10x10 cells (PLAN §8.6) ---- */
+    /* ---- metrics: glyphs render in 10x10 cells ---- */
     CHECK(OPHIS_FONT_W == 10);
     CHECK(OPHIS_FONT_H == 10);
 

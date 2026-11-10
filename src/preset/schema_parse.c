@@ -1,8 +1,6 @@
-/* src/preset/schema.c — preset format schema layer (PLAN §9 format,
- * schema version 2, owner order 2026-11-09 PLAN_MOD_MATRIX_16.md R2)
+/* src/preset/schema.c — preset format schema layer (schema version 2)
  * over the vendored sheredom/json.h (third_party/json.h, Unlicense).
- * Replaces the Phase 1-6 hand-rolled preset/json.{c,h}
- * (PLAN_CODE_REVIEW_FIXES.md Phase 7): json.h knows nothing about our
+ * json.h knows nothing about our
  * schema, so the contract is explicit code here — strict app/version
  * (version 2 ONLY; version 1 files REJECT), required keys, array
  * lengths 3 chains / 2 subs / 8 steps / "xmod" 0..16 ACTIVE entries in
@@ -10,18 +8,18 @@
  * array are OFF: dest off, amount 0, mix 0), enum strings, integer
  * percents 0..100, bpm 1..500, duty 5..95, delay/reverb/safety objects
  * REQUIRED, unknown keys leniently skipped, over-long keys (> 15 chars)
- * REJECTED (Phase 6 P5 absorbed), duplicate keys REJECTED at every
+ * REJECTED, duplicate keys REJECTED at every
  * object level (json.h preserves member order, so the walker flags a
  * second occurrence). Parses into a local, commits into *p only on
- * success (IMPLEMENTATION.md §7). Error messages are field paths,
+ * success. Error messages are field paths,
  * e.g. "seq.steps[2].vel".
  * Writer: the synth_params_t DOM is built into a fixed arena and
- * serialized with json.h's minified writer (compact {"key":value,...},
- * byte-identical to the Phase 1-6 hand-rolled writer, so shipped presets
- * round-trip byte-comparable). POSIX open_memstream is NOT needed:
+ * serialized with json.h's minified writer (compact {"key":value,...}),
+ * so shipped presets
+ * round-trip byte-comparable. POSIX open_memstream is NOT needed:
  * json_write_minified returns its own heap buffer, which we copy into the
  * caller's fixed buffer (the 8 KiB contract is preserved).
- * BPM is GLOBAL (AMENDED, owner order, PLAN §6/§9): the REQUIRED
+ * BPM is GLOBAL: the REQUIRED
  * top-level "bpm" (integer 1..500) sits next to "master"; seq objects
  * carry NO "bpm" key (a stray one is an unknown key — ignored). */
 #include "schema.h"
@@ -38,8 +36,8 @@
 
 /* ---------------- parser ---------------- */
 
-/* Phase 6 P5 absorbed (PLAN_CODE_REVIEW_FIXES.md): object keys longer
- * than 15 characters are rejected instead of silently truncated. */
+/* object keys longer than 15 characters are rejected instead of silently
+ * truncated. */
 #define SCHEMA_KEY_MAX 15
 
 typedef struct {
@@ -66,7 +64,7 @@ static void join_path(char *out, int cap, const char *path, const char *key)
 }
 
 /* required-key bookkeeping per object level */
-/* A3 (PLAN_OPTIMIZATION.md O1): a key's seen-bit is its INDEX in its
+/* a key's seen-bit is its INDEX in its
  * req table — no hand-numbered bits anywhere. Each table gets a
  * parallel enum; handlers set SB(<ENUM_CONST>).
  * SB: seen-bit for index i */
@@ -89,8 +87,7 @@ static double val_number(const json_value_t *v, ps_t *j, const char *path)
     return strtod(((const json_number_t *)v->payload)->number, NULL);
 }
 
-/* documented-range check for raw numeric fields (owner mandate
- * 2026-11-05, PLAN_SCHEMA_RANGE_VALIDATION.md): out of range -> reject
+/* documented-range check for raw numeric fields: out of range -> reject
  * the whole preset. Also rejects ±inf ("1e999" is JSON-legal and
  * strtod turns it into inf, which poisons the DSP with NaN); the
  * comparisons fail for NaN too. */
@@ -167,11 +164,11 @@ static int val_enum(const json_value_t *v, const ent_t *tab, int n,
 /* set seen-bit i (the table index) in the walker arg */
 static void set_bit(void *arg, int i) { ((warg_t *)arg)->seen |= SB(i); }
 
-/* ---- D4 (PLAN_OPTIMIZATION.md O5): table-driven keys ----------------
+/* ---- table-driven keys ----------------------------------------------
  * The regular scalar keys of every object live in a key_spec_t table;
  * ONE generic walker reads them. Irregular keys (checks, arrays,
  * objects) stay as small residual handlers referenced by KT_CUSTOM.
- * The seen-bit is the table index (A3). -------------------------------
+ * The seen-bit is the table index. -----------------------------------
  * KT_*: member kinds (all int-sized or float members, addressed as
  * base + off). -------------------------------------------------------- */
 typedef enum {
@@ -304,7 +301,7 @@ static int seq_elem(ps_t *j, const char *path, int idx,
 static int xmod_elem(ps_t *j, const char *path, int idx,
                      const json_value_t *v, void *arg);
 
-/* root seen-bit indices (A3: bit == index = key-table order) */
+/* root seen-bit indices (bit == index = key-table order) */
 enum { RB_APP, RB_VERSION, RB_MASTER, RB_BPM, RB_CHAIN, RB_SEQ,
        RB_XMOD, RB_DELAY, RB_REVERB, RB_SAFETY, RB_COUNT };
 /* chain */
@@ -351,7 +348,7 @@ static int seq_custom(ps_t *j, const char *path, const char *key,
 static int xmod_amount(ps_t *j, const char *path, const char *key,
                        const json_value_t *v, void *arg);
 
-/* ---- key tables (D4): the regular scalar keys of every object -------
+/* ---- key tables: the regular scalar keys of every object ------------
  * base = the object's own struct; seen-bit = table index. -------------- */
 
 static const key_spec_t ROOT_KEYS[] = {
@@ -370,8 +367,7 @@ static const key_spec_t ROOT_KEYS[] = {
 
 static const key_spec_t CHAIN_KEYS[] = {
     [CB_FREQ]  = { "freq_hz", KT_FNUM, offsetof(chain_params_t, freq_hz),
-                   0.01, 20000.0 },  /* floor 0.01 Hz (PLAN_FREQ_
-                                      * DECIMALS.md R4 — the LFO range) */
+                   0.01, 20000.0 },  /* floor 0.01 Hz — the LFO range */
     [CB_WAVE]  = { "wave",    KT_ENUM, offsetof(chain_params_t, wave),
                    6, 0, wave_tab },
     [CB_DUTY]  = { "duty",    KT_DUTY, offsetof(chain_params_t, duty) },
@@ -414,8 +410,7 @@ static const key_spec_t FILTER_KEYS[] = {
 
 static const key_spec_t STEP_KEYS[] = {
     [TB_PITCH] = { "pitch_hz", KT_FNUM, offsetof(seq_step_t, pitch_hz),
-                   0.01, 20000.0 },  /* floor 0.01 Hz (PLAN_FREQ_
-                                      * DECIMALS.md R4) */
+                   0.01, 20000.0 },  /* floor 0.01 Hz */
     [TB_VEL]   = { "vel",      KT_PERCENT, offsetof(seq_step_t, vel) },
 };
 
@@ -479,7 +474,7 @@ static int root_custom(ps_t *j, const char *path, const char *key,
     if (!strcmp(key, "version")) {
         int ver;
         if (val_int(v, &ver, j, path)) return -1;
-        /* schema 2 ONLY (owner order 2026-11-09, R2): version 1 — the
+        /* schema 2 ONLY: version 1 — the
          * old fixed-length-3 contract — is REJECTED, not migrated */
         if (ver != 2) { perr(j, path); return -1; }
         a->seen |= SB(RB_VERSION);
@@ -496,7 +491,7 @@ static int root_custom(ps_t *j, const char *path, const char *key,
         return 0;
     }
     if (!strcmp(key, "xmod")) {
-        /* v2 (R2): 0..MOD_SLOTS ACTIVE entries; entry i lands in slot i
+        /* v2: 0..MOD_SLOTS ACTIVE entries; entry i lands in slot i
          * (positional — xmod_elem's warg idx); absent slots stay at the
          * memset-zero OFF state of the parse-into local */
         if (walk_array(v, j, path, 0, MOD_SLOTS, xmod_elem, NULL))
@@ -684,8 +679,7 @@ static int xmod_elem(ps_t *j, const char *path, int idx,
     warg_t a = { 0, idx, 0 };
     if (walk_object(v, j, path, xmod_key, &a)) return -1;
     if (missing_keys(j, path, XMOD_KEYS, XBCOUNT - 2, a.seen)) return -1;
-    /* amount range depends on dest (key order arbitrary — post-walk;
-     * PLAN_SCHEMA_RANGE_VALIDATION.md) */
+    /* amount range depends on dest (key order arbitrary — post-walk) */
     xmod_params_t *x = &j->p.xmod[idx];
     if (x->dest == MOD_RING)
         return val_range((double)x->amount, 0.0, 100.0, j, path);

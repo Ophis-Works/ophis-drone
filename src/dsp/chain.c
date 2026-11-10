@@ -1,4 +1,4 @@
-/* src/dsp/chain.c — chain graph, per-sample render order per PLAN.md §5:
+/* src/dsp/chain.c — chain graph, per-sample render order:
  * 1. f = f_osc + Δf (own sub PITCH detune + cross-mod detune), clamped
  *    0.1 Hz–20 kHz
  * 2. main osc waveform -> x
@@ -7,10 +7,10 @@
  * 5. filter: fc = base×(1 + amt×m)×(1 + envamt/100×env), clamped
  *    30 Hz–18 kHz; Q from RES: pos = res/2 (0..50), Q = 0.5×40^(pos/50)
  *    (an active FLT_RES slot sweeps res per sample and forces the
- *    per-sample coefficient path — PLAN_OSC_NAMING.md R0c);
+ *    per-sample coefficient path);
  *    poles: 12 dB/oct (one biquad) or 24 dB/oct (two identical cascaded)
  * 6. chain level -> out
- * Contract: IMPLEMENTATION.md §2. Pure, deterministic. No SDL/ALSA. */
+ * Pure, deterministic. No SDL/ALSA. */
 #include <string.h>
 #include <math.h>
 #include <stdbool.h>
@@ -20,7 +20,7 @@
 
 #define OPHIS_2PI 6.28318530717958647692
 
-/* M-4 (PLAN_REVIEW MS4): FLT_RES Q LUT, pos = res/2 (0..50) -> Q =
+/* FLT_RES Q LUT, pos = res/2 (0..50) -> Q =
  * 0.5 × 40^(pos/50) — replaces the per-sample pow in the res_mod path.
  * Lazy fill on first use, audio thread only (single thread calls
  * chain_render; no malloc, no lock). Values are the same pow results,
@@ -60,12 +60,12 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
         c->vel = ev->vel;
     }
 
-    /* 1. frequency with cross-mod detune, PLAN §5 step 1 (subs no
-     * longer modulate — they are voices; PLAN_OPTIMIZATION.md O2) */
+    /* 1. frequency with cross-mod detune (subs no
+     * longer modulate — they are voices) */
     double f = (double)p->freq_hz + xm->detune_hz;
     double amp_mod    = xm->amp_mod;
     double filter_mod = xm->filter_mod;
-    /* PHASE (PM, approved plan change eacb368+fix): the modulator adds to
+    /* PHASE (PM): the modulator adds to
      * the carrier phase — phase += (amount/100 × pi) × m per sample, m the
      * normalized (-1..1) modulator; amount ±100 % = ±pi rad. Applied to
      * the main osc phase in step 2 below; xmod A.PHASE arrives via
@@ -87,16 +87,16 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
     /* 2. waveform. PM first: the carrier phase sees the DELTA of the
      * phase offset beta*m (beta = phase_mod × pi), so the accumulated
      * phase telescopes to theta(n) + beta*m(n) — the modulator "adds to
-     * the carrier phase" (PLAN §5) without integrating into a frequency
+     * the carrier phase" without integrating into a frequency
      * shift. osc_next advances/wraps as usual; the square duty compare
      * and the wave shape both see the shifted phase. */
     c->osc.wave = p->wave;
-    c->osc.duty = p->duty;    /* square pulse width (approved plan change) */
+    c->osc.duty = p->duty;    /* square pulse width */
     double pm_rad = phase_mod * 3.14159265358979323846;
     c->osc.phase += (pm_rad - c->last_pm_rad) / OPHIS_2PI;   /* turns */
     c->last_pm_rad = pm_rad;
     double x = osc_next(&c->osc, f, sr);
-    /* OSC SUM (Spice mixer arrangement, O2): the subs' audio joins the
+    /* OSC SUM (Spice mixer arrangement): the subs' audio joins the
      * main osc BEFORE everything downstream (mod/ADSR/filter) */
     x += sub_sum;
     c->raw_osc_out = x - sub_sum;   /* the MAIN osc only — matrix sources
@@ -110,8 +110,7 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
      * into release by passing gate=0 to adsr_next */
     int env_gate = (c->last_gate && !gate) ? 0 : gate;
     c->last_gate = gate;
-    /* ADSR mod dests (owner order 2026-11-10, PLAN_MOD_FENV_ADSR_DIV.md
-     * MS1): effective params per sample — A/D/R scale seconds by the
+    /* ADSR mod dests: effective params per sample — A/D/R scale seconds by the
      * ratio (1 + adsr_mod[i]), clamped 0..60 s; S adds points, clamped
      * 0..100 (int percent, 1-point granularity, matching the knob). All
      * fields zero reproduces the plain params exactly (bit-identical
@@ -130,10 +129,9 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
 
     /* 5. filter (coefficients updated only when fc/mode/res/poles actually
      * change). fc: xmod filter mod then ENV AMT (chain ADSR drives
-     * cutoff, PLAN §5 step 5), clamped 30 Hz–18 kHz. Q: res percent ->
+     * cutoff), clamped 30 Hz–18 kHz. Q: res percent ->
      * pos = res/2 in 0..50, Q = 0.5 × 40^(pos/50) (log 0.5..20).
-     * FLT_ENV (owner order 2026-11-10, PLAN_MOD_FENV_ADSR_DIV.md MS1):
-     * the slot adds points to the ENV AMT knob — envamt_eff = envamt +
+     * FLT_ENV: the slot adds points to the ENV AMT knob — envamt_eff = envamt +
      * 100×env_mod, clamped ±100 (like RES); env_mod == 0 keeps the
      * existing fc value exactly. */
     double envamt_eff = clampd((double)p->envamt + xm->env_mod * 100.0,
@@ -142,7 +140,7 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
               * (1.0 + envamt_eff / 100.0 * (double)env);
     fc = clampd(fc, 30.0, 18000.0);
     int poles = (p->poles == 24) ? 24 : 12;
-    /* FLT_RES (owner order 2026-11-07, PLAN_OSC_NAMING.md R0c): the slot
+    /* FLT_RES: the slot
      * sweeps the RES knob — effective percent = res + res_mod×100,
      * clamped 0..100. While a FLT_RES slot is active the Q changes per
      * sample, so the biquad coefficients recompute EVERY sample (via
@@ -170,11 +168,11 @@ double chain_render(chain_state_t *c, const chain_params_t *p,
     } else if (!fexactf((float)fc, c->last_fc) ||
         p->fmode != c->last_mode ||
         p->res != c->last_res || poles != c->last_poles) {
-        /* S2 (review): Q depends only on the res knob — computed here,
+        /* Q depends only on the res knob — computed here,
          * inside the coefficient-update branch, not per sample */
         int pos = p->res / 2;                     /* res 0..100 -> pos 0..50 */
         float q = (float)(0.5 * pow(40.0, (double)pos / 50.0));
-        /* S1 (review): when ONLY fc changed, update the coefficients and
+        /* when ONLY fc changed, update the coefficients and
          * KEEP the filter history (the ENV-driven cutoff sweeps here per
          * sample — a state-clearing set would wipe z1/z2 every sample);
          * mode/res/poles changes still take the full clearing set */

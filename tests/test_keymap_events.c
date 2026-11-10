@@ -1,6 +1,6 @@
 /* tests/test_keymap_events.c — keymap_action() event-level checks
- * (remediation F1 auto-repeat gate, F6 controller-button collision; the
- * F5 keymap_label caller-buffer contract lives in test_keymap.c).
+ * (auto-repeat gate, controller-button collision; the
+ * keymap_label caller-buffer contract lives in test_keymap.c).
  * SDL-linked: constructs SDL_Event structs directly. One source compiled
  * twice, mirroring test_keymap / test_keymap_r36s:
  *   -DTARGET_DESKTOP -> build/tests/test_keymap_events
@@ -44,7 +44,7 @@ int main(void)
     e = key_down(SDLK_SPACE, 0);
     CHECK(keymap_action(&e, &a) == 1);
     CHECK(a == ACT_RUN);
-    /* Owner-ordered desktop bindings (2026-11-05): T = TRIGGER,
+    /* Desktop bindings: T = TRIGGER,
      * Enter = CONFIRM (menu select), Space = RUN (transport only). */
     e = key_down(SDLK_t, 0);
     CHECK(keymap_action(&e, &a) == 1);
@@ -59,7 +59,7 @@ int main(void)
     CHECK(keymap_action(&e, &a) == 1);
     CHECK(a == ACT_VAL_INC);
 
-    /* F1: repeat=1 maps ONLY the VAL_INC/VAL_DEC binding; RUN/TRIGGER/
+    /* repeat=1 maps ONLY the VAL_INC/VAL_DEC binding; RUN/TRIGGER/
      * CONFIRM/MENU/TAB/NAV/SEL return 0 (no action). */
     e = key_down(SDLK_SPACE, 1);   /* RUN     */
     CHECK(keymap_action(&e, &a) == 0);
@@ -95,9 +95,9 @@ int main(void)
     e.type = SDL_KEYUP;
     CHECK(keymap_action(&e, &a) == 0);
 
-    /* value-key RELEASE ends the hold (owner order 2026-11-05): KEYUP
+    /* value-key RELEASE ends the hold: KEYUP
      * of the VAL_INC/VAL_DEC bindings -> +1/-1; other keys -> 0;
-     * controller events map nothing on desktop (F6) */
+     * controller events map nothing on desktop */
     e = key_down(SDLK_x, 0);
     e.type = SDL_KEYUP;
     CHECK(keymap_val_release(&e) == 1);
@@ -108,7 +108,7 @@ int main(void)
     e.type = SDL_CONTROLLERBUTTONUP;
     CHECK(keymap_val_release(&e) == 0);
 
-    /* F6: desktop KB_* are ophis key ids 0..11, numerically colliding
+    /* desktop KB_* are ophis key ids 0..11, numerically colliding
      * with the SDL controller button constants — a controller event
      * maps NOTHING on desktop semantics. */
     e = cbutton(SDL_CONTROLLER_BUTTON_A);         /* 0 == OPHIS_KEY_Q     */
@@ -129,7 +129,7 @@ int main(void)
 #elif defined(TARGET_R36S) || defined(TARGET_RG28XX)
 
     /* KB_* are button constants: controller events map as configured
-     * (behavior unchanged by F6). */
+     * (behavior unchanged). */
     e = cbutton(0);  CHECK(keymap_action(&e, &a) == 1); CHECK(a == ACT_RUN);
     e = cbutton(1);  CHECK(keymap_action(&e, &a) == 1); CHECK(a == ACT_TRIGGER);
     e = cbutton(2);  CHECK(keymap_action(&e, &a) == 1); CHECK(a == ACT_VAL_INC);
@@ -141,8 +141,7 @@ int main(void)
     e = cbutton(12); CHECK(keymap_action(&e, &a) == 1); CHECK(a == ACT_SEL_DOWN);
     e = cbutton(13); CHECK(keymap_action(&e, &a) == 1); CHECK(a == ACT_NAV_LEFT);
     e = cbutton(14); CHECK(keymap_action(&e, &a) == 1); CHECK(a == ACT_NAV_RIGHT);
-    e = cbutton(4);  /* Select = second MENU (owner demand 2026-11-05:
-                      * exit path without Start) */
+    e = cbutton(4);  /* Select = second MENU (an exit path without Start) */
     CHECK(keymap_action(&e, &a) == 1);
     CHECK(a == ACT_MENU);
     /* value-key RELEASE on the handheld: X(2) -> +1, Y(3) -> -1 */
@@ -158,7 +157,7 @@ int main(void)
     e = cbutton(200);
     CHECK(keymap_action(&e, &a) == 0);
 
-    /* F1 on the handheld build too (pre-existing collision semantics: a
+    /* on the handheld build too (pre-existing collision semantics: a
      * keydown resolves to OUR id and is matched against the KB_* button
      * values). repeat=1 keydown mapping to a non-VAL action -> 0; mapping
      * to VAL_INC -> 1. */

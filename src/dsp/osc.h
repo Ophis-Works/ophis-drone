@@ -1,5 +1,5 @@
 /* src/dsp/osc.h — oscillator: sine, tri, saw, square, white, pink.
- * Contract: IMPLEMENTATION.md §2. Declarations only (M1 STEP 1: tests first). */
+ * Declarations only. */
 #ifndef OPHIS_OSC_H
 #define OPHIS_OSC_H
 

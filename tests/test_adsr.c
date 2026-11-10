@@ -1,4 +1,4 @@
-/* tests/test_adsr.c — PLAN.md §10 (M1), gate-driven model:
+/* tests/test_adsr.c — gate-driven model:
  * gate rising edge -> ATTACK from current level; gate held -> A/D/S;
  * gate falling edge (from any stage) -> RELEASE to zero at exact sample
  * counts; retrigger via adsr_trigger() while held re-enters ATTACK;
@@ -107,7 +107,7 @@ int main(void)
     adsr_reset(&e);
     CHECK(fexactf(adsr_next(&e, &p, SR, 0), 0.0f));   /* reset -> idle, level 0 */
 
-    /* ---- Phase 5 item 6 (PLAN_CODE_REVIEW_FIXES.md): adsr_trigger()
+    /* ---- adsr_trigger()
      * mid-RELEASE restarts the attack EXACTLY like a gate rising edge —
      * sample-exact equality over the whole attack (both entry paths must
      * share ONE mechanism) ---- */

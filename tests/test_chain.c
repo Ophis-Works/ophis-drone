@@ -1,7 +1,7 @@
-/* tests/test_chain.c — PLAN.md §10 (M1): velocity 0 → silence;
+/* tests/test_chain.c — velocity 0 → silence;
  * trigger → audible; sub mod observable end-to-end; gate falling edge
- * → release → silence (gate-driven envelope, IMPLEMENTATION.md §2).
- * Approved plan change (commits eacb368+fix): xmod dest A.PHASE — the
+ * → release → silence (gate-driven envelope).
+ * xmod dest A.PHASE — the
  * slot's modulator adds to chain A's carrier phase, amount ±100% = ±π rad;
  * exercised end-to-end through the mixer xmod matrix (B.osc → A). */
 #include <string.h>
@@ -22,7 +22,7 @@ static chain_params_t mkchain(void)
     memset(&p, 0, sizeof p);
     p.freq_hz = 200.0;
     p.wave    = WAVE_TRIANGLE;
-    /* subs: Spice/Subharmonicon voices (O2) — level 0 = inaudible */
+    /* subs: Spice/Subharmonicon voices — level 0 = inaudible */
     p.sub[0].div = 1; p.sub[0].wave = WAVE_SINE;
     p.sub[0].duty = 50; p.sub[0].level = 0;
     p.sub[1].div = 1; p.sub[1].wave = WAVE_SINE;
@@ -80,7 +80,7 @@ int main(void)
     CHECK(base_rms > 0.05);
     CHECK(fabs(base_rate - 200.0) < 1.5);      /* sanity: rate == freq */
 
-    /* ---- SP1 (PLAN_OPTIMIZATION.md O2): the sub is an AUDIO voice —
+    /* ---- the sub is an AUDIO voice —
      * level 100, div 1, same wave/phase sums to ~2x the osc alone;
      * level 0 with a WILD sub (div 3 saw) is byte-identical to the
      * bare chain. Carrier here: 200 Hz SINE for an exact in-phase sum. */
@@ -96,7 +96,7 @@ int main(void)
     chain_run(&c, &p, &xm0, 1.0f, NC);
     CHECK(fabs(rms_steady(NC) / sine_rms - 1.0) < 1e-9);  /* silent sub */
 
-    /* ---- SP2 (PLAN_OPTIMIZATION.md O2): divider tracking — the sub
+    /* ---- divider tracking — the sub
      * plays parent_f / div. Carrier 200 Hz SAW (its harmonics are
      * 200k — 100 Hz and 50 Hz are NOT harmonics, so the sub owns the
      * probed bins). div 2 -> 100 Hz; div 4 -> 50 Hz. */
@@ -125,9 +125,9 @@ int main(void)
     /* r = 0.001 s → 44 release samples after the edge */
     CHECK(h_rms(buf + 40000, 10000) < 1e-6);
 
-    /* ---- filter expansion (PLAN §5): ENV AMT drives cutoff end-to-end.
+    /* ---- filter expansion: ENV AMT drives cutoff end-to-end.
      * Saw 200 Hz, LP fc=500; measure the 1 kHz harmonic (5th). Was the
-     * 50th (10 kHz) pre-PolyBLEP (PLAN_POLYBLEP MS1): band-limiting
+     * 50th (10 kHz) pre-PolyBLEP: band-limiting
      * pushed that measurement to the numerical floor, so the harmonic
      * bin moved into the surviving band — same property, same factors. */
     {
@@ -187,7 +187,7 @@ int main(void)
         CHECK(g24 < g12);
     }
 
-    /* ---- fc clamps to 30 Hz–18 kHz with env + mod (PLAN §5) ---- */
+    /* ---- fc clamps to 30 Hz–18 kHz with env + mod ---- */
     {
         /* high: base 15000, filter_mod ×1.2 and envamt +100 -> 36000,
          * clamped to 18000. Compare against the exact 18000 Hz filter
@@ -225,7 +225,7 @@ int main(void)
             if (!(buf[i] > -2.0 && buf[i] < 2.0)) { CHECK(0); break; }
     }
 
-    /* ---- xmod slot dest A.PHASE (PLAN §5, approved change) ----
+    /* ---- xmod slot dest A.PHASE ----
      * Slot 1: src = B.osc (raw source fed as a 30 Hz sine), dest = PHASE,
      * amount ±100/±50/0. A renders a 200 Hz sine carrier; PM by a 30 Hz
      * sine moves carrier energy into 200±30 Hz sidebands:
@@ -282,7 +282,7 @@ int main(void)
         CHECK(side_up[1] > side_up[2]);
     }
 
-    /* ---- PLAN_MOD_FENV_ADSR_DIV.md MS1: envelope-stage timing helpers.
+    /* ---- envelope-stage timing helpers.
      * first_above: first index where |buf| rises above frac × the late
      * (sustain) peak — attack timing. last_above: last index above
      * frac × the global peak — decay/release timing. ---- */
@@ -337,7 +337,7 @@ int main(void)
         CHECK(fabs(g_mod / g_ref - 1.0) < 1e-9);
     }
 
-    /* ---- ADSR consumption (owner decision: A/D/R ratio, S additive
+    /* ---- ADSR consumption (A/D/R ratio, S additive
      * points). adsr_mod[i]: 0=A 1=D 2=S 3=R. ---- */
     {
         /* first index where |buf| rises above frac × the sustain peak */
@@ -458,7 +458,7 @@ int main(void)
         }
     }
 
-    /* ---- M-4 (PLAN_REVIEW MS4): FLT_RES Q LUT — bit-exact against the
+    /* ---- FLT_RES Q LUT — bit-exact against the
      * per-sample pow expression it replaces ---- */
     {
         for (int pos = 0; pos <= 50; pos++)
@@ -466,10 +466,10 @@ int main(void)
                          0.5 * pow(40.0, (double)pos / 50.0)));
     }
 
-    /* sub RING/FM dest pins (owner order 2026-11-06) are GONE with the
-     * sub dests (O2/DP2): the matrix covers them — test_mixer pins the
+    /* sub RING/FM dest pins are GONE with the
+     * sub dests: the matrix covers them — test_mixer pins the
      * RING/MIX application, test_chain's PM pin above exercises the
-     * phase channel, test_engine_seq pins FM end-to-end (P2). */
+     * phase channel, test_engine_seq pins FM end-to-end. */
 
     HARNESS_REPORT();
 }

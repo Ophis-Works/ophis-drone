@@ -1,6 +1,6 @@
 /* src/dsp/subosc.h — sub-oscillator: an AUDIO voice at parent_f / div
- * (Spice/Subharmonicon style, PLAN_OPTIMIZATION.md O2); the chain sums
- * it by its LEVEL. Contract: IMPLEMENTATION.md §2 (amended). */
+ * (Spice/Subharmonicon style); the chain sums
+ * it by its LEVEL. */
 #ifndef OPHIS_SUBOSC_H
 #define OPHIS_SUBOSC_H
 

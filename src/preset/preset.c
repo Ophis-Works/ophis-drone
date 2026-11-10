@@ -1,11 +1,10 @@
-/* src/preset/preset.c — preset file I/O over preset/schema.c
- * (IMPLEMENTATION.md §2,
- * §7). All functions take explicit dirs (testable). Name rules: 1..32
+/* src/preset/preset.c — preset file I/O over preset/schema.c.
+ * All functions take explicit dirs (testable). Name rules: 1..32
  * chars from [A-Za-z0-9 _-]; reject empty, ".", "..", "/", length > 32,
  * bad chars; stored as <name>.json. preset.c uses only C stdio + mkdir(2)
  * (EEXIST tolerated). Also the LOAD folder navigator
  * contracts: preset_list_dirs (subdirs + "..", alphabetical) and
- * preset_path (resolve dir/name) per the amended IMPLEMENTATION.md §2.*/
+ * preset_path (resolve dir/name). */
 #include "preset.h"
 #include "schema.h"
 
@@ -54,7 +53,7 @@ static int build_path(char *out, int out_len, const char *dir,
  * no env var, no HOME, no fallbacks. Normal case: /proc/self/exe always
  * resolves and is absolute. Guards below cover the impossible-but-UB
  * paths (readlink failure, truncation, bad args) — they return -1, they
- * never read or write garbage (PLAN_PRESET_DIR_REVIEW_FIXES.md B1..B4). */
+ * never read or write garbage. */
 int preset_dir(char *out, int out_len)
 {
     if (!out || out_len <= 0) return -1;
@@ -88,7 +87,7 @@ int preset_list(const char *dir, char names[][33], int *count, int max)
         if (*count >= max) break;
         memcpy(names[*count], e->d_name, len - 5);
         names[*count][len - 5] = '\0';
-        /* H-1/L-3: reject over-long or dotted base names (name_ok is the
+        /* reject over-long or dotted base names (name_ok is the
          * single name contract); skip before counting */
         if (!name_ok(names[*count]))
             continue;
@@ -100,7 +99,7 @@ int preset_list(const char *dir, char names[][33], int *count, int max)
     return 0;
 }
 
-/* mkdir -p equivalent (IMPLEMENTATION.md §7, F1a user order 2026-11-05):
+/* mkdir -p equivalent:
  * create every missing path prefix, EEXIST tolerated. LOAD opens the
  * presets dir through this, so a fresh install finds an empty-but-
  * existing folder. Returns 0, or -1 (NULL/empty, too long, a prefix
@@ -138,7 +137,7 @@ int preset_save(const char *dir, const char *name, const synth_params_t *p,
     int n = schema_write_params(buf, sizeof buf, p);
     if (n < 0) return set_err(err, err_len, "params do not fit preset JSON");
 
-    /* M-3: write <path>.tmp, flush+fsync, then rename — a crash mid-save
+    /* write <path>.tmp, flush+fsync, then rename — a crash mid-save
      * leaves the old preset intact, never a torn file at the final path */
     char tmp[1040];
     int tn = snprintf(tmp, sizeof tmp, "%s.tmp", path);
@@ -175,7 +174,7 @@ int preset_load(const char *dir, const char *name, synth_params_t *p,
     /* L-7: plain local — no shared static state; call depth is shallow */
     char buf[65536];
     size_t got = fread(buf, 1, sizeof buf, f);
-    /* M-2: buffer filled and one more byte remains -> file is oversize;
+    /* buffer filled and one more byte remains -> file is oversize;
      * reject instead of parsing truncated leading JSON */
     int oversize = (got == sizeof buf) && (fgetc(f) != EOF);
     int read_err = ferror(f);
@@ -195,7 +194,7 @@ int preset_load(const char *dir, const char *name, synth_params_t *p,
     return 0;
 }
 
-/* LOAD folder navigator (PLAN §8.4): subdirectories of dir + "..",
+/* LOAD folder navigator: subdirectories of dir + "..",
  * alphabetically. Entry names have no trailing "/" (the UI adds the
  * suffix when drawing). Files are NOT listed here — preset_list covers
  * *.json; the navigator merges both lists. */
@@ -228,7 +227,7 @@ int preset_list_dirs(const char *dir, char names[][33], int *count, int max)
         (*count)++;
     }
     closedir(d);
-    /* ".." always present (go up one level, PLAN §8.4), sorted in */
+    /* ".." always present (go up one level), sorted in */
     if (*count < max) {
         memcpy(names[*count], "..", 3);
         (*count)++;
@@ -240,7 +239,7 @@ int preset_list_dirs(const char *dir, char names[][33], int *count, int max)
 
 /* Resolve <dir>/<name> for the navigator (entering a listed entry,
  * including ".."). The joined path is lexically normalized by a single
- * dir walk (X2, PLAN_CODE_REVIEW_FIXES.md Phase 8): components are
+ * dir walk: components are
  * consumed left to right and the normalized result is written as we go —
  * "" and "." components drop, ".." unwinds the last written component
  * (clamped at "/" for absolute paths; kept as a literal component when a

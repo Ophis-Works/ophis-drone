@@ -1,9 +1,8 @@
 /* src/ui/ui_internal.h — PRIVATE interface between the ui.c translation
- * units (X3, PLAN_CODE_REVIEW_FIXES.md Phase 8 — pure structure, no
- * behavior change). ui.c keeps the state machine (tabs, focus, cursor,
+ * units. ui.c keeps the state machine (tabs, focus, cursor,
  * value edits, event routing), ui_menu.c the menu/dialog logic
- * (PLAN §8.4: NEW/SAVE/LOAD/confirm/quit windows), ui_draw.c the
- * rendering (PLAN §8.6). The public API stays ui.h; everything declared
+ * (NEW/SAVE/LOAD/confirm/quit windows), ui_draw.c the
+ * rendering. The public API stays ui.h; everything declared
  * here is internal to src/ui and must not be used outside it. The shared
  * helpers keep their pre-split names (they were static in ui.c). */
 #ifndef OPHIS_UI_INTERNAL_H
@@ -28,24 +27,24 @@ item_t    content_item(const ui_t *ui, int i); /* flat item i (binds the
 int       item_dim(const ui_t *ui, item_t it);
 void      edit_item(ui_t *ui, item_t it, int dir);   /* one edit step   */
 
-/* --- PLAN_HZ_EDIT.md: the 5-digit odometer boxes (R1) ----------------
+/* --- the 5-digit odometer boxes ---------------------------------------
  * The digit-box rows (digit cursor ui_t.freq_digit + the drawn digit
- * marker) are a SPEC property: item_spec(id)->nav == NAV_DIGITS (R12a,
- * seq_items.h); there is no id-list predicate. ---- */
+ * marker) are a SPEC property: item_spec(id)->nav == NAV_DIGITS
+ * (seq_items.h); there is no id-list predicate. ---- */
 
-/* R13 (PLAN_HZ_EDIT.md): the digit-marker gate, shared by ui_draw.c's
+/* the digit-marker gate, shared by ui_draw.c's
  * two draw paths — true iff `it` IS the cursor row AND the focus is on
  * the content (OSC tabs: ui->focus[chain_of(ui)] != 0; MOD/MASTER have
  * no sub-tab row -> always content) AND !item_dim AND the spec nav
  * mode == NAV_DIGITS. The row highlight keeps its own sel condition. */
 int       ui_digit_marker_active(const ui_t *ui, item_t it);
 
-/* --- M1 (PLAN_OPTIMIZATION.md O6): the value-key state machine
+/* --- the value-key state machine
  * (valrepeat.c) -------------------------------------------------------- */
 void      val_edit(ui_t *ui, int dir, Uint32 now);
 void      valrepeat_tick(ui_t *ui, Uint32 now);
 
-/* --- D3 (PLAN_OPTIMIZATION.md O4): the member accessors under the
+/* --- the member accessors under the
  * spec table — one switch on param_kind_t each ------------------------- */
 double param_get(const synth_params_t *d, param_kind_t kind, int ci,
                  int si);
@@ -54,7 +53,7 @@ void   param_set(synth_params_t *d, param_kind_t kind, int ci, int si,
 
 /* --- value formatting (ui_draw.c) -------------------------------------- */
 
-/* the item's value string for display (PLAN_WAVE_DISPLAY.md P1: hoisted
+/* the item's value string for display (hoisted
  * out of ui_draw.c's static scope so the enum-row pins can call it) */
 void item_value(const ui_t *ui, item_t it, char *b, size_t blen);
 

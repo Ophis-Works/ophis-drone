@@ -1,5 +1,5 @@
-/* tests/test_engine.c — M4 integration test (PLAN §10, IMPLEMENTATION.md
- * §8 M4). The ONLY test linking ALSA: renders through alsa_pcm on device
+/* tests/test_engine.c — integration test. The ONLY test linking ALSA:
+ * renders through alsa_pcm on device
  * "null", 44100 Hz, period 256.
  * Checks:
  *   - engine running (RUN on) -> non-silent output (RMS > 1e-4)
@@ -94,7 +94,7 @@ int main(void)
     CHECK(r < 1e-5);
     CHECK(e.p.run == 0);                     /* panic clears RUN */
 
-    /* 3a. H3: RUN belongs to the mailbox (the UI owns RUN). A panic block
+    /* 3a. RUN belongs to the mailbox (the UI owns RUN). A panic block
      * zeroes e.p.run as a ONE-BLOCK guard only; the next block's run is
      * exactly what the mailbox snapshot holds — the engine never persists
      * a forced run-off (after PANIC the UI commits draft.run = 0, so the
@@ -140,8 +140,8 @@ int main(void)
     run_blocks(&e, pcm, BLOCKS(1), 1, 0, 0);
     e.p.delay.mix = 0;
 
-    /* 3c. safety on attenuates a 60 Hz drone end-to-end (owner-ordered
-     * FX amendment: safety = HP 60 Hz + LP 18 kHz in the master path). */
+    /* 3c. safety on attenuates a 60 Hz drone end-to-end
+     * (safety = HP 60 Hz + LP 18 kHz in the master path). */
     {
         double amp_on, amp_off;
         engine_init(&e, (double)SR);

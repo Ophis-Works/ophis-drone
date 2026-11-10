@@ -1,5 +1,5 @@
-/* src/ui/font8x8.h — embedded bitmap font (PLAN.md §8.6 AMENDED, owner
- * order: letters +2 pts). Glyphs render in 10x10 cells — a per-pixel
+/* src/ui/font8x8.h — embedded bitmap font (letters +2 pts). Glyphs render
+ * in 10x10 cells — a per-pixel
  * scale of the embedded 8x8 face; a "line" = 10 px. SDL-free on purpose
  * so the test harness (tests/test_font.c) needs no SDL. */
 #ifndef OPHIS_FONT8X8_H

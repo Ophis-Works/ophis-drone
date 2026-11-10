@@ -1,12 +1,12 @@
-/* src/seq/sequencer.c — sample-clock driven sequencer (PLAN §6,
- * IMPLEMENTATION.md §2). Pure: sample time in, step index out. No timers,
+/* src/seq/sequencer.c — sample-clock driven sequencer.
+ * Pure: sample time in, step index out. No timers,
  * no SDL/ALSA. Ticked by the engine only while RUN is ON.
- * Owner-ordered modes amendment (PLAN §6): step ORDER per p->mode
+ * Step ORDER per p->mode
  * (fwd/pingpong/oddeven/random/markov) and the ONCE option (loop/once).
  * random/markov use a per-instance xoshiro256** PRNG seeded via
- * splitmix64 — the shared dsp/prng.{h,c} module (Phase 5 item 1), the
+ * splitmix64 — the shared dsp/prng.{h,c} module, the
  * same generator osc.c uses (no rand(), deterministic).
- * BPM is GLOBAL (AMENDED, owner order, PLAN §6): no per-seq bpm — the
+ * BPM is GLOBAL: no per-seq bpm — the
  * global tempo arrives as the `bpm` argument of seq_tick. */
 #include "seq/sequencer.h"
 
@@ -33,14 +33,14 @@ void seq_reset(seq_state_t *s)
     s->next_step_time = 0.0;   /* first boundary fires at now >= 0 */
 }
 
-/* next step index per mode (PLAN §6); updates the order state */
+/* next step index per mode; updates the order state */
 static int next_index(seq_state_t *s, int mode)
 {
     static const int ODDEVEN[8] = { 0, 2, 4, 6, 1, 3, 5, 7 };
     int idx;
     switch (mode) {
     case 1:                                     /* pingpong */
-        /* 0..7 then 7..0, bouncing (PLAN §6): the turn emits the edge
+        /* 0..7 then 7..0, bouncing: the turn emits the edge
          * step 7 again, and the bottom turn resumes at 1 */
         idx = s->cursor;
         s->cursor += s->dir;
@@ -76,15 +76,15 @@ int seq_tick(seq_state_t *s, const seq_params_t *p, int bpm, double now,
 {
     (void)sr;                  /* times are in seconds; sr unused here */
     if (!p->on)
-        return -1;             /* sequencer disabled -> no events (PLAN §6) */
+        return -1;             /* sequencer disabled -> no events */
 
     double period = 60.0 / (double)bpm / 4.0 * (double)p->div;
-    /* bpm: the GLOBAL tempo argument (AMENDED, owner order, PLAN §6);
+    /* bpm: the GLOBAL tempo argument;
      * div = 1 -> 16th notes; a div change takes effect like a tempo
-     * change (pending boundary keeps its scheduled period — PLAN §6) */
+     * change (pending boundary keeps its scheduled period) */
 
     if (now >= s->next_step_time) {
-        /* once mode (PLAN §6): after one pass (8 emitted steps) the
+        /* once mode: after one pass (8 emitted steps) the
          * sequencer is silent until restarted (seq_reset by the engine on
          * RUN off->on, seq off->on, or PANIC). Time is left where it is —
          * after a restart the first boundary fires immediately. */

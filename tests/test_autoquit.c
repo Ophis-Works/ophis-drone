@@ -1,4 +1,4 @@
-/* tests/test_autoquit.c — PLAN_CODE_REVIEW_FIXES.md Phase 6 P3: the
+/* tests/test_autoquit.c — the
  * OPHIS_AUTOQUIT_MS parse helper (SDL-free) — strtol with validation:
  * full-consumption decimal, junk rejected, sane range (24 h) clamped. */
 #include "harness.h"

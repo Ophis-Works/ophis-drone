@@ -1,6 +1,5 @@
 /* src/preset/schema_priv.h — PRIVATE interface between the preset
- * schema TUs (M2 split, PLAN_OPTIMIZATION.md O5). Nothing here is used
- * outside src/preset/. */
+ * schema TUs. Nothing here is used outside src/preset/. */
 #ifndef OPHIS_SCHEMA_PRIV_H
 #define OPHIS_SCHEMA_PRIV_H
 

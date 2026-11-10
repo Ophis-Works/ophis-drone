@@ -1,6 +1,5 @@
-/* src/app/autoquit.c — see autoquit.h (P3, PLAN_CODE_REVIEW_FIXES.md
- * Phase 6): strtol with full-consumption validation replacing the bare
- * atoi() on OPHIS_AUTOQUIT_MS. */
+/* src/app/autoquit.c — see autoquit.h: strtol with full-consumption
+ * validation replacing the bare atoi() on OPHIS_AUTOQUIT_MS. */
 #include "autoquit.h"
 
 #include <ctype.h>
