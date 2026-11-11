@@ -324,8 +324,8 @@ bottom of every screen shows the keymap in effect; a status strip at the top
 shows the centered OPHIS DRONE title, RUN state, gate value,
 TRIGGER/PANIC flashes, the live envelope bar
 (chain tabs) and the live sequencer step cursor (SEQ pages). R36S bindings
-are the proposed values in <code>src/config.h</code> and must be verified
-against the physical device — see <code>CHECKLIST_R36S.md</code>.</p>
+are the values in <code>src/config.h</code> and must be verified against
+the physical device.</p>
 
 <h2>3. Installation</h2>
 
@@ -343,10 +343,7 @@ changes into its own directory and execs the binary. No WiFi is assumed —
 transfer via SD card or USB OTG. Presets are written to
 <code>presets/</code> beside the executable on the device. Presets saved
 under the old <code>$HOME/ophis-drone/presets</code> location remain
-reachable via the LOAD navigator's <code>..</code> traversal. Acceptance
-questions
-(video driver, audio device, buttons, preset persistence) are in
-<code>CHECKLIST_R36S.md</code>.</p>
+reachable via the LOAD navigator's <code>..</code> traversal.</p>
 
 <h3>Desktop</h3>
 <p>Run the prebuilt binary <code>build/desktop/ophis-drone</code>, or build
@@ -369,6 +366,9 @@ archive.</p>
 <tr><td><code>make</code> (default <code>all</code>)</td><td><code>build/desktop/ophis-drone</code> — native desktop build, <code>-DTARGET_DESKTOP</code></td></tr>
 <tr><td><code>make test</code></td><td>builds and runs all 16 unit test binaries under <code>build/tests/</code>, prints <code>TOTAL: N/M passed</code> (all DSP/seq/preset tests are SDL-free; only <code>test_engine</code> links ALSA, on device <code>"null"</code>)</td></tr>
 <tr><td><code>make handheld</code></td><td><code>build/r36s/ophis-drone</code> (aarch64, <code>-DTARGET_R36S</code>) plus the deploy layout and <code>build/deploy/ophis-drone-r36s.zip</code></td></tr>
+<tr><td><code>make rg28xx</code></td><td><code>build/rg28xx/ophis-drone</code> (aarch64, <code>-DTARGET_RG28XX</code>) plus the deploy layout and <code>build/deploy/ophis-drone-rg28xx.zip</code></td></tr>
+<tr><td><code>make desktop</code></td><td>desktop release archive <code>build/deploy/ophis-drone-desktop.tar.gz</code> (binary, presets, MANUAL.md)</td></tr>
+<tr><td><code>make bench</code></td><td>render benchmark, prints µs/block for the default and saw/square-heavy parameter sets</td></tr>
 <tr><td><code>make clean</code></td><td>removes <code>build/</code></td></tr>
 </table>
 
@@ -398,9 +398,9 @@ contents so <code>ports/</code> sits at the SD <code>roms/</code> root
 
 <h2>5. On-device verification</h2>
 <p>On-device behavior (Ports menu visibility, launch, video driver, audio,
-button mapping, preset save/load, stability) is manual and covered by the
-question checklist in <code>CHECKLIST_R36S.md</code>; it is not
-machine-verified. The machine-verified part is the host gate in
+button mapping, preset save/load, stability) is manual — verify by
+launching on the physical device; it is not machine-verified. The
+machine-verified part is the host gate in
 <code>tools/handheld_gate.sh</code> and the desktop zero-xrun test
 (<code>make test</code>, <code>test_engine</code>).</p>
 

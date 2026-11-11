@@ -71,12 +71,17 @@ make desktop    # also package build/deploy/ophis-drone-desktop.tar.gz
 You need gcc, make, and the SDL2 + ALSA dev packages (pkg-config names:
 `sdl2`, `alsa`).
 
-Handhelds are cross-compiled from the same source:
+Handhelds are cross-compiled from the same source with
+[zig](https://ziglang.org) (0.14+):
 
 ```
-make handheld   # R36S binary + zip (needs zig, arm64 SDL2/ALSA)
+make handheld   # R36S binary + zip
 make rg28xx     # RG28XX binary + zip
 ```
+
+The handheld builds additionally need the arm64 SDL2 + ALSA dev packages
+via multiarch (`libsdl2-dev:arm64`, `libasound2-dev:arm64` under
+`/usr/lib/aarch64-linux-gnu`) and `zip`.
 
 Both handheld builds run a gate (`tools/handheld_gate.sh`) that fails the
 build unless the binary runs against glibc 2.28 or older, so it works on
