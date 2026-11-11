@@ -42,71 +42,71 @@ build/desktop/ophis-drone: $(SRC_APP) src/config.h $(AUDIO_SRC) $(UI_SRC) \
 	    $(UI_SRC) $(DSP_SRC) $(SEQ_SRC) $(PRESET_SRC) $(DEPS) \
 	    -Wl,-z,relro,-z,now -lpthread -lm -o $@
 
-build/desktop build/r36s build/tests build/r36s/obj/compat \
-build/rg28xx build/rg28xx/obj/compat build/deploy/ports \
+build/desktop build/r36s build/tests \
+build/rg28xx build/deploy/ports \
 build/deploy/Roms/PORTS:
 	mkdir -p $@
 
 # --- handheld (R36S) --------------------------------------------------------
-# Build ON THE HOST with aarch64-linux-gnu-gcc; glibc-2.28 target met with
-# symbol pinning, not static linking / container:
-#   - fully dynamic link against arm64 SDL2/ALSA (/usr/lib/aarch64-linux-gnu);
-#   - pow/log2/pthread_create/pthread_join wrapped to GLIBC_2.17 aliases
-#     (src/compat/glibc_symver.c, -Wl,--wrap);
-#   - custom crt0.s pins __libc_start_main@GLIBC_2.17 (-nostartfiles);
+# Build ON THE HOST with zig cc targeting glibc 2.28 exactly (ArkOS/R36S
+# firmware): zig supplies crt1.o and the glibc 2.28 symbol stubs; no crt0,
+# no symbol pinning, no -Wl,--wrap. Fully dynamic link against the arm64
+# SDL2/ALSA shared libraries already present in /usr/lib/aarch64-linux-gnu
+# (zig cc ships glibc, not SDL). /usr/include/aarch64-linux-gnu is added to
+# the include path: Debian's SDL_config.h indirection (_real_SDL_config.h)
+# lives there, and zig cc lacks the cross-gcc default include path.
 #   - GATE (tools/handheld_gate.sh): readelf -V must show no required glibc
 #     version above GLIBC_2.28 and file must say aarch64 ELF.
 # Outputs: build/r36s/ophis-drone, build/deploy/ports/ layout and
 # build/deploy/ophis-drone-r36s.zip (build/ is gitignored).
-CROSS       = aarch64-linux-gnu-gcc
-HCFLAGS     = -std=c23 -O2 $(WARNFLAGS) -D_POSIX_C_SOURCE=200809L \
-              -fstack-protector-strong -D_FORTIFY_SOURCE=2 \
-              -Isrc -isystem third_party -isystem /usr/include/SDL2
+CROSS       = zig cc
+HTARGET     = aarch64-linux-gnu.2.28
+# -Wno-enum-enum-conversion: clang-only default warning (not in WARNFLAGS);
+# TAB_COUNT * SUB_COUNT mixes the two tab enums by design.
+# -Wno-sign-conversion: zig cc's clang flags enum<->int conversions gcc does
+# not (ui.c xmod dest); clang's -Wconversion implies sign-conversion, so the
+# negative flag is needed even though -Wsign-conversion is absent. Handheld
+# rules only; gcc keeps -Wsign-conversion.
+# -Wno-missing-field-initializers: clang warns on designated initializers
+# that omit trailing fields (seq_items.c item table); gcc does not.
+HCFLAGS     = -target $(HTARGET) -std=c23 -O2 $(WARNFLAGS) \
+              -Wno-enum-enum-conversion -Wno-sign-conversion \
+              -Wno-missing-field-initializers \
+              -D_POSIX_C_SOURCE=200809L \
+              -Isrc -isystem third_party -isystem /usr/include/SDL2 \
+              -isystem /usr/include/aarch64-linux-gnu \
+              -isystem /usr/include
 HANDHELD_SRC = $(SRC_APP) $(AUDIO_SRC) $(UI_SRC) $(DSP_SRC) $(SEQ_SRC) \
-               $(PRESET_SRC) src/compat/glibc_symver.c
-HANDHELD_OBJ = $(patsubst src/%.c,build/r36s/obj/%.o,$(HANDHELD_SRC)) \
-               build/r36s/obj/compat/crt0.o
-RG28XX_OBJ   = $(patsubst src/%.c,build/rg28xx/obj/%.o,$(HANDHELD_SRC)) \
-               build/rg28xx/obj/compat/crt0.o
+               $(PRESET_SRC)
+HANDHELD_OBJ = $(patsubst src/%.c,build/r36s/obj/%.o,$(HANDHELD_SRC))
+RG28XX_OBJ   = $(patsubst src/%.c,build/rg28xx/obj/%.o,$(HANDHELD_SRC))
 ARM64_LIB   = /usr/lib/aarch64-linux-gnu
 DEPLOY      = build/deploy
 
 handheld: build/r36s/ophis-drone $(DEPLOY)/ophis-drone-r36s.zip
 
-build/r36s/ophis-drone: $(HANDHELD_OBJ) | build/r36s/obj/compat
-	$(CROSS) -nostartfiles -no-pie $(HANDHELD_OBJ) -L$(ARM64_LIB) \
-	    -Wl,--wrap=pow,--wrap=log2,--wrap=exp,--wrap=pthread_create,--wrap=pthread_join \
-	    -Wl,--no-as-needed \
-	    -lSDL2 -lasound -lm -lpthread -ldl \
-	    $(ARM64_LIB)/libpthread.so.0 -o $@
+build/r36s/ophis-drone: $(HANDHELD_OBJ) | build/r36s
+	$(CROSS) -target $(HTARGET) $(HANDHELD_OBJ) -L$(ARM64_LIB) \
+	    -lSDL2 -lasound -lm -lpthread -ldl -o $@
 	tools/handheld_gate.sh $@
 
 build/r36s/obj/%.o: src/%.c
 	@mkdir -p $(@D)
 	$(CROSS) $(HCFLAGS) -DTARGET_R36S -c $< -o $@
 
-build/r36s/obj/compat/crt0.o: src/compat/crt0.s | build/r36s/obj/compat
-	$(CROSS) -c $< -o $@
-
 # --- RG28XX (Allwinner H700, EmuELEC-family firmware) -----------------------
 # Own compile target: -DTARGET_RG28XX (portrait-panel rendering, H700 pad
-# self-mapping, separate binary and zip). Same glibc pinning as the R36S.
+# self-mapping, separate binary and zip). Same zig cc glibc 2.28 target.
 rg28xx: build/rg28xx/ophis-drone $(DEPLOY)/ophis-drone-rg28xx.zip
 
-build/rg28xx/ophis-drone: $(RG28XX_OBJ) | build/rg28xx/obj/compat
-	$(CROSS) -nostartfiles -no-pie $(RG28XX_OBJ) -L$(ARM64_LIB) \
-	    -Wl,--wrap=pow,--wrap=log2,--wrap=exp,--wrap=pthread_create,--wrap=pthread_join \
-	    -Wl,--no-as-needed \
-	    -lSDL2 -lasound -lm -lpthread -ldl \
-	    $(ARM64_LIB)/libpthread.so.0 -o $@
+build/rg28xx/ophis-drone: $(RG28XX_OBJ) | build/rg28xx
+	$(CROSS) -target $(HTARGET) $(RG28XX_OBJ) -L$(ARM64_LIB) \
+	    -lSDL2 -lasound -lm -lpthread -ldl -o $@
 	tools/handheld_gate.sh $@
 
 build/rg28xx/obj/%.o: src/%.c
 	@mkdir -p $(@D)
 	$(CROSS) $(HCFLAGS) -DTARGET_RG28XX -c $< -o $@
-
-build/rg28xx/obj/compat/crt0.o: src/compat/crt0.s | build/rg28xx/obj/compat
-	$(CROSS) -c $< -o $@
 
 # Deploy staging: program folder ports/ophis-drone/ with the binary, and the
 # executable launcher ports/Ophis-Drone.sh OUTSIDE the folder (EmulationStation
