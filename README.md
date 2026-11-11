@@ -74,7 +74,7 @@ You need gcc, make, and the SDL2 + ALSA dev packages (pkg-config names:
 Handhelds are cross-compiled from the same source:
 
 ```
-make handheld   # R36S binary + zip (needs aarch64-linux-gnu-gcc, arm64 SDL2/ALSA)
+make handheld   # R36S binary + zip (needs zig, arm64 SDL2/ALSA)
 make rg28xx     # RG28XX binary + zip
 ```
 

@@ -25,11 +25,9 @@
 <body>
 
 <h1>ophis-drone</h1>
-<p>User manual. Sources: <code>PLAN.md</code> (binding design),
-<code>IMPLEMENTATION.md</code>, <code>src/config.h</code>,
+<p>User manual. Sources: <code>src/config.h</code>,
 <code>src/ui/ui.c</code>, <code>src/dsp/</code>, <code>src/preset/schema.c</code>,
-<code>Makefile</code>, <code>BUILD_NOTES.md</code>,
-<code>CHECKLIST_R36S.md</code>.</p>
+<code>Makefile</code>.</p>
 
 <h2>1. What it is</h2>
 <p>ophis-drone is a three-chain drone synthesizer for Linux, written in C11
@@ -358,10 +356,8 @@ from source with <code>make</code> (§4). ALSA is the mandatory audio backend.</
 
 <h3>Requirements</h3>
 <p><strong>Desktop:</strong> gcc, make, SDL2 and ALSA development packages
-(<code>pkg-config</code> must find <code>sdl2</code> and <code>alsa</code>;
-measured at M0: SDL 2.32.10, alsa 1.2.15.3), plus <code>zip</code> is not
-needed for desktop. <strong>Handheld:</strong> the
-<code>aarch64-linux-gnu-gcc</code> cross toolchain plus the arm64 SDL2/ALSA
+(<code>pkg-config</code> must find <code>sdl2</code> and <code>alsa</code>).
+<strong>Handheld:</strong> <code>zig</code> (0.14+) plus the arm64 SDL2/ALSA
 libraries and headers installed via multiarch
 (<code>libsdl2-dev:arm64</code>, <code>libasound2-dev:arm64</code> under
 <code>/usr/lib/aarch64-linux-gnu</code>), and <code>zip</code> for the deploy
@@ -378,19 +374,15 @@ archive.</p>
 
 <h3>The GLIBC ≤ 2.28 gate</h3>
 <p>ArkOS userspace derives from Ubuntu 19.10 (glibc&nbsp;2.28). The handheld
-build links fully dynamically against the arm64 SDL2/ALSA but pins the
-symbols a modern host toolchain would bind too new:
-<code>src/compat/glibc_symver.c</code> provides <code>.symver</code> aliases
-for <code>pow</code>, <code>log2</code> (@GLIBC_2.29→2.17) and
-<code>pthread_create</code>, <code>pthread_join</code> (@GLIBC_2.34→2.17),
-redirected with <code>-Wl,--wrap</code>; <code>src/compat/crt0.s</code>
-replaces the toolchain start file (<code>-nostartfiles</code>) so
-<code>__libc_start_main</code> is required at @GLIBC_2.17.
-<code>tools/handheld_gate.sh</code>, run automatically at the end of
-<code>make handheld</code>, machine-checks the result: the binary must be an
-aarch64 ELF and <code>readelf -V</code> must show no required glibc version
-above GLIBC_2.28. Measured output (BUILD_NOTES.md): max required version
-GLIBC_2.17. Details in <code>BUILD_NOTES.md</code>.</p>
+builds are cross-compiled with <code>zig cc -target
+aarch64-linux-gnu.2.28</code>, which selects glibc 2.28 headers, start
+files and symbol versions directly — the binaries link dynamically against
+the arm64 SDL2/ALSA and require no glibc symbol above 2.28 by
+construction. <code>tools/handheld_gate.sh</code>, run automatically at the
+end of <code>make handheld</code> / <code>make rg28xx</code>,
+machine-checks the result: the binary must be an aarch64 ELF and
+<code>readelf -V</code> must show no required glibc version above
+GLIBC_2.28.</p>
 
 <h3>Deploy outputs</h3>
 <p><code>make handheld</code> stages:</p>
